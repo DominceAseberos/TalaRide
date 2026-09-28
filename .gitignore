@@ -50,3 +50,9 @@ yarn-error.*
 /supabase/.branches/
 
 .idea/
+
+# Turborepo and Next.js
+.turbo/
+.next/
+out/
+
