@@ -4,6 +4,8 @@
 
 This project implements the full **TalaRide MVP Application Plan** (Sections 1 through 43).
 
+📖 **Detailed Documentation**: See [PROJECT_GOALS_AND_MOBILE_ARCHITECTURE.md](./PROJECT_GOALS_AND_MOBILE_ARCHITECTURE.md) for the complete breakdown of project goal objects, entity relationships, sequence flows, and native mobile OS integrations.
+
 As requested, the repository is architected into **two completely separate, independently deployable folders**:
 
 ```text
