@@ -1,6 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Loader2, ArrowLeft, Banknote, AlertTriangle, ShieldCheck } from 'lucide-react';
+import {
+  ArrowLeft,
+  Banknote,
+  CheckCircle2,
+  Loader2,
+  ShieldCheck
+} from 'lucide-react';
 import { Payment } from '../../types';
 import { api, connectSSE, getWebPaymentMode } from '../../services/api';
 import { playPaymentChime } from '../../utils/audio';
@@ -24,19 +30,20 @@ export const DriverQRScreen: React.FC<Props> = ({
   onCancel,
   onSwitchToCash
 }) => {
+  const isMock = getWebPaymentMode() === 'mock';
   const [payment, setPayment] = useState<Payment | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isMock);
   const [timeLeft, setTimeLeft] = useState(300);
   const [simulating, setSimulating] = useState(false);
   const [paymentError, setPaymentError] = useState('');
 
-  const isMock = getWebPaymentMode() === 'mock';
-
-  // 1. Generate QR on mount
   useEffect(() => {
+    if (!isMock) return;
+
     let mounted = true;
     const generateQR = async () => {
       setLoading(true);
+      setPaymentError('');
       try {
         const res = await api.createPaymentQR(driverId, vehicleId, fareAmount, isCustom);
         if (mounted && res.success) {
@@ -45,42 +52,38 @@ export const DriverQRScreen: React.FC<Props> = ({
           setTimeLeft(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)));
         }
       } catch (err: any) {
-        console.error('Failed to create payment QR', err);
-        setPaymentError('Could not connect to payment gateway. Please switch to cash.');
+        console.error('Failed to create demo payment QR', err);
+        if (mounted) setPaymentError('Could not create the demo payment QR.');
       } finally {
         if (mounted) setLoading(false);
       }
     };
-    generateQR();
 
+    void generateQR();
     return () => {
       mounted = false;
     };
-  }, [driverId, vehicleId, fareAmount, isCustom]);
+  }, [driverId, vehicleId, fareAmount, isCustom, isMock]);
 
-  // 2. Countdown timer
   useEffect(() => {
-    if (timeLeft <= 0) return;
-    const timer = setInterval(() => setTimeLeft((t) => t - 1), 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft]);
+    if (!isMock || timeLeft <= 0) return;
+    const timer = window.setInterval(() => setTimeLeft((value) => value - 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [isMock, timeLeft]);
 
-  // 3. Listen for SSE / Broadcast payment confirmation
   useEffect(() => {
     const cleanup = connectSSE({
       driverId,
       onPaymentConfirmed: (data) => {
-        if (!payment || data.paymentId === payment.payment_id) {
+        if (!payment || data.paymentId === payment.payment_id || !isMock) {
           playPaymentChime();
           onPaymentSuccess(data);
         }
       }
     });
-
     return () => cleanup();
-  }, [driverId, payment, onPaymentSuccess]);
+  }, [driverId, payment, isMock, onPaymentSuccess]);
 
-  // 4. Quick Simulator trigger
   const handleSimulatePayment = async (provider: 'gcash' | 'maya' | 'gotyme') => {
     if (!payment || !isMock) return;
     setSimulating(true);
@@ -108,62 +111,68 @@ export const DriverQRScreen: React.FC<Props> = ({
 
   return (
     <div className="min-h-full flex flex-col justify-between p-4 bg-slate-950 text-white select-none">
-      {/* Top Bar */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <button
           onClick={onCancel}
           className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white p-1 rounded-lg"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Cancel</span>
+          <span>Back</span>
         </button>
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs font-bold text-emerald-400">{vehicleId}</span>
-          <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full font-mono">
-            {minutes}:{seconds}
+          <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full font-bold">
+            {isMock ? minutes + ':' + seconds : 'PERMANENT QR'}
           </span>
         </div>
       </div>
 
-      {/* Main QR Card */}
-      <div className="my-auto py-2 flex flex-col items-center text-center space-y-3">
-        {loading ? (
+      <div className="my-auto py-5 flex flex-col items-center text-center space-y-4">
+        {!isMock ? (
+          <>
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+              <ShieldCheck className="w-8 h-8 text-emerald-400" />
+            </div>
+            <div>
+              <div className="text-xl font-black">Use the permanent vehicle sticker</div>
+              <p className="mt-2 text-sm text-slate-400 max-w-sm">
+                Passengers scan the fixed QR on the tricycle. TalaRide verifies the active driver,
+                then the passenger chooses or enters the fare and selects a payment method on their
+                own phone.
+              </p>
+            </div>
+            <div className="w-full max-w-sm rounded-2xl border border-emerald-800 bg-emerald-950/30 p-4 text-left">
+              <div className="flex items-center gap-2 text-emerald-300 font-bold text-sm">
+                <CheckCircle2 className="w-4 h-4" />
+                Live payment flow
+              </div>
+              <p className="mt-2 text-xs text-slate-400">
+                No expiring payment QR is generated here. This screen waits for provider-confirmed
+                payments for the driver.
+              </p>
+            </div>
+          </>
+        ) : loading ? (
           <div className="h-64 flex flex-col items-center justify-center space-y-2">
             <Loader2 className="w-10 h-10 animate-spin text-emerald-400" />
-            <p className="text-xs text-slate-400">Generating QR Ph payment code...</p>
+            <p className="text-xs text-slate-400">Generating demo payment QR...</p>
           </div>
         ) : paymentError ? (
           <div className="p-4 bg-rose-950/80 border border-rose-800 rounded-2xl space-y-3 max-w-xs">
-            <AlertTriangle className="w-8 h-8 text-rose-400 mx-auto" />
             <div className="text-sm font-bold text-rose-200">{paymentError}</div>
-            <button
-              onClick={onSwitchToCash}
-              className="w-full py-2.5 bg-amber-500 text-slate-950 font-bold text-xs rounded-xl"
-            >
-              PAY CASH INSTEAD
-            </button>
           </div>
         ) : (
           <>
-            <div className="space-y-0.5">
+            <div>
               <span className="text-xs uppercase font-bold tracking-wider text-slate-400">
-                {isCustom ? 'Special / Custom Fare' : 'Standard Fare'}
+                {isCustom ? 'Demo custom fare' : 'Demo standard fare'}
               </span>
               <div className="text-4xl font-mono font-black text-emerald-400 tracking-tight">
                 ₱{fareAmount}
               </div>
             </div>
 
-            {/* QR Ph Container (Sunlight-readable high contrast white block) */}
-            <div className="p-4 bg-white rounded-3xl shadow-2xl shadow-emerald-500/10 flex flex-col items-center border-4 border-emerald-500/40">
-              <div className="w-full flex items-center justify-between pb-2 mb-2 border-b border-slate-200">
-                <span className="text-[10px] font-black tracking-widest text-slate-900 flex items-center gap-1 font-mono">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  TALARIDE PAYMENT QR
-                </span>
-                <span className="text-[10px] text-slate-500 font-mono">TAGUM CITY</span>
-              </div>
-
+            <div className="p-4 bg-white rounded-3xl shadow-2xl border-4 border-emerald-500/40">
               {payment && (
                 <QRCodeSVG
                   value={payment.qr_payload}
@@ -172,70 +181,55 @@ export const DriverQRScreen: React.FC<Props> = ({
                   includeMargin={false}
                 />
               )}
-
               <div className="mt-2 text-[10px] font-semibold text-slate-600">
-                Scan with TalaRide to continue to secure PayMongo checkout
+                DEMO ONLY — expiring payment QR
               </div>
             </div>
 
-            {/* Waiting Pulse Status */}
-            <div className="flex items-center gap-2 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 px-3.5 py-1.5 rounded-full animate-pulse">
-              <div className="w-2 h-2 rounded-full bg-amber-400" />
-              <span className="font-semibold tracking-wide uppercase text-[11px]">
-                Waiting for payment confirmation...
-              </span>
+            <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 space-y-1.5 w-full max-w-sm">
+              <div className="text-[10px] uppercase font-bold text-slate-400 text-center tracking-wider">
+                Simulator-only confirmation
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                <button
+                  onClick={() => handleSimulatePayment('gcash')}
+                  disabled={simulating || !payment}
+                  className="py-1.5 bg-blue-600 text-white text-[11px] font-bold rounded-lg disabled:opacity-50"
+                >
+                  GCash
+                </button>
+                <button
+                  onClick={() => handleSimulatePayment('maya')}
+                  disabled={simulating || !payment}
+                  className="py-1.5 bg-emerald-600 text-white text-[11px] font-bold rounded-lg disabled:opacity-50"
+                >
+                  Maya
+                </button>
+                <button
+                  onClick={() => handleSimulatePayment('gotyme')}
+                  disabled={simulating || !payment}
+                  className="py-1.5 bg-cyan-700 text-white text-[11px] font-bold rounded-lg disabled:opacity-50"
+                >
+                  GoTyme
+                </button>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-400 max-w-xs">
-              This QR identifies the TalaRide payment request. PayMongo handles the actual wallet,
-              card, or QR Ph payment and the server confirms settlement.
-            </p>
           </>
         )}
       </div>
 
-      {/* Action & Fallback Section */}
       <div className="space-y-2.5 pt-2">
-        {/* Fallback to cash (Section 19 & 20) */}
         <button
           onClick={onSwitchToCash}
           className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-sm rounded-xl transition flex items-center justify-center gap-2 border border-slate-700"
         >
           <Banknote className="w-4 h-4" />
-          <span>Passenger Wants to Pay Cash (₱{fareAmount})</span>
+          <span>Record cash fare (₱{fareAmount})</span>
         </button>
-
-        {isMock ? (
-          <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 space-y-1.5">
-            <div className="text-[10px] uppercase font-bold text-slate-400 text-center tracking-wider">
-              Simulator-only instant confirmation:
-            </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              <button
-                onClick={() => handleSimulatePayment('gcash')}
-                disabled={simulating || !payment}
-                className="py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold rounded-lg transition disabled:opacity-50"
-              >
-                GCash Pay
-              </button>
-              <button
-                onClick={() => handleSimulatePayment('maya')}
-                disabled={simulating || !payment}
-                className="py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition disabled:opacity-50"
-              >
-                Maya Pay
-              </button>
-              <button
-                onClick={() => handleSimulatePayment('gotyme')}
-                disabled={simulating || !payment}
-                className="py-1.5 bg-cyan-700 hover:bg-cyan-600 text-white text-[11px] font-bold rounded-lg transition disabled:opacity-50"
-              >
-                GoTyme Pay
-              </button>
-            </div>
-          </div>
-        ) : (
+        {!isMock && (
           <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-400 text-center">
-            Live staging waits for PayMongo provider confirmation. No browser button can mark this ride paid.
+            Paid status comes only from the payment provider/webhook. The driver cannot mark a
+            digital payment paid from this screen.
           </div>
         )}
       </div>

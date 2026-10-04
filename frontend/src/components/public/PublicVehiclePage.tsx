@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ChevronRight,
   CreditCard,
+  ExternalLink,
   Loader2,
   ShieldCheck,
   Smartphone
@@ -36,10 +37,38 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
   const [data, setData] = useState<PublicVehicleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [fare, setFare] = useState<number>(30);
+  const [presetFare, setPresetFare] = useState<number | null>(null);
+  const [customMode, setCustomMode] = useState(false);
   const [customFare, setCustomFare] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('gcash');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const appDeepLink = useMemo(
+    () =>
+      'talaride://ride-confirm?vehicle_code=' +
+      encodeURIComponent(vehicleCode) +
+      '&c=' +
+      encodeURIComponent(checksum),
+    [vehicleCode, checksum]
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const search = new URLSearchParams(window.location.search);
+    if (search.get('web') === '1') return;
+    if (!/Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent)) return;
+
+    const frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.display = 'none';
+    frame.src = appDeepLink;
+    document.body.appendChild(frame);
+    const timer = window.setTimeout(() => frame.remove(), 1400);
+    return () => {
+      window.clearTimeout(timer);
+      frame.remove();
+    };
+  }, [appDeepLink]);
 
   useEffect(() => {
     let ignore = false;
@@ -63,20 +92,37 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
   }, [vehicleCode, checksum]);
 
   const finalFare = useMemo(() => {
-    if (fare > 0) return fare;
+    if (!customMode) return presetFare ?? 0;
     const parsed = Number(customFare);
     return Number.isFinite(parsed) ? parsed : 0;
-  }, [fare, customFare]);
+  }, [customFare, customMode, presetFare]);
 
+  const hasValidFare = finalFare >= 1 && finalFare <= 100000;
   const canPay =
     !!data?.driver_code &&
     data.status === 'Active' &&
     data.shift_status === 'Active' &&
-    finalFare >= 10 &&
+    hasValidFare &&
+    !!paymentMethod &&
     !submitting;
 
+  const choosePreset = (amount: number) => {
+    setPresetFare(amount);
+    setCustomMode(false);
+    setCustomFare('');
+    setPaymentMethod(null);
+    setErrorMessage(null);
+  };
+
+  const chooseCustom = () => {
+    setPresetFare(null);
+    setCustomMode(true);
+    setPaymentMethod(null);
+    setErrorMessage(null);
+  };
+
   const proceed = async () => {
-    if (!data?.driver_code || !canPay) return;
+    if (!data?.driver_code || !paymentMethod || !canPay) return;
     setSubmitting(true);
     setErrorMessage(null);
     try {
@@ -84,7 +130,7 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
         data.driver_code,
         data.vehicle_code,
         finalFare,
-        fare === 0,
+        customMode,
         paymentMethod
       );
       if (!result.checkoutUrl) {
@@ -110,14 +156,20 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
   ];
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white px-4 py-5">
+    <main className="min-h-screen bg-slate-950 px-4 py-5 text-white">
       <div className="mx-auto w-full max-w-md">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <div className="text-lg font-black tracking-tight">TalaRide</div>
-            <div className="text-[11px] text-slate-500">Scan • Choose • Pay</div>
+            <div className="text-[11px] text-slate-500">Scan • Choose fare • Pay</div>
           </div>
-          <div className="text-[10px] font-bold text-emerald-400">SECURE CHECKOUT</div>
+          <button
+            type="button"
+            onClick={() => { window.location.href = appDeepLink; }}
+            className="flex items-center gap-1 text-[10px] font-bold text-emerald-400"
+          >
+            OPEN APP <ExternalLink className="h-3 w-3" />
+          </button>
         </div>
 
         {loading && (
@@ -157,20 +209,22 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
             </section>
 
             <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-              <div className="mb-3 text-sm font-bold">Choose fare</div>
+              <div className="mb-1 text-sm font-bold">1. Choose fare</div>
+              <p className="mb-3 text-[11px] text-slate-500">
+                Select a fare or enter the amount before choosing how to pay.
+              </p>
               <div className="grid grid-cols-5 gap-2">
                 {PRESET_FARES.map((amount) => (
                   <button
                     key={amount}
-                    onClick={() => {
-                      setFare(amount);
-                      setCustomFare('');
-                    }}
-                    className={`rounded-xl border py-2.5 text-xs font-black transition ${
-                      fare === amount
+                    type="button"
+                    onClick={() => choosePreset(amount)}
+                    className={
+                      'rounded-xl border py-2.5 text-xs font-black transition ' +
+                      (!customMode && presetFare === amount
                         ? 'border-emerald-500 bg-emerald-500 text-slate-950'
-                        : 'border-slate-700 bg-slate-950 text-slate-300'
-                    }`}
+                        : 'border-slate-700 bg-slate-950 text-slate-300')
+                    }
                   >
                     ₱{amount}
                   </button>
@@ -178,53 +232,80 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <button
-                  onClick={() => setFare(0)}
-                  className={`shrink-0 rounded-xl border px-3 py-2.5 text-xs font-bold ${
-                    fare === 0
+                  type="button"
+                  onClick={chooseCustom}
+                  className={
+                    'shrink-0 rounded-xl border px-3 py-2.5 text-xs font-bold ' +
+                    (customMode
                       ? 'border-emerald-500 text-emerald-400'
-                      : 'border-slate-700 text-slate-400'
-                  }`}
+                      : 'border-slate-700 text-slate-400')
+                  }
                 >
                   Other
                 </button>
-                {fare === 0 && (
+                {customMode && (
                   <div className="flex flex-1 items-center rounded-xl border border-slate-700 bg-slate-950 px-3">
                     <span className="text-sm text-slate-500">₱</span>
                     <input
+                      autoFocus
                       inputMode="decimal"
                       value={customFare}
-                      onChange={(e) => setCustomFare(e.target.value.replace(/[^0-9.]/g, ''))}
+                      onChange={(e) => {
+                        setCustomFare(e.target.value.replace(/[^0-9.]/g, ''));
+                        setPaymentMethod(null);
+                      }}
                       placeholder="Enter fare"
                       className="w-full bg-transparent px-2 py-2.5 text-sm font-bold outline-none"
                     />
                   </div>
                 )}
               </div>
+              {customMode && customFare && !hasValidFare && (
+                <p className="mt-2 text-[11px] text-rose-400">Enter a fare from ₱1 to ₱100,000.</p>
+              )}
             </section>
 
-            <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-              <div className="mb-3 text-sm font-bold">Select payment</div>
-              <div className="grid grid-cols-2 gap-2">
-                {paymentOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => setPaymentMethod(option.id)}
-                    className={`flex items-center gap-2.5 rounded-xl border p-3 text-left transition ${
-                      paymentMethod === option.id
-                        ? 'border-emerald-500 bg-emerald-500/10'
-                        : 'border-slate-700 bg-slate-950'
-                    }`}
-                  >
-                    <span className={paymentMethod === option.id ? 'text-emerald-400' : 'text-slate-400'}>
-                      {option.icon}
-                    </span>
-                    <span>
-                      <span className="block text-xs font-black">{option.label}</span>
-                      <span className="block text-[10px] text-slate-500">{option.subtitle}</span>
-                    </span>
-                  </button>
-                ))}
+            <section
+              className={
+                'rounded-2xl border p-4 ' +
+                (hasValidFare
+                  ? 'border-slate-800 bg-slate-900'
+                  : 'border-slate-800/60 bg-slate-900/50')
+              }
+            >
+              <div className="mb-1 flex items-center justify-between">
+                <div className="text-sm font-bold">2. Select payment</div>
+                {hasValidFare && (
+                  <div className="text-xs font-black text-emerald-400">₱{finalFare.toFixed(2)}</div>
+                )}
               </div>
+              {!hasValidFare ? (
+                <p className="mt-2 text-xs text-slate-500">Choose or enter the fare first.</p>
+              ) : (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {paymentOptions.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setPaymentMethod(option.id)}
+                      className={
+                        'flex items-center gap-2.5 rounded-xl border p-3 text-left transition ' +
+                        (paymentMethod === option.id
+                          ? 'border-emerald-500 bg-emerald-500/10'
+                          : 'border-slate-700 bg-slate-950')
+                      }
+                    >
+                      <span className={paymentMethod === option.id ? 'text-emerald-400' : 'text-slate-400'}>
+                        {option.icon}
+                      </span>
+                      <span>
+                        <span className="block text-xs font-black">{option.label}</span>
+                        <span className="block text-[10px] text-slate-500">{option.subtitle}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </section>
 
             {errorMessage && (
@@ -234,26 +315,31 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
             )}
 
             <button
+              type="button"
               onClick={proceed}
               disabled={!canPay}
               className="flex w-full items-center justify-between rounded-2xl bg-emerald-500 px-4 py-4 text-slate-950 shadow-lg shadow-emerald-950/30 transition disabled:cursor-not-allowed disabled:opacity-40"
             >
               <span className="text-left">
                 <span className="block text-[10px] font-bold uppercase tracking-wider opacity-70">
-                  Proceed to payment
+                  3. Proceed to payment
                 </span>
                 <span className="block text-lg font-black">
-                  {finalFare >= 10 ? `₱${finalFare.toFixed(2)} • ${paymentOptions.find((x) => x.id === paymentMethod)?.label}` : 'Choose fare'}
+                  {!hasValidFare
+                    ? 'Choose fare first'
+                    : !paymentMethod
+                      ? '₱' + finalFare.toFixed(2) + ' • Select payment'
+                      : '₱' +
+                        finalFare.toFixed(2) +
+                        ' • ' +
+                        paymentOptions.find((x) => x.id === paymentMethod)?.label}
                 </span>
               </span>
               {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <ChevronRight className="h-5 w-5" />}
             </button>
 
             <p className="px-4 text-center text-[10px] leading-relaxed text-slate-500">
-              {paymentMethod === 'gcash'
-                ? 'Your fare is locked before TalaRide sends you directly to secure GCash authorization.'
-                : 'Your fare and selected payment method are locked into the checkout when you continue.'}
-              {' '}TalaRide only marks the ride paid after provider confirmation.
+              No payment is created until you tap Proceed. The selected fare and payment method are then locked into that payment.
             </p>
           </div>
         )}
