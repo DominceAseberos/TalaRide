@@ -28,6 +28,8 @@ export async function createPayMongoCheckout(
 
   const authHeader = 'Basic ' + Buffer.from(secretKey + ':').toString('base64');
 
+  const publicWebOrigin = env.PUBLIC_WEB_ORIGIN.replace(/\/$/, '');
+
   const payload = {
     data: {
       attributes: {
@@ -39,8 +41,8 @@ export async function createPayMongoCheckout(
         send_email_receipt: false,
         show_description: true,
         show_line_items: true,
-        cancel_url: `${env.WEB_ORIGIN.split(',')[0]}/cancel`,
-        success_url: `${env.WEB_ORIGIN.split(',')[0]}/success?payment_id=${options.paymentId}`,
+        cancel_url: `${publicWebOrigin}/cancel?payment_id=${encodeURIComponent(options.paymentId)}`,
+        success_url: `${publicWebOrigin}/success?payment_id=${encodeURIComponent(options.paymentId)}`,
         description: `TalaRide fare for ${options.vehicleCode} (Ride #${options.rideId})`,
         payment_method_types: ['gcash', 'paymaya', 'qrph', 'card'],
         reference_number: options.paymentId,

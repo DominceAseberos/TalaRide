@@ -28,12 +28,16 @@ export const app = express();
 const PORT = env.PORT || 4000;
 
 // CORS configuration honoring WEB_ORIGIN and development localhost
-const allowedOrigins = env.WEB_ORIGIN.split(',').map((s) => s.trim());
+const allowedOrigins = new Set(
+  [...env.WEB_ORIGIN.split(','), env.PUBLIC_WEB_ORIGIN]
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
 app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true); // Allow native mobile, curl, server-to-server
-      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      if (allowedOrigins.has('*') || allowedOrigins.has(origin)) {
         return callback(null, true);
       }
       if (env.NODE_ENV === 'development' && origin.startsWith('http://localhost:')) {
