@@ -96,6 +96,8 @@ export interface Payment {
   amount_centavos: number;
   provider: PaymentProvider;
   provider_ref: string | null;
+  checkout_session_id?: string | null;
+  checkout_url?: string | null;
   payment_status: PaymentStatus;
   provider_fee_centavos: number;
   talaride_fee_centavos: number;

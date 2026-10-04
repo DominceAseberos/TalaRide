@@ -126,6 +126,36 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       expiresInSeconds: 300
     });
 
+    // 9. In provider-authoritative mode, create the PayMongo checkout before
+    // persisting a pending ride/payment. This prevents orphaned unpaid records.
+    let checkoutSessionId: string | null = null;
+    let checkoutUrl: string | null = null;
+    if (env.PAYMENT_MODE === 'live') {
+      if (!env.PAYMENT_PROVIDER_KEY || !env.PAYMENT_PROVIDER_KEY.startsWith('sk_')) {
+        return res.status(503).json({
+          error: 'Payment provider unavailable',
+          message: 'PayMongo secret key is not configured'
+        });
+      }
+      try {
+        const pmResult = await createPayMongoCheckout({
+          paymentId,
+          rideId,
+          vehicleCode: vehicle_code,
+          driverCode: driver_code,
+          amountCentavos: amount_centavos
+        });
+        checkoutSessionId = pmResult.checkoutSessionId;
+        checkoutUrl = pmResult.checkoutUrl;
+      } catch (pmErr: any) {
+        console.error('PayMongo checkout session creation failed:', pmErr.message);
+        return res.status(502).json({
+          error: 'Payment provider unavailable',
+          message: 'Could not create PayMongo checkout session'
+        });
+      }
+    }
+
     const ride = await repository.createRide({
       ride_id: rideId,
       driver_code,
@@ -153,6 +183,8 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       amount_centavos,
       provider: 'gcash',
       provider_ref: null,
+      checkout_session_id: checkoutSessionId,
+      checkout_url: checkoutUrl,
       payment_status: 'awaiting_confirmation',
       provider_fee_centavos: feeBreakdown.providerFeeCentavos,
       talaride_fee_centavos: feeBreakdown.talarideFeeCentavos,
@@ -172,23 +204,6 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       payload: { amount_centavos, ride_id: rideId },
       created_at: new Date().toISOString()
     });
-
-    // 10. Generate PayMongo Checkout Session if PayMongo is configured
-    let checkoutUrl: string | undefined;
-    if (env.PAYMENT_PROVIDER_KEY && env.PAYMENT_PROVIDER_KEY.startsWith('sk_')) {
-      try {
-        const pmResult = await createPayMongoCheckout({
-          paymentId,
-          rideId,
-          vehicleCode: vehicle_code,
-          driverCode: driver_code,
-          amountCentavos: amount_centavos
-        });
-        checkoutUrl = pmResult.checkoutUrl;
-      } catch (pmErr: any) {
-        console.warn('PayMongo checkout session creation skipped:', pmErr.message);
-      }
-    }
 
     return res.status(201).json({
       success: true,

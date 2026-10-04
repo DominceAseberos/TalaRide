@@ -470,6 +470,19 @@ export class TalaRideRepository {
     return payment || null;
   }
 
+  async updatePaymentCheckout(
+    paymentId: string,
+    checkoutSessionId: string,
+    checkoutUrl: string
+  ): Promise<Payment> {
+    const payment = await this.getPayment(paymentId);
+    if (!payment) throw new Error('Payment not found');
+    payment.checkout_session_id = checkoutSessionId;
+    payment.checkout_url = checkoutUrl;
+    this.persistToDisk(this.memoryState);
+    return payment;
+  }
+
   async getPaymentByRideId(rideId: string): Promise<Payment | null> {
     const payment = this.memoryState.payments.find((p) => p.ride_id === rideId);
     return payment || null;

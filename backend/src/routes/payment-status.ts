@@ -23,6 +23,7 @@ async function getPaymentStatusHandler(req: Request, res: Response) {
       amount_centavos: payment.amount_centavos,
       provider: payment.provider,
       provider_ref: payment.provider_ref,
+      checkout_url: payment.checkout_url ?? null,
       payment_status: payment.payment_status,
       provider_fee_centavos: payment.provider_fee_centavos,
       talaride_fee_centavos: payment.talaride_fee_centavos,
