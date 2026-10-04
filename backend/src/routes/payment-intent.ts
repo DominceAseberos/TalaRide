@@ -5,7 +5,7 @@ import { calculateFeeBreakdown } from '../lib/money.js';
 import { generatePaymentQR } from '../lib/qr.js';
 import { optionalAuth } from '../lib/auth.js';
 import { paymentIntentRateLimiter } from '../middleware/rate-limit.js';
-import { createPayMongoCheckout } from '../lib/paymongo.js';
+import { createPayMongoCheckout, createPayMongoDirectGcash } from '../lib/paymongo.js';
 import { env } from '../env.js';
 
 export const paymentIntentRouter = Router();
@@ -140,21 +140,38 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
         });
       }
       try {
-        const pmResult = await createPayMongoCheckout({
-          paymentId,
-          rideId,
-          vehicleCode: vehicle_code,
-          driverCode: driver_code,
-          amountCentavos: amount_centavos,
-          paymentMethod: payment_method
-        });
-        checkoutSessionId = pmResult.checkoutSessionId;
-        checkoutUrl = pmResult.checkoutUrl;
+        if (payment_method === 'gcash') {
+          const gcashResult = await createPayMongoDirectGcash({
+            paymentId,
+            rideId,
+            vehicleCode: vehicle_code,
+            driverCode: driver_code,
+            amountCentavos: amount_centavos,
+            paymentMethod: 'gcash'
+          });
+          // Existing persistence column is kept for compatibility; for direct GCash
+          // it stores the PayMongo PaymentIntent id instead of a Checkout Session id.
+          checkoutSessionId = gcashResult.paymentIntentId;
+          checkoutUrl = gcashResult.redirectUrl;
+        } else {
+          const pmResult = await createPayMongoCheckout({
+            paymentId,
+            rideId,
+            vehicleCode: vehicle_code,
+            driverCode: driver_code,
+            amountCentavos: amount_centavos,
+            paymentMethod: payment_method
+          });
+          checkoutSessionId = pmResult.checkoutSessionId;
+          checkoutUrl = pmResult.checkoutUrl;
+        }
       } catch (pmErr: any) {
-        console.error('PayMongo checkout session creation failed:', pmErr.message);
+        console.error('PayMongo payment initialization failed:', pmErr.message);
         return res.status(502).json({
           error: 'Payment provider unavailable',
-          message: 'Could not create PayMongo checkout session'
+          message: payment_method === 'gcash'
+            ? 'Could not start GCash authorization'
+            : 'Could not create PayMongo checkout session'
         });
       }
     }
@@ -222,7 +239,8 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       payment_status: payment.payment_status,
       expires_at: payment.expires_at,
       qr_payload: payment.qr_payload,
-      checkout_url: checkoutUrl
+      checkout_url: checkoutUrl,
+      payment_flow: payment_method === 'gcash' ? 'direct_gcash' : 'paymongo_checkout'
     });
   } catch (err: any) {
     console.error('Error generating payment intent:', err);

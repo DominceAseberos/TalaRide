@@ -250,8 +250,10 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
             </button>
 
             <p className="px-4 text-center text-[10px] leading-relaxed text-slate-500">
-              Your fare and selected payment method are locked into the checkout when you continue.
-              TalaRide only marks the ride paid after provider confirmation.
+              {paymentMethod === 'gcash'
+                ? 'Your fare is locked before TalaRide sends you directly to secure GCash authorization.'
+                : 'Your fare and selected payment method are locked into the checkout when you continue.'}
+              {' '}TalaRide only marks the ride paid after provider confirmation.
             </p>
           </div>
         )}
