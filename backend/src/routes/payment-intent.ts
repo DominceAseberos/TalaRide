@@ -14,6 +14,7 @@ export const PaymentIntentSchema = z.object({
   driver_code: z.string().regex(/^DR-[0-9]{6}$/, 'driver_code must match DR-000000 format'),
   vehicle_code: z.string().regex(/^TR-[0-9]{5}$/, 'vehicle_code must match TR-00000 format'),
   amount_centavos: z.number().int().positive('amount_centavos must be a positive integer'),
+  payment_method: z.enum(['gcash', 'maya', 'card', 'qrph']).default('gcash'),
   approximate_location: z.string().optional().default('Tagum City')
 });
 
@@ -30,6 +31,7 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
           : req.body.fareAmount !== undefined
           ? Math.round(Number(req.body.fareAmount) * 100)
           : undefined,
+      payment_method: req.body.payment_method || req.body.paymentMethod || 'gcash',
       approximate_location: req.body.approximate_location || req.body.approximateLocation
     };
 
@@ -41,7 +43,7 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       });
     }
 
-    const { driver_code, vehicle_code, amount_centavos, approximate_location } = parsed.data;
+    const { driver_code, vehicle_code, amount_centavos, payment_method, approximate_location } = parsed.data;
 
     // 1. Validate Driver exists
     const driver = await repository.getDriver(driver_code);
@@ -143,7 +145,8 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
           rideId,
           vehicleCode: vehicle_code,
           driverCode: driver_code,
-          amountCentavos: amount_centavos
+          amountCentavos: amount_centavos,
+          paymentMethod: payment_method
         });
         checkoutSessionId = pmResult.checkoutSessionId;
         checkoutUrl = pmResult.checkoutUrl;
@@ -181,7 +184,7 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       driver_code,
       vehicle_code,
       amount_centavos,
-      provider: 'gcash',
+      provider: payment_method === 'qrph' ? 'qrph_bank' : payment_method,
       provider_ref: null,
       checkout_session_id: checkoutSessionId,
       checkout_url: checkoutUrl,
@@ -201,7 +204,7 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       event_id: `EVT-${Date.now().toString().slice(-6)}`,
       payment_id: paymentId,
       event_type: 'intent_created',
-      payload: { amount_centavos, ride_id: rideId },
+      payload: { amount_centavos, ride_id: rideId, payment_method },
       created_at: new Date().toISOString()
     });
 
@@ -212,6 +215,7 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       driver_code: payment.driver_code,
       vehicle_code: payment.vehicle_code,
       amount_centavos: payment.amount_centavos,
+      payment_method,
       provider_fee_centavos: payment.provider_fee_centavos,
       talaride_fee_centavos: payment.talaride_fee_centavos,
       net_centavos: payment.net_centavos,

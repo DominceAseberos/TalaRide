@@ -117,13 +117,32 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
           </button>
         )}
 
+        {state === 'confirmed' && (
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-emerald-800 bg-emerald-950/30 p-4">
+              <div className="text-sm font-black text-emerald-300">Get more with TalaRide</div>
+              <p className="mt-1 text-xs leading-relaxed text-emerald-100/70">
+                Install TalaRide for ride history, saved receipts, safety tools, and rewards.
+              </p>
+              <button
+                onClick={() => { window.location.href = '/'; }}
+                className="mt-3 w-full rounded-xl bg-emerald-500 py-3 text-xs font-black text-slate-950"
+              >
+                INSTALL TALARIDE
+              </button>
+            </div>
+            <div className="rounded-2xl border border-amber-800/60 bg-amber-950/20 p-4">
+              <div className="text-sm font-black text-amber-300">🎟 Vouchers & rewards</div>
+              <p className="mt-1 text-xs text-amber-100/60">Coming soon.</p>
+            </div>
+          </div>
+        )}
+
         <button
-          onClick={() => {
-            window.location.href = '/';
-          }}
-          className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl transition"
+          onClick={() => { window.location.href = '/'; }}
+          className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-black rounded-xl transition"
         >
-          Return to TalaRide
+          Done
         </button>
 
         <p className="text-[11px] text-slate-500 text-center leading-relaxed">

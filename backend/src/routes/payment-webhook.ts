@@ -9,7 +9,7 @@ export const paymentWebhookRouter = Router();
 
 const PaymentWebhookSchema = z.object({
   event: z.string(),
-  provider: z.enum(['gcash', 'maya', 'gotyme', 'qrph_bank', 'mock']),
+  provider: z.enum(['gcash', 'maya', 'gotyme', 'qrph_bank', 'card', 'mock']),
   provider_ref: z.string().min(1, 'provider_ref is required'),
   payment_id: z.string().min(1, 'payment_id is required'),
   amount_centavos: z.number().int().positive('amount_centavos must be a positive integer'),
@@ -79,9 +79,18 @@ paymentWebhookRouter.post('/', async (req: Request, res: Response) => {
         }
       }
 
+      const normalizedProvider =
+        methodUsed === 'paymaya' || methodUsed === 'maya'
+          ? 'maya'
+          : methodUsed === 'qrph'
+            ? 'qrph_bank'
+            : methodUsed === 'card'
+              ? 'card'
+              : 'gcash';
+
       normalizedPayload = {
         event: eventType || 'payment.paid',
-        provider: methodUsed === 'paymaya' ? 'maya' : 'gcash',
+        provider: normalizedProvider,
         provider_ref: providerRef,
         payment_id: matchedPayId,
         amount_centavos: amountCentavos

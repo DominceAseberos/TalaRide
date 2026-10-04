@@ -6,6 +6,7 @@ export interface PayMongoCheckoutOptions {
   vehicleCode: string;
   driverCode: string;
   amountCentavos: number;
+  paymentMethod?: 'gcash' | 'maya' | 'card' | 'qrph';
   description?: string;
 }
 
@@ -29,6 +30,15 @@ export async function createPayMongoCheckout(
   const authHeader = 'Basic ' + Buffer.from(secretKey + ':').toString('base64');
 
   const publicWebOrigin = env.PUBLIC_WEB_ORIGIN.replace(/\/$/, '');
+  const paymentMethodMap = {
+    gcash: 'gcash',
+    maya: 'paymaya',
+    card: 'card',
+    qrph: 'qrph'
+  } as const;
+  const selectedPaymentMethod = options.paymentMethod
+    ? [paymentMethodMap[options.paymentMethod]]
+    : ['gcash', 'paymaya', 'qrph', 'card'];
 
   const payload = {
     data: {
@@ -44,7 +54,7 @@ export async function createPayMongoCheckout(
         cancel_url: `${publicWebOrigin}/cancel?payment_id=${encodeURIComponent(options.paymentId)}`,
         success_url: `${publicWebOrigin}/success?payment_id=${encodeURIComponent(options.paymentId)}`,
         description: `TalaRide fare for ${options.vehicleCode} (Ride #${options.rideId})`,
-        payment_method_types: ['gcash', 'paymaya', 'qrph', 'card'],
+        payment_method_types: selectedPaymentMethod,
         reference_number: options.paymentId,
         line_items: [
           {
@@ -59,7 +69,8 @@ export async function createPayMongoCheckout(
           payment_id: options.paymentId,
           ride_id: options.rideId,
           vehicle_code: options.vehicleCode,
-          driver_code: options.driverCode
+          driver_code: options.driverCode,
+          selected_payment_method: options.paymentMethod || 'any'
         }
       }
     }

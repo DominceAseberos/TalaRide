@@ -35,10 +35,11 @@ publicVehiclesRouter.get('/:code/public', async (req: Request, res: Response) =>
     }
 
     const activeShift = await repository.getActiveShiftForVehicle(vehicleCode);
+    const publicDriverCode = activeShift?.driver_code || vehicle.assigned_driver_code || null;
     let driverName: string | null = null;
 
-    if (vehicle.assigned_driver_code) {
-      const driver = await repository.getDriver(vehicle.assigned_driver_code);
+    if (publicDriverCode) {
+      const driver = await repository.getDriver(publicDriverCode);
       if (driver) {
         driverName = formatSafeDriverName(driver.full_name);
       }
@@ -51,6 +52,7 @@ publicVehiclesRouter.get('/:code/public', async (req: Request, res: Response) =>
       toda: vehicle.toda,
       status: vehicle.status === 'active' ? 'Active' : 'Inactive',
       shift_status: activeShift ? 'Active' : 'Not currently active',
+      driver_code: publicDriverCode,
       driver_name: driverName || 'No driver assigned'
     });
   } catch (err: any) {

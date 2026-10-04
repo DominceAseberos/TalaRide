@@ -11,7 +11,7 @@ export type PaymentStatus =
   | 'expired'
   | 'refunded'
   | 'reversed';
-export type PaymentProvider = 'gcash' | 'maya' | 'gotyme' | 'qrph_bank' | 'mock';
+export type PaymentProvider = 'gcash' | 'maya' | 'gotyme' | 'qrph_bank' | 'card' | 'mock';
 export type LostItemCategory = 'phone' | 'wallet' | 'bag' | 'documents' | 'keys' | 'other';
 export type LostItemStatus = 'submitted' | 'driver_notified' | 'found' | 'unresolved' | 'closed';
 

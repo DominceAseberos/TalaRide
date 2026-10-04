@@ -352,20 +352,22 @@ export const api = {
     driverId: string,
     vehicleId: string,
     fareAmount: number,
-    _isCustom = false
+    _isCustom = false,
+    paymentMethod: 'gcash' | 'maya' | 'card' | 'qrph' = 'gcash'
   ) => {
     const raw = await apiJson<any>('/payment-intent', {
       method: 'POST',
       body: JSON.stringify({
         driver_code: driverId,
         vehicle_code: vehicleId,
-        amount_centavos: Math.round(fareAmount * 100)
+        amount_centavos: Math.round(fareAmount * 100),
+        payment_method: paymentMethod
       })
     });
     const payment = normalizePayment({
       ...raw,
       payment_status: raw.payment_status,
-      provider: 'gcash',
+      provider: raw.payment_method === 'qrph' ? 'qrph_bank' : (raw.payment_method || paymentMethod),
       provider_ref: null,
       created_at: new Date().toISOString(),
       confirmed_at: null
