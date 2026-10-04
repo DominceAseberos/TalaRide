@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Clock3, RotateCw, XCircle } from 'lucide-react';
 import { api } from '../../services/api';
 
@@ -15,6 +15,7 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
   const [message, setMessage] = useState(
     cancelled ? 'Checkout was cancelled. No payment was marked successful.' : 'Checking payment status…'
   );
+  const autoOpenAttempted = useRef(false);
 
   const verify = useCallback(async () => {
     if (!paymentId || cancelled) return;
@@ -48,15 +49,59 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
     }
   }, [cancelled, paymentId]);
 
+  const openTalaRide = useCallback(
+    (silent = false) => {
+      if (!paymentId || typeof window === 'undefined') return;
+
+      const appUrl =
+        'talaride://payment-status?payment_id=' + encodeURIComponent(paymentId);
+      const ua = window.navigator.userAgent;
+
+      if (/Android/i.test(ua)) {
+        const fallback = new URL(window.location.href);
+        fallback.searchParams.set('web', '1');
+        const intentUrl =
+          'intent://payment-status?payment_id=' +
+          encodeURIComponent(paymentId) +
+          '#Intent;scheme=talaride;package=com.beepanjero.talaride;S.browser_fallback_url=' +
+          encodeURIComponent(fallback.toString()) +
+          ';end';
+        window.location.href = intentUrl;
+        return;
+      }
+
+      if (/iPhone|iPad|iPod/i.test(ua) && silent) {
+        const frame = document.createElement('iframe');
+        frame.setAttribute('aria-hidden', 'true');
+        frame.style.display = 'none';
+        frame.src = appUrl;
+        document.body.appendChild(frame);
+        window.setTimeout(() => frame.remove(), 1400);
+        return;
+      }
+
+      window.location.href = appUrl;
+    },
+    [paymentId]
+  );
+
   useEffect(() => {
-    if (cancelled) return;
+    if (cancelled || state === 'confirmed' || state === 'failed') return;
     const initial = window.setTimeout(() => void verify(), 0);
     const timer = window.setInterval(() => void verify(), 3000);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);
     };
-  }, [cancelled, verify]);
+  }, [cancelled, state, verify]);
+
+  useEffect(() => {
+    if (state !== 'confirmed' || autoOpenAttempted.current) return;
+    autoOpenAttempted.current = true;
+    if (!/Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent)) return;
+    const timer = window.setTimeout(() => openTalaRide(true), 900);
+    return () => window.clearTimeout(timer);
+  }, [openTalaRide, state]);
 
   const amount =
     result?.payment?.amount ??
@@ -78,7 +123,7 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
           <div>
             <h1 className="text-xl font-black">
               {state === 'confirmed'
-                ? 'Payment confirmed'
+                ? 'Payment successful'
                 : state === 'failed'
                   ? 'Payment not completed'
                   : 'Verifying payment'}
@@ -120,16 +165,20 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
         {state === 'confirmed' && (
           <div className="space-y-3">
             <div className="rounded-2xl border border-emerald-800 bg-emerald-950/30 p-4">
-              <div className="text-sm font-black text-emerald-300">Get more with TalaRide</div>
+              <div className="text-sm font-black text-emerald-300">Continue in TalaRide</div>
               <p className="mt-1 text-xs leading-relaxed text-emerald-100/70">
-                Install TalaRide for ride history, saved receipts, safety tools, and rewards.
+                If TalaRide is installed, return to the app for your payment status and ride history.
+                No app yet? You can stay on this receipt page.
               </p>
               <button
-                onClick={() => { window.location.href = '/'; }}
+                onClick={() => openTalaRide(false)}
                 className="mt-3 w-full rounded-xl bg-emerald-500 py-3 text-xs font-black text-slate-950"
               >
-                INSTALL TALARIDE
+                OPEN TALARIDE
               </button>
+              <p className="mt-2 text-center text-[10px] text-emerald-100/50">
+                App-store installation links will be added when TalaRide is published.
+              </p>
             </div>
             <div className="rounded-2xl border border-amber-800/60 bg-amber-950/20 p-4">
               <div className="text-sm font-black text-amber-300">🎟 Vouchers & rewards</div>
@@ -139,15 +188,17 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
         )}
 
         <button
-          onClick={() => { window.location.href = '/'; }}
+          onClick={() => {
+            window.location.href = '/';
+          }}
           className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-black rounded-xl transition"
         >
           Done
         </button>
 
         <p className="text-[11px] text-slate-500 text-center leading-relaxed">
-          A redirect alone never marks a TalaRide payment as paid. This page only shows success after
-          the backend reports provider-confirmed settlement.
+          A redirect alone never marks a TalaRide payment as paid. Success appears only after the
+          backend reports provider-confirmed settlement.
         </p>
       </div>
     </div>

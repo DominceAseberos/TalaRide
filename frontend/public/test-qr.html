@@ -1,342 +1,92 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TalaRide — QR Test Bench & Scanner Studio</title>
+  <title>TalaRide Permanent QR Test</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
-    :root {
-      --bg: #090d16;
-      --card: #131b2e;
-      --card-border: #1f2a44;
-      --accent: #10b981;
-      --accent-hover: #059669;
-      --amber: #f59e0b;
-      --text: #f1f5f9;
-      --text-muted: #94a3b8;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
-    body { background-color: var(--bg); color: var(--text); padding: 24px; min-height: 100vh; }
-    .container { max-width: 1040px; margin: 0 auto; }
-    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; padding-bottom: 16px; border-bottom: 1px solid var(--card-border); }
-    .logo-badge { display: flex; align-items: center; gap: 10px; }
-    .logo-icon { width: 36px; height: 36px; background: var(--accent); color: #000; border-radius: 8px; display: grid; place-items: center; font-weight: 900; font-size: 18px; }
-    h1 { font-size: 22px; font-weight: 700; }
-    .subtitle { color: var(--text-muted); font-size: 14px; margin-top: 2px; }
-    .nav-links { display: flex; gap: 12px; }
-    .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 13px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--card-border); background: #1a233a; transition: all 0.2s; }
-    .nav-links a:hover { color: #fff; border-color: var(--accent); }
-
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
-
-    .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
-    .card-title { font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-    .card-title span.badge { font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #1e293b; color: var(--text-muted); font-weight: normal; }
-
-    .qr-box { background: #fff; padding: 16px; border-radius: 12px; display: inline-flex; justify-content: center; align-items: center; margin: 0 auto; box-shadow: 0 8px 30px rgba(0,0,0,0.5); min-width: 240px; min-height: 240px; }
-    .qr-box canvas, .qr-box img { display: block; }
-
-    .controls { display: flex; flex-direction: column; gap: 12px; }
-    .form-group { display: flex; flex-direction: column; gap: 6px; }
-    label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
-    input, select { background: #0b1120; border: 1px solid var(--card-border); border-radius: 8px; padding: 10px 12px; color: #fff; font-size: 14px; }
-    input:focus, select:focus { outline: none; border-color: var(--accent); }
-
-    .fare-pills { display: flex; gap: 8px; flex-wrap: wrap; }
-    .fare-pill { background: #1a233a; border: 1px solid var(--card-border); color: #cbd5e1; padding: 6px 14px; border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.15s; }
-    .fare-pill.active { background: var(--accent); color: #000; font-weight: 700; border-color: var(--accent); }
-
-    button.btn { background: var(--accent); color: #000; font-weight: 700; border: none; padding: 12px; border-radius: 8px; font-size: 14px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
-    button.btn:hover { background: var(--accent-hover); }
-    button.btn-secondary { background: #1e293b; color: #e2e8f0; border: 1px solid var(--card-border); }
-    button.btn-secondary:hover { background: #2d3b55; }
-
-    .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; width: fit-content; }
-    .status-awaiting { background: rgba(245, 158, 11, 0.15); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.3); }
-    .status-confirmed { background: rgba(16, 185, 129, 0.15); color: var(--accent); border: 1px solid rgba(16, 185, 129, 0.3); }
-    .status-expired { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
-
-    .ocr-plate { background: #fef08a; color: #1e1b4b; border: 4px solid #1e1b4b; border-radius: 10px; padding: 16px 28px; text-align: center; font-weight: 900; font-size: 38px; letter-spacing: 4px; display: inline-block; margin: 12px auto; box-shadow: 0 6px 20px rgba(0,0,0,0.4); text-transform: uppercase; }
-
-    pre.code-preview { background: #080d19; border: 1px solid var(--card-border); border-radius: 6px; padding: 10px; font-size: 11px; color: #64748b; overflow-x: auto; max-height: 80px; }
+    :root { color-scheme: dark; --bg:#090d16; --card:#131b2e; --border:#1f2a44; --green:#10b981; --muted:#94a3b8; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:var(--bg); color:#f8fafc; font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif; padding:24px; }
+    .wrap { max-width:720px; margin:0 auto; }
+    .brand { display:flex; align-items:center; gap:12px; margin-bottom:24px; }
+    .mark { width:42px; height:42px; border-radius:12px; display:grid; place-items:center; background:var(--green); color:#04120c; font-weight:900; }
+    h1 { margin:0; font-size:22px; }
+    .sub { margin-top:4px; color:var(--muted); font-size:13px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:22px; }
+    .badge { display:inline-flex; padding:5px 9px; border-radius:999px; color:#6ee7b7; background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.25); font-size:11px; font-weight:800; }
+    .grid { display:grid; grid-template-columns:280px 1fr; gap:24px; align-items:center; margin-top:18px; }
+    .qr { width:260px; min-height:260px; padding:18px; border-radius:18px; background:white; display:grid; place-items:center; }
+    .steps { display:grid; gap:10px; margin-top:14px; }
+    .step { border:1px solid var(--border); border-radius:12px; padding:12px; background:#0b1120; font-size:13px; }
+    .step b { color:#6ee7b7; }
+    .link { margin-top:16px; padding:12px; border-radius:10px; background:#080d19; border:1px solid var(--border); color:var(--muted); font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+    a.btn { text-decoration:none; padding:11px 14px; border-radius:10px; font-size:12px; font-weight:800; }
+    .primary { background:var(--green); color:#03140d; }
+    .secondary { border:1px solid var(--border); color:#e2e8f0; background:#1a233a; }
+    .note { margin-top:18px; color:var(--muted); font-size:12px; line-height:1.6; }
+    @media (max-width:680px) { body{padding:16px}.grid{grid-template-columns:1fr}.qr{margin:0 auto;width:240px;min-height:240px} }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div class="logo-badge">
-        <div class="logo-icon">TR</div>
-        <div>
-          <h1>TalaRide QR Test Bench & Scanner Studio</h1>
-          <div class="subtitle">Generate & test real camera scanning with your TalaRide mobile phone</div>
-        </div>
-      </div>
-      <div class="nav-links">
-        <a href="/simulator" target="_blank">Dual Simulator ↗</a>
-        <a href="/driver" target="_blank">Driver Portal ↗</a>
-        <a href="/v/TR-01842?c=2ab48c98297c" target="_blank">Vehicle Sticker ↗</a>
-      </div>
-    </header>
-
-    <div class="grid">
-      <!-- Card 1: Dynamic Payment QR -->
-      <div class="card">
-        <div class="card-title">
-          ⚡ 1. Dynamic Payment QR
-          <span class="badge" style="background:#064e3b; color:#34d399">Canonical API</span>
-        </div>
-        <p style="font-size:13px; color:var(--text-muted);">
-          Scanned by the mobile passenger via <strong>Scan Ride</strong>. Encodes signed payment intent, vehicle code, fare, and 300s expiry.
-        </p>
-
-        <div class="form-group">
-          <label>Fare Amount (Centavos)</label>
-          <div class="fare-pills">
-            <div class="fare-pill" onclick="selectFare(1500, this)">₱15</div>
-            <div class="fare-pill" onclick="selectFare(2000, this)">₱20</div>
-            <div class="fare-pill" onclick="selectFare(2500, this)">₱25</div>
-            <div class="fare-pill active" onclick="selectFare(3000, this)">₱30</div>
-            <div class="fare-pill" onclick="selectFare(4000, this)">₱40</div>
-            <div class="fare-pill" onclick="selectFare(5000, this)">₱50</div>
-          </div>
-        </div>
-
-        <div style="display:flex; gap:12px; flex-wrap:wrap;">
-          <button class="btn" style="flex:1;" onclick="generateDynamicIntent()">
-            ⚡ Generate New Payment QR
-          </button>
-          <button id="btnMockConfirm" class="btn btn-secondary" style="display:none;" onclick="triggerMockConfirm()">
-            Simulate Confirmation
-          </button>
-        </div>
-        <a id="paymongoCheckoutBtn" href="#" target="_blank" class="btn" style="display:none; background:#0284c7; color:#fff; text-decoration:none; text-align:center;">
-          🌐 Open PayMongo GCash Screen ↗
-        </a>
-
-        <div style="display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:8px;">
-          <div id="dynamicQrContainer" class="qr-box">
-            <span style="color:#64748b; font-size:13px;">Generating QR...</span>
-          </div>
-          <div id="dynamicStatus" class="status-badge status-awaiting">
-            Awaiting mobile scan...
-          </div>
-          <div id="timerDisplay" style="font-size:12px; color:var(--text-muted);">Expiry: 300s</div>
-        </div>
-
-        <div>
-          <label>Raw Payload Encoded in QR:</label>
-          <pre id="dynamicPayloadPreview" class="code-preview">// Click generate to create live signed payload</pre>
-        </div>
-      </div>
-
-      <!-- Card 2: Static Vehicle Sticker QR -->
-      <div class="card">
-        <div class="card-title">
-          🏷️ 2. Static Vehicle Sticker QR
-          <span class="badge" style="background:#1e3a8a; color:#60a5fa">Offline Capable</span>
-        </div>
-        <p style="font-size:13px; color:var(--text-muted);">
-          Simulates the physical QR sticker mounted on a tricycle. Works 100% offline in the mobile app or opens the public vehicle verification page in web browser.
-        </p>
-
-        <div class="form-group">
-          <label>Vehicle Code</label>
-          <input type="text" id="vehicleCodeInput" value="TR-01842" oninput="updateStaticQr()" />
-        </div>
-
-        <div style="display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:8px;">
-          <div id="staticQrContainer" class="qr-box"></div>
-          <div style="font-size:13px; color:#cbd5e1; text-align:center;">
-            <strong>Vehicle Code:</strong> <span id="lblVehicleCode">TR-01842</span> (Checksum: <code>2ab48c98297c</code>)
-          </div>
-        </div>
-
-        <div style="margin-top:10px;">
-          <label>Sticker URL Encoded:</label>
-          <pre id="staticPayloadPreview" class="code-preview"></pre>
-        </div>
-
-        <!-- Card 3: OCR Number Plate for Camera Scanner -->
-        <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--card-border); text-align:center;">
-          <div class="card-title" style="justify-content:center; margin-bottom:8px;">
-            📷 3. OCR Camera Plate Test
-          </div>
-          <p style="font-size:12px; color:var(--text-muted);">
-            Point your mobile camera at this body number using the <strong>OCR Camera</strong> mode:
-          </p>
-          <div class="ocr-plate" id="ocrPlateDisplay">
-            TR-01842
-          </div>
-        </div>
+  <main class="wrap">
+    <div class="brand">
+      <div class="mark">TR</div>
+      <div>
+        <h1>TalaRide Permanent Vehicle QR</h1>
+        <div class="sub">This is the QR passengers scan for the MVP.</div>
       </div>
     </div>
-  </div>
+
+    <section class="card">
+      <span class="badge">NON-EXPIRING VEHICLE STICKER</span>
+      <div class="grid">
+        <div id="qr" class="qr"></div>
+        <div>
+          <h2 style="margin:0 0 6px;font-size:20px">TR-01842</h2>
+          <div style="color:var(--muted);font-size:13px">Scan with the phone's normal Camera app.</div>
+          <div class="steps">
+            <div class="step"><b>1.</b> If TalaRide is installed, open the app checkout.</div>
+            <div class="step"><b>2.</b> Otherwise stay on the web checkout.</div>
+            <div class="step"><b>3.</b> Verify driver and vehicle.</div>
+            <div class="step"><b>4.</b> Choose a fare or enter the exact fare.</div>
+            <div class="step"><b>5.</b> Choose payment, then tap Proceed.</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="url" class="link"></div>
+      <div class="actions">
+        <a id="openNormal" class="btn primary" target="_blank">OPEN NORMAL QR LINK</a>
+        <a id="openWeb" class="btn secondary" target="_blank">OPEN WEB FALLBACK</a>
+      </div>
+      <p class="note">
+        This permanent sticker does not contain a fare and does not create a payment. The payment is
+        created only after the passenger chooses or enters a fare, selects a payment method, and taps
+        Proceed.
+      </p>
+    </section>
+  </main>
 
   <script>
-    const IS_LOCAL = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-    const API_BASE = IS_LOCAL ? 'http://localhost:4000/api' : 'https://talaride-web.onrender.com/api';
-    let currentFareCentavos = 3000;
-    let activePaymentId = null;
-    let pollInterval = null;
-    let timerInterval = null;
-    let expiresAt = null;
+    const vehicleCode = 'TR-01842';
+    const checksum = '2ab48c98297c';
+    const normalUrl = window.location.origin + '/v/' + vehicleCode + '?c=' + checksum;
+    const webUrl = normalUrl + '&web=1';
 
-    function selectFare(centavos, element) {
-      currentFareCentavos = centavos;
-      document.querySelectorAll('.fare-pill').forEach(p => p.classList.remove('active'));
-      element.classList.add('active');
-      generateDynamicIntent();
-    }
+    document.getElementById('url').textContent = normalUrl;
+    document.getElementById('openNormal').href = normalUrl;
+    document.getElementById('openWeb').href = webUrl;
 
-    async function generateDynamicIntent() {
-      clearInterval(pollInterval);
-      clearInterval(timerInterval);
-
-      const statusEl = document.getElementById('dynamicStatus');
-      statusEl.className = 'status-badge status-awaiting';
-      statusEl.innerText = 'Creating payment intent...';
-      document.getElementById('btnMockConfirm').style.display = 'none';
-
-      try {
-        const res = await fetch(`${API_BASE}/payment-intent`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            vehicle_code: 'TR-01842',
-            driver_code: 'DR-000481',
-            amount_centavos: currentFareCentavos
-          })
-        });
-
-        const data = await res.json();
-        if (!data.success) throw new Error(data.message || 'Failed to create intent');
-
-        activePaymentId = data.payment_id;
-        expiresAt = new Date(data.expires_at).getTime();
-
-        // Normal phone cameras need an HTTPS URL, not TalaRide's internal JSON payload.
-        const scanParams = new URLSearchParams({
-          payment_id: data.payment_id,
-          amount: String(data.amount_centavos / 100),
-          vehicle: data.vehicle_code || 'TR-01842',
-          driver_id: data.driver_code || 'DR-000481',
-          driver_name: 'Juan Dela Cruz'
-        });
-        const scanUrl = `${window.location.origin}/guest?${scanParams.toString()}`;
-
-        // Render a no-app web QR that any phone camera can open.
-        const container = document.getElementById('dynamicQrContainer');
-        container.innerHTML = '';
-        new QRCode(container, {
-          text: scanUrl,
-          width: 210,
-          height: 210,
-          colorDark: '#000000',
-          colorLight: '#ffffff',
-          correctLevel: QRCode.CorrectLevel.M
-        });
-
-        document.getElementById('dynamicPayloadPreview').innerText =
-          `Phone camera URL:\n${scanUrl}\n\nSigned TalaRide intent:\n${data.qr_payload}`;
-        statusEl.innerText = `Ready to scan: ₱${(data.amount_centavos / 100).toFixed(2)} (${data.payment_id})`;
-        document.getElementById('btnMockConfirm').style.display = IS_LOCAL ? 'block' : 'none';
-
-        const pmBtn = document.getElementById('paymongoCheckoutBtn');
-        if (data.checkout_url) {
-          pmBtn.href = data.checkout_url;
-          pmBtn.style.display = 'block';
-        } else {
-          pmBtn.style.display = 'none';
-        }
-
-        // Start countdown
-        startCountdown();
-
-        // Start status polling
-        pollPaymentStatus(data.payment_id);
-      } catch (err) {
-        statusEl.className = 'status-badge status-expired';
-        statusEl.innerText = 'Error: ' + err.message;
-      }
-    }
-
-    function startCountdown() {
-      const display = document.getElementById('timerDisplay');
-      timerInterval = setInterval(() => {
-        const remaining = Math.max(0, Math.round((expiresAt - Date.now()) / 1000));
-        display.innerText = `Expiry: ${remaining}s left`;
-        if (remaining <= 0) {
-          clearInterval(timerInterval);
-          clearInterval(pollInterval);
-          const statusEl = document.getElementById('dynamicStatus');
-          if (!statusEl.classList.contains('status-confirmed')) {
-            statusEl.className = 'status-badge status-expired';
-            statusEl.innerText = 'QR Expired (300s exceeded)';
-          }
-        }
-      }, 1000);
-    }
-
-    function pollPaymentStatus(paymentId) {
-      pollInterval = setInterval(async () => {
-        try {
-          const res = await fetch(`${API_BASE}/payment-status?payment_id=${encodeURIComponent(paymentId)}`);
-          const data = await res.json();
-          if (data.payment_status === 'confirmed') {
-            clearInterval(pollInterval);
-            clearInterval(timerInterval);
-            const statusEl = document.getElementById('dynamicStatus');
-            statusEl.className = 'status-badge status-confirmed';
-            statusEl.innerText = 'Payment Confirmed! ✅ (Ride #' + data.ride_id + ')';
-            document.getElementById('btnMockConfirm').style.display = 'none';
-          }
-        } catch {}
-      }, 1500);
-    }
-
-    async function triggerMockConfirm() {
-      if (!activePaymentId) return;
-      try {
-        if (!IS_LOCAL) throw new Error('Mock confirmation is disabled on deployed staging.');
-        await fetch(`${API_BASE}/mock-confirm`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ payment_id: activePaymentId })
-        });
-      } catch (e) {
-        alert('Mock confirmation failed: ' + e.message);
-      }
-    }
-
-    function updateStaticQr() {
-      const code = document.getElementById('vehicleCodeInput').value.trim().toUpperCase() || 'TR-01842';
-      document.getElementById('lblVehicleCode').innerText = code;
-      document.getElementById('ocrPlateDisplay').innerText = code;
-
-      // Current permanent vehicle checksum for the staging vehicle.
-      const checksum = code === 'TR-01842' ? '2ab48c98297c' : 'invalid-test-checksum';
-      const url = `${window.location.origin}/v/${code}?c=${checksum}`;
-
-      const container = document.getElementById('staticQrContainer');
-      container.innerHTML = '';
-      new QRCode(container, {
-        text: url,
-        width: 210,
-        height: 210,
-        colorDark: '#000000',
-        colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M
-      });
-
-      document.getElementById('staticPayloadPreview').innerText = url;
-    }
-
-    // Initialize on page load
-    window.addEventListener('DOMContentLoaded', () => {
-      updateStaticQr();
-      generateDynamicIntent();
+    new QRCode(document.getElementById('qr'), {
+      text: normalUrl,
+      width: 220,
+      height: 220,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
     });
   </script>
 </body>
