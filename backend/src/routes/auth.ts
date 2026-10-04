@@ -1,86 +1,83 @@
-import { Router } from 'express';
-import { db } from '../db.js';
-import { User, Driver } from '../types.js';
+import { Router, Request, Response } from 'express';
+import { env } from '../env.js';
+import { repository } from '../lib/repository.js';
+import { otpRateLimiter } from '../middleware/rate-limit.js';
 
 export const authRouter = Router();
 
-// Request OTP
-authRouter.post('/otp-request', (req, res) => {
-  const { mobileNumber, role = 'commuter' } = req.body;
-  if (!mobileNumber) {
-    return res.status(400).json({ error: 'Mobile number is required' });
-  }
+// POST /api/auth/otp-request
+authRouter.post('/otp-request', otpRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { mobileNumber, role = 'commuter' } = req.body;
+    if (!mobileNumber) {
+      return res.status(400).json({ error: 'Mobile number is required' });
+    }
 
-  // Simulated OTP for MVP
-  const otp = '8842';
-  return res.json({
-    success: true,
-    message: `OTP sent to ${mobileNumber}`,
-    otp, // Exposed in demo response for easy testing
-    expiresInSeconds: 300
-  });
+    if (!env.DEMO_AUTH) {
+      return res.status(501).json({
+        error: 'Production auth required',
+        message: 'Direct demo OTP generation is disabled in production. Use Supabase Auth SMS provider.'
+      });
+    }
+
+    // Demo Mode OTP
+    const otp = '8842';
+    return res.json({
+      success: true,
+      message: `OTP sent to ${mobileNumber}`,
+      otp, // Exposed only when DEMO_AUTH=true
+      expiresInSeconds: 300
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Server error', message: err.message });
+  }
 });
 
-// Verify OTP & Login
-authRouter.post('/otp-verify', (req, res) => {
-  const { mobileNumber, otp, role = 'commuter', name } = req.body;
+// POST /api/auth/otp-verify
+authRouter.post('/otp-verify', async (req: Request, res: Response) => {
+  try {
+    const { mobileNumber, otp, role = 'commuter', pin } = req.body;
 
-  if (otp !== '8842' && otp !== '1234') {
-    return res.status(400).json({ error: 'Invalid or expired OTP. Use demo OTP 8842.' });
-  }
-
-  // Find existing user or register
-  let user: User | undefined;
-  for (const u of db.users.values()) {
-    if (u.mobile_number === mobileNumber) {
-      user = u;
-      break;
+    if (!env.DEMO_AUTH) {
+      return res.status(501).json({
+        error: 'Production auth required',
+        message: 'Direct demo OTP verification is disabled in production. Verify through Supabase Auth.'
+      });
     }
-  }
 
-  if (!user) {
-    const userId = `USR-${role.toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-4)}`;
-    user = {
-      user_id: userId,
-      mobile_number: mobileNumber,
-      name: name || (role === 'driver' ? 'Juan Driver' : 'Commuter Rider'),
-      account_type: role,
-      status: 'active',
-      created_at: new Date().toISOString()
-    };
-    db.users.set(user.user_id, user);
+    // Strict validation
+    if (otp !== '8842' && otp !== '1234') {
+      return res.status(401).json({ error: 'Invalid or expired OTP. Use demo OTP 8842.' });
+    }
 
+    // Driver PIN validation - driver authentication fails closed if PIN is missing or invalid.
     if (role === 'driver') {
-      const driverId = `DR-000${Math.floor(100 + Math.random() * 900)}`;
-      const driver: Driver = {
-        driver_id: driverId,
-        user_id: user.user_id,
-        name: user.name,
-        mobile_number: user.mobile_number,
-        verification_status: 'verified',
-        toda_operator: 'Tagum Poblacion TODA',
-        assigned_vehicle_id: null,
-        shift_status: 'ended',
-        license_number: 'N01-20-' + Math.floor(100000 + Math.random() * 900000),
-        created_at: new Date().toISOString()
-      };
-      db.drivers.set(driver.driver_id, driver);
-    }
-  }
-
-  let driverProfile: Driver | undefined;
-  if (user.account_type === 'driver') {
-    for (const d of db.drivers.values()) {
-      if (d.user_id === user.user_id) {
-        driverProfile = d;
-        break;
+      if (!pin) {
+        return res.status(400).json({ error: 'Driver PIN is required' });
+      }
+      if (pin !== '8842' && pin !== '1234') {
+        return res.status(401).json({ error: 'Invalid Driver PIN' });
       }
     }
-  }
 
-  return res.json({
-    success: true,
-    user,
-    driver: driverProfile
-  });
+    // Find profile
+    let profile = await repository.getProfileByMobile(mobileNumber);
+    if (!profile) {
+      const isDriver = role === 'driver';
+      const userId = isDriver ? 'USR-DRV-001' : 'USR-COM-001';
+      profile = await repository.getProfile(userId);
+    }
+
+    const driver = role === 'driver' ? await repository.getDriver('DR-000481') : null;
+    const token = role === 'driver' ? 'demo-driver-token' : 'demo-passenger-token';
+
+    return res.json({
+      success: true,
+      token,
+      user: profile,
+      driver
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Server error', message: err.message });
+  }
 });

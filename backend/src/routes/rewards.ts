@@ -1,69 +1,89 @@
-import { Router } from 'express';
-import { db } from '../db.js';
+import { Router, Request, Response } from 'express';
+import { repository } from '../lib/repository.js';
+import { optionalAuth } from '../lib/auth.js';
 
 export const rewardsRouter = Router();
 
-// Get rewards balance and milestone for user
-rewardsRouter.get('/:userId', (req, res) => {
-  const userId = req.params.userId;
+// GET /api/rewards-me
+rewardsRouter.get('/rewards-me', optionalAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id || (req.query.user_id as string) || (req.query.userId as string) || 'USR-COM-001';
+    const data = await repository.getRewardsForUser(userId);
 
-  const userRewards = Array.from(db.rewards.values()).filter(r => r.user_id === userId);
-  const totalEarnedPoints = userRewards
-    .filter(r => r.status === 'earned')
-    .reduce((sum, r) => sum + r.points, 0);
-
-  const redeemedCount = userRewards.filter(r => r.status === 'redeemed').length;
-
-  const currentPoints = Math.max(0, totalEarnedPoints - (redeemedCount * 10));
-  const progressToNextReward = currentPoints % 10;
-  const rewardsUnlocked = Math.floor(currentPoints / 10);
-
-  return res.json({
-    userId,
-    currentPoints,
-    targetMilestone: 10,
-    progressTowardsMilestone: progressToNextReward,
-    unlockedRewardsCount: rewardsUnlocked,
-    activeVoucher: rewardsUnlocked > 0 ? {
-      voucherCode: 'TALA-PROMO-10RIDE',
-      description: '₱20 Fare Discount / Partner Merchant Offer',
-      expiry: '30 days from unlock'
-    } : null,
-    history: userRewards.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-  });
+    return res.json({
+      user_id: userId,
+      current_points: data.currentPoints,
+      target_milestone: 10,
+      progress_towards_milestone: data.progressTowardsMilestone,
+      unlocked_rewards_count: data.unlockedRewardsCount,
+      active_voucher:
+        data.unlockedRewardsCount > 0
+          ? {
+              voucher_code: 'TALA-PROMO-10RIDE',
+              description: '₱20 Fare Discount / Partner Merchant Voucher',
+              expiry: '30 days from unlock'
+            }
+          : null,
+      history: data.history
+    });
+  } catch (err: any) {
+    console.error('Error fetching rewards:', err);
+    return res.status(500).json({ error: 'Server error', message: err.message });
+  }
 });
 
-// Redeem reward voucher
-rewardsRouter.post('/redeem', (req, res) => {
-  const { userId } = req.body;
+// GET /api/rewards/:userId (compatibility)
+rewardsRouter.get('/:userId', async (req: Request, res: Response) => {
+  try {
+    const userId = String(req.params.userId);
+    const data = await repository.getRewardsForUser(userId);
 
-  const userRewards = Array.from(db.rewards.values()).filter(r => r.user_id === userId);
-  const earned = userRewards.filter(r => r.status === 'earned').reduce((s, r) => s + r.points, 0);
-  const redeemed = userRewards.filter(r => r.status === 'redeemed').length;
-  const availablePoints = earned - (redeemed * 10);
-
-  if (availablePoints < 10) {
-    return res.status(400).json({ error: 'You need at least 10 TalaPoints to redeem this reward' });
+    return res.json({
+      userId,
+      currentPoints: data.currentPoints,
+      targetMilestone: 10,
+      progressTowardsMilestone: data.progressTowardsMilestone,
+      unlockedRewardsCount: data.unlockedRewardsCount,
+      activeVoucher:
+        data.unlockedRewardsCount > 0
+          ? {
+              voucherCode: 'TALA-PROMO-10RIDE',
+              description: '₱20 Fare Discount / Partner Merchant Offer',
+              expiry: '30 days from unlock'
+            }
+          : null,
+      history: data.history
+    });
+  } catch (err: any) {
+    console.error('Error fetching rewards for user:', err);
+    return res.status(500).json({ error: 'Server error', message: err.message });
   }
+});
 
-  const redeemTx = {
-    reward_id: `REW-RED-${Date.now().toString().slice(-4)}`,
-    user_id: userId,
-    ride_id: '',
-    points: 10,
-    status: 'redeemed' as const,
-    reward_type: 'promotional_voucher' as const,
-    created_at: new Date().toISOString()
-  };
-
-  db.rewards.set(redeemTx.reward_id, redeemTx);
-
-  return res.json({
-    success: true,
-    message: 'Congratulations! You unlocked your ₱20 TalaRide promotional reward voucher.',
-    voucher: {
-      code: `TALAPROMO-${Math.floor(1000 + Math.random() * 9000)}`,
-      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
+// POST /api/rewards/redeem
+rewardsRouter.post('/redeem', optionalAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.body.user_id || req.body.userId || req.user?.id;
+    if (!userId) {
+      return res.status(400).json({ error: 'user_id is required' });
     }
-  });
+
+    const redemption = await repository.redeemReward(userId);
+
+    return res.json({
+      success: true,
+      message: 'Congratulations! You unlocked your ₱20 TalaRide promotional reward voucher.',
+      redemption,
+      voucher: {
+        code: `TALAPROMO-${Math.floor(1000 + Math.random() * 9000)}`,
+        valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      }
+    });
+  } catch (err: any) {
+    if (err.message.includes('Insufficient points')) {
+      return res.status(400).json({ error: err.message });
+    }
+    console.error('Error redeeming reward:', err);
+    return res.status(500).json({ error: 'Server error', message: err.message });
+  }
 });
