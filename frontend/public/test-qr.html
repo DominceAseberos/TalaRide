@@ -76,7 +76,7 @@
       <div class="nav-links">
         <a href="/simulator" target="_blank">Dual Simulator ↗</a>
         <a href="/driver" target="_blank">Driver Portal ↗</a>
-        <a href="/v/TR-01842?c=0bee61269f02" target="_blank">Vehicle Sticker ↗</a>
+        <a href="/v/TR-01842?c=2ab48c98297c" target="_blank">Vehicle Sticker ↗</a>
       </div>
     </header>
 
@@ -149,7 +149,7 @@
         <div style="display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:8px;">
           <div id="staticQrContainer" class="qr-box"></div>
           <div style="font-size:13px; color:#cbd5e1; text-align:center;">
-            <strong>Vehicle Code:</strong> <span id="lblVehicleCode">TR-01842</span> (Checksum: <code>0bee61269f02</code>)
+            <strong>Vehicle Code:</strong> <span id="lblVehicleCode">TR-01842</span> (Checksum: <code>2ab48c98297c</code>)
           </div>
         </div>
 
@@ -301,9 +301,9 @@
       document.getElementById('lblVehicleCode').innerText = code;
       document.getElementById('ocrPlateDisplay').innerText = code;
 
-      // Checksum for TR-01842 is 0bee61269f02
-      const checksum = code === 'TR-01842' ? '0bee61269f02' : 'abcd1234ef56';
-      const url = `https://talaride.app/v/${code}?c=${checksum}`;
+      // Current permanent vehicle checksum for the staging vehicle.
+      const checksum = code === 'TR-01842' ? '2ab48c98297c' : 'invalid-test-checksum';
+      const url = `${window.location.origin}/v/${code}?c=${checksum}`;
 
       const container = document.getElementById('staticQrContainer');
       container.innerHTML = '';
