@@ -56,8 +56,24 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
     if (typeof window === 'undefined') return;
     const search = new URLSearchParams(window.location.search);
     if (search.get('web') === '1') return;
-    if (!/Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent)) return;
 
+    const userAgent = window.navigator.userAgent;
+    if (/Android/i.test(userAgent)) {
+      const fallback = new URL(window.location.href);
+      fallback.searchParams.set('web', '1');
+      const intentUrl =
+        'intent://ride-confirm?vehicle_code=' +
+        encodeURIComponent(vehicleCode) +
+        '&c=' +
+        encodeURIComponent(checksum) +
+        '#Intent;scheme=talaride;package=com.beepanjero.talaride;S.browser_fallback_url=' +
+        encodeURIComponent(fallback.toString()) +
+        ';end';
+      window.location.replace(intentUrl);
+      return;
+    }
+
+    if (!/iPhone|iPad|iPod/i.test(userAgent)) return;
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
     frame.style.display = 'none';
@@ -68,7 +84,7 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
       window.clearTimeout(timer);
       frame.remove();
     };
-  }, [appDeepLink]);
+  }, [appDeepLink, vehicleCode, checksum]);
 
   useEffect(() => {
     let ignore = false;
