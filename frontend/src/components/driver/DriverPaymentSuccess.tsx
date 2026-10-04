@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Check, ShieldCheck, ArrowRight, Banknote } from 'lucide-react';
+import { Check, ShieldCheck, ArrowRight } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { playPaymentChime } from '../../utils/audio';
 
@@ -20,15 +20,15 @@ export const DriverPaymentSuccess: React.FC<Props> = ({ payment, onNextPassenger
         spread: 60,
         origin: { y: 0.6 }
       });
-    } catch (e) {
+    } catch {
       // ignore
     }
   }, []);
 
-  const amount = payment?.amount || 30;
-  const net = payment?.net_amount || (amount * 0.9825).toFixed(2);
-  const fee = payment?.driver_fee || (amount * 0.0175).toFixed(2);
-  const ref = payment?.provider_reference || `GCASH-REF-${Math.floor(1000000 + Math.random() * 9000000)}`;
+  const amount = payment?.amount_centavos ? payment.amount_centavos / 100 : payment?.amount || 30;
+  const net = payment?.net_centavos ? (payment.net_centavos / 100).toFixed(2) : payment?.net_amount || (amount * 0.9825).toFixed(2);
+  const fee = payment?.provider_fee_centavos ? (payment.provider_fee_centavos / 100).toFixed(2) : payment?.driver_fee || (amount * 0.0175).toFixed(2);
+  const ref = payment?.provider_reference || payment?.provider_ref || 'GCASH-REF-8842109';
 
   return (
     <div className="min-h-full flex flex-col justify-between p-6 bg-emerald-600 text-slate-950 select-none animate-fadeIn">

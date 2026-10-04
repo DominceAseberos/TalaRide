@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Banknote, QrCode, Calendar, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Banknote, QrCode, Calendar } from 'lucide-react';
 import { Driver, Ride, Payment } from '../../types';
 import { api } from '../../services/api';
 
@@ -11,26 +11,23 @@ interface Props {
 export const DriverHistory: React.FC<Props> = ({ driver, onBack }) => {
   const [rides, setRides] = useState<Ride[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [summary, setSummary] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadData();
+    let ignore = false;
+    api.getDriverSummary(driver.driver_id)
+      .then((data) => {
+        if (!ignore) {
+          setRides(data.rides || []);
+          setPayments(data.payments || []);
+        }
+      })
+      .catch((e) => {
+        if (!ignore) console.warn('Driver summary fallback', e);
+      });
+    return () => {
+      ignore = true;
+    };
   }, [driver.driver_id]);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const data = await api.getDriverSummary(driver.driver_id);
-      setSummary(data.activeShift);
-      setRides(data.rides || []);
-      setPayments(data.payments || []);
-    } catch (e) {
-      console.warn('Driver summary fallback', e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const digitalRides = rides.filter(r => r.payment_method === 'digital');
   const cashRides = rides.filter(r => r.payment_method === 'cash');

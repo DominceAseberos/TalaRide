@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
   Smartphone,
-  Shield,
   Layers,
   Sparkles,
   Home,
   QrCode,
   Clock,
   Award,
-  User,
-  SlidersHorizontal,
-  ChevronRight
+  User
 } from 'lucide-react';
+
+import { PublicVehiclePage } from './components/public/PublicVehiclePage';
+import { PaymentReturnPage } from './components/public/PaymentReturnPage';
 
 // Commuter Components
 import { CommuterHome } from './components/commuter/CommuterHome';
@@ -43,10 +43,30 @@ import { Ride, Driver } from './types';
 import { api, connectSSE } from './services/api';
 import { playAlertChime } from './utils/audio';
 
+const SEED_TIMESTAMP = '2026-10-01T08:00:00.000Z';
+
 type ActivePortal = 'commuter' | 'driver' | 'guest' | 'admin' | 'simulator';
 
 export function App() {
-  const [activePortal, setActivePortal] = useState<ActivePortal>('commuter');
+  const [activePortal, setActivePortal] = useState<ActivePortal>(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path === '/simulator') return 'simulator';
+      if (path === '/admin') return 'admin';
+      if (path === '/driver') return 'driver';
+      if (path === '/guest') return 'guest';
+    }
+    return 'commuter';
+  });
+
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+  const currentSearch = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const isVehiclePublic = currentPath.startsWith('/v/');
+  const isPaymentSuccessReturn = currentPath === '/success';
+  const isPaymentCancelReturn = currentPath === '/cancel';
+  const returnPaymentId = currentSearch.get('payment_id') || '';
+  const publicVehicleCode = isVehiclePublic ? currentPath.replace(/^\/v\//, '').split('/')[0] : '';
+  const publicChecksum = currentSearch.get('c') || '';
 
   // Commuter State
   const [commuterTab, setCommuterTab] = useState<'home' | 'scan' | 'history' | 'rewards' | 'account'>('home');
@@ -69,14 +89,14 @@ export function App() {
     assigned_vehicle_id: 'TR-01842',
     shift_status: 'active',
     license_number: 'N02-14-098765',
-    created_at: new Date().toISOString()
+    created_at: SEED_TIMESTAMP
   });
 
   const [driverShift, setDriverShift] = useState<any>({
     shift_id: 'SHIFT-2026-001',
     driver_id: 'DR-000481',
     vehicle_id: 'TR-01842',
-    start_time: new Date().toISOString(),
+    start_time: SEED_TIMESTAMP,
     end_time: null,
     status: 'active',
     digital_rides_count: 18,
@@ -130,6 +150,27 @@ export function App() {
       setRecentRide(res.ride);
     }
   };
+
+  if (isPaymentSuccessReturn || isPaymentCancelReturn) {
+    return (
+      <PaymentReturnPage
+        paymentId={returnPaymentId}
+        cancelled={isPaymentCancelReturn}
+      />
+    );
+  }
+
+  if (isVehiclePublic) {
+    return (
+      <PublicVehiclePage
+        vehicleCode={publicVehicleCode}
+        checksum={publicChecksum}
+        onGoHome={() => {
+          window.location.href = '/';
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">

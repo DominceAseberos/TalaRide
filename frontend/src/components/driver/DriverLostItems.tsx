@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Bell, CheckCircle, XCircle, HelpCircle, Shield, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ArrowLeft, Bell, CheckCircle, XCircle, HelpCircle, Shield } from 'lucide-react';
 import { Driver, LostItemReport } from '../../types';
 import { api } from '../../services/api';
 
@@ -10,24 +10,30 @@ interface Props {
 
 export const DriverLostItems: React.FC<Props> = ({ driver, onBack }) => {
   const [reports, setReports] = useState<LostItemReport[]>([]);
-  const [loading, setLoading] = useState(true);
   const [respondingId, setRespondingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadReports();
-  }, [driver.driver_id]);
-
-  const loadReports = async () => {
-    setLoading(true);
+  const loadReports = useCallback(async () => {
     try {
       const data = await api.getLostItems({ driverId: driver.driver_id });
       setReports(data);
     } catch (e) {
       console.warn('Lost item fetch fallback', e);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [driver.driver_id]);
+
+  useEffect(() => {
+    let ignore = false;
+    api.getLostItems({ driverId: driver.driver_id })
+      .then((data) => {
+        if (!ignore) setReports(data);
+      })
+      .catch((e) => {
+        if (!ignore) console.warn('Lost item fetch fallback', e);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [driver.driver_id]);
 
   const handleDriverResponse = async (reportId: string, response: 'found' | 'not_found' | 'contact_support') => {
     setRespondingId(reportId);

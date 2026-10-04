@@ -1,16 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Users,
-  Bike,
-  CreditCard,
   AlertTriangle,
   HelpCircle,
-  Settings,
-  TrendingUp,
-  ShieldCheck,
   Search,
-  CheckCircle,
-  XCircle,
   Printer,
   Plus,
   RefreshCw
@@ -46,11 +38,7 @@ export const AdminDashboard: React.FC = () => {
   // Printable sticker modal
   const [stickerVehicle, setStickerVehicle] = useState<Vehicle | null>(null);
 
-  useEffect(() => {
-    loadAllData();
-  }, []);
-
-  const loadAllData = async () => {
+  const loadAllData = useCallback(async () => {
     setLoading(true);
     try {
       const [ov, drvs, vehs, txs, items, issues, fares] = await Promise.all([
@@ -74,7 +62,41 @@ export const AdminDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const [ov, drvs, vehs, txs, items, issues, fares] = await Promise.all([
+          api.getAdminOverview(),
+          api.getAdminDrivers(),
+          api.getVehicles(),
+          api.getAdminTransactions(),
+          api.getLostItems(),
+          api.getPaymentIssues(),
+          api.getFareConfig()
+        ]);
+        if (!ignore) {
+          setOverview(ov);
+          setDrivers(drvs);
+          setVehicles(vehs);
+          setTransactions(txs);
+          setLostItems(items);
+          setPaymentIssues(issues);
+          setFareConfig(fares);
+        }
+      } catch (e) {
+        console.warn('Admin load error', e);
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const handleVerifyDriver = async (driverId: string) => {
     await api.verifyDriver(driverId);
@@ -121,7 +143,7 @@ export const AdminDashboard: React.FC = () => {
     await loadAllData();
   };
 
-  const handleUpdateFares = async (faresArray: number[]) => {
+  const _handleUpdateFares = async (faresArray: number[]) => {
     await api.updateFareConfig({ standard_fares: faresArray });
     await loadAllData();
   };

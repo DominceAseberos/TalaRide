@@ -17,6 +17,7 @@ export const SafetyCheckInModal: React.FC<Props> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [currentTime] = useState(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
   if (!isOpen) return null;
 
@@ -97,7 +98,7 @@ export const SafetyCheckInModal: React.FC<Props> = ({
                 <span className="text-slate-400 flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5" /> Time:
                 </span>
-                <span className="text-slate-700">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                <span className="text-slate-700">{currentTime}</span>
               </div>
             </div>
 

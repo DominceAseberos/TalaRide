@@ -8,9 +8,8 @@ interface Props {
 
 export const DriverLogin: React.FC<Props> = ({ onLoginSuccess }) => {
   const [mobileNumber, setMobileNumber] = useState('09171234567');
-  const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('8842');
-  const [pin, setPin] = useState('1234');
+  const [pin, setPin] = useState('8842');
   const [step, setStep] = useState<'mobile' | 'otp' | 'pin'>('mobile');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -25,7 +24,6 @@ export const DriverLogin: React.FC<Props> = ({ onLoginSuccess }) => {
     setError('');
     try {
       await api.requestOtp(mobileNumber, 'driver');
-      setOtpSent(true);
       setStep('otp');
     } catch (err: any) {
       setError(err.message || 'Failed to send OTP');
@@ -36,39 +34,34 @@ export const DriverLogin: React.FC<Props> = ({ onLoginSuccess }) => {
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
-    try {
-      const res = await api.verifyOtp(mobileNumber, otp, 'driver', 'Juan Dela Cruz');
-      if (res.success) {
-        setStep('pin');
-      } else {
-        setError(res.error || 'Verification failed');
-      }
-    } catch (err: any) {
-      setError(err.message || 'OTP Verification failed');
-    } finally {
-      setLoading(false);
+    if (!/^\d{4}$/.test(otp)) {
+      setError('Enter the 4-digit OTP sent to your mobile number.');
+      return;
     }
+    // The backend verifies OTP and PIN together on the final authentication step.
+    setStep('pin');
   };
 
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (pin !== '8842' && pin !== '1234') {
+      setError('Invalid Driver PIN. Please enter your 4-digit security PIN.');
+      return;
+    }
+
     setLoading(true);
+    setError('');
     try {
-      // Driver profile loaded
-      const driverRes = await api.getDriver('DR-000481');
-      onLoginSuccess(driverRes.driver);
-    } catch (err) {
-      onLoginSuccess({
-        driver_id: 'DR-000481',
-        name: 'Juan Dela Cruz',
-        mobile_number: mobileNumber,
-        verification_status: 'verified',
-        toda_operator: 'Tagum Poblacion TODA',
-        assigned_vehicle_id: 'TR-01842',
-        shift_status: 'ended'
-      });
+      const auth = await api.verifyOtp(mobileNumber, otp, 'driver', 'Juan Dela Cruz', pin);
+      if (auth?.success && auth?.driver) {
+        onLoginSuccess(auth.driver);
+      } else {
+        setError('Driver authentication failed.');
+      }
+    } catch (err: any) {
+      // Fail closed: no hardcoded verified-driver fallback.
+      setError(err.message || 'Authentication failed. Please verify credentials.');
     } finally {
       setLoading(false);
     }

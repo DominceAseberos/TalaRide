@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, HelpCircle, CheckCircle2, Shield, Smartphone, Wallet, Briefcase, FileText, Key, MoreHorizontal } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Shield, Smartphone, Wallet, Briefcase, FileText, Key, MoreHorizontal } from 'lucide-react';
 import { Ride, LostItemCategory } from '../../types';
 import { api } from '../../services/api';
 

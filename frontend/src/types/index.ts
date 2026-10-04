@@ -82,6 +82,7 @@ export interface Payment {
   amount: number;
   provider: PaymentProvider;
   provider_reference: string;
+  checkout_url?: string | null;
   payment_status: PaymentStatus;
   provider_fee: number;
   talaride_fee: number;

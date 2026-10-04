@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Check, Award, ArrowRight, ShieldCheck, FileText } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Check, Award, ShieldCheck } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface Props {
@@ -20,17 +20,23 @@ export const CommuterPaymentSuccess: React.FC<Props> = ({
         spread: 55,
         origin: { y: 0.5 }
       });
-    } catch (e) {
+    } catch {
       // ignore
     }
   }, []);
 
   const ride = paymentResult?.ride;
   const payment = paymentResult?.payment;
-  const pointsAwarded = paymentResult?.pointsAwarded ?? 1;
+  const pointsAwarded = paymentResult?.points_awarded ?? paymentResult?.pointsAwarded ?? 1;
 
-  const vehicleId = ride?.vehicle_id || payment?.vehicle_id || 'TR-01842';
-  const amount = ride?.fare_amount || payment?.amount || 30;
+  const vehicleId = ride?.vehicle_code || ride?.vehicle_id || payment?.vehicle_code || payment?.vehicle_id || 'TR-01842';
+  const amount = payment?.amount_centavos ? payment.amount_centavos / 100 : ride?.fare_amount || payment?.amount || 30;
+
+  const [formattedTimestamp] = useState(() => {
+    const ts = ride?.timestamp || payment?.confirmed_at || new Date().toISOString();
+    const d = new Date(ts);
+    return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}, ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  });
 
   return (
     <div className="min-h-full flex flex-col justify-between p-6 bg-slate-50 text-slate-900 select-none">
@@ -64,9 +70,7 @@ export const CommuterPaymentSuccess: React.FC<Props> = ({
           </div>
           <div className="flex justify-between border-b border-slate-100 pb-1.5">
             <span className="text-slate-500">Date & Time:</span>
-            <span className="text-slate-800 font-medium">
-              {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}, {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
+            <span className="text-slate-800 font-medium">{formattedTimestamp}</span>
           </div>
           <div className="flex justify-between border-b border-slate-100 pb-1.5">
             <span className="text-slate-500">Payment:</span>

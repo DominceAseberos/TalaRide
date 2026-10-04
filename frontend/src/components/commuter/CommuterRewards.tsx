@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Award, Gift, Sparkles, CheckCircle2, ShieldAlert, ArrowLeft, Ticket } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Award, Gift, Sparkles, ShieldAlert, ArrowLeft, Ticket } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { api } from '../../services/api';
 
@@ -13,11 +13,7 @@ export const CommuterRewards: React.FC<Props> = ({ userId = 'USR-COM-001', onBac
   const [redeeming, setRedeeming] = useState(false);
   const [unlockedVoucher, setUnlockedVoucher] = useState<any>(null);
 
-  useEffect(() => {
-    loadRewards();
-  }, [userId]);
-
-  const loadRewards = async () => {
+  const loadRewards = useCallback(async () => {
     try {
       const res = await api.getRewards(userId);
       setData(res);
@@ -33,7 +29,34 @@ export const CommuterRewards: React.FC<Props> = ({ userId = 'USR-COM-001', onBac
         unlockedRewardsCount: 0
       });
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    let ignore = false;
+    api.getRewards(userId)
+      .then((res) => {
+        if (!ignore) {
+          setData(res);
+          if (res.activeVoucher) {
+            setUnlockedVoucher(res.activeVoucher);
+          }
+        }
+      })
+      .catch((e) => {
+        if (!ignore) {
+          console.warn('Rewards load fallback', e);
+          setData({
+            currentPoints: 8,
+            targetMilestone: 10,
+            progressTowardsMilestone: 8,
+            unlockedRewardsCount: 0
+          });
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [userId]);
 
   const handleRedeem = async () => {
     setRedeeming(true);

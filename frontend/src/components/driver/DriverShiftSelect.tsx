@@ -15,42 +15,47 @@ export const DriverShiftSelect: React.FC<Props> = ({ driver, onShiftStarted }) =
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadVehicles();
-  }, []);
-
-  const loadVehicles = async () => {
-    try {
-      const data = await api.getVehicles();
-      setVehicles(data);
-      if (driver.assigned_vehicle_id) {
-        setSelectedVehicleId(driver.assigned_vehicle_id);
-      } else if (data.length > 0) {
-        setSelectedVehicleId(data[0].vehicle_id);
-      }
-    } catch (e) {
-      console.warn('Vehicle list fallback', e);
-      setVehicles([
-        {
-          vehicle_id: 'TR-01842',
-          plate_body_number: 'TAG-842',
-          toda: 'Tagum Poblacion TODA',
-          status: 'active',
-          assigned_driver_id: driver.driver_id,
-          qr_code_payload: 'TALARIDE:VEHICLE:TR-01842',
-          created_at: new Date().toISOString()
-        },
-        {
-          vehicle_id: 'TR-00421',
-          plate_body_number: 'TAG-421',
-          toda: 'Magsaysay TODA',
-          status: 'active',
-          assigned_driver_id: null,
-          qr_code_payload: 'TALARIDE:VEHICLE:TR-00421',
-          created_at: new Date().toISOString()
+    let ignore = false;
+    api.getVehicles()
+      .then((data) => {
+        if (!ignore) {
+          setVehicles(data);
+          if (driver.assigned_vehicle_id) {
+            setSelectedVehicleId(driver.assigned_vehicle_id);
+          } else if (data.length > 0) {
+            setSelectedVehicleId(data[0].vehicle_id);
+          }
         }
-      ]);
-    }
-  };
+      })
+      .catch((e) => {
+        if (!ignore) {
+          console.warn('Vehicle list fallback', e);
+          setVehicles([
+            {
+              vehicle_id: 'TR-01842',
+              plate_body_number: 'TAG-842',
+              toda: 'Tagum Poblacion TODA',
+              status: 'active',
+              assigned_driver_id: driver.driver_id,
+              qr_code_payload: 'TALARIDE:VEHICLE:TR-01842',
+              created_at: '2026-09-01T08:00:00.000Z'
+            },
+            {
+              vehicle_id: 'TR-00421',
+              plate_body_number: 'TAG-421',
+              toda: 'Magsaysay TODA',
+              status: 'active',
+              assigned_driver_id: null,
+              qr_code_payload: 'TALARIDE:VEHICLE:TR-00421',
+              created_at: '2026-09-05T09:00:00.000Z'
+            }
+          ]);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [driver.assigned_vehicle_id, driver.driver_id]);
 
   const handleStartShift = async () => {
     if (!selectedVehicleId) return;

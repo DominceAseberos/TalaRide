@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { ArrowLeft, ShieldCheck, CreditCard, ChevronRight, Check } from 'lucide-react';
-import { api } from '../../services/api';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ArrowLeft, ShieldCheck, ChevronRight, Loader2, RefreshCw, ExternalLink } from 'lucide-react';
+import { api, getWebPaymentMode } from '../../services/api';
 
 interface Props {
   scanData: any;
@@ -13,8 +13,12 @@ export const CommuterConfirmRide: React.FC<Props> = ({
   onCancel,
   onPaymentSuccess
 }) => {
+  const paymentMode = getWebPaymentMode();
+  const isMock = paymentMode === 'mock';
   const [selectedProvider, setSelectedProvider] = useState<'gcash' | 'maya' | 'gotyme'>('gcash');
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [checkoutOpened, setCheckoutOpened] = useState(false);
   const [error, setError] = useState('');
 
   const vehicleId = scanData.vehicleId || 'TR-01842';
@@ -22,24 +26,106 @@ export const CommuterConfirmRide: React.FC<Props> = ({
   const fare = scanData.amount || 30;
   const paymentId = scanData.paymentId || 'PAY-2026-1003-01';
 
+  const checkPaymentStatus = useCallback(async (silent = false) => {
+    if (!silent) setChecking(true);
+    try {
+      const result = await api.getConfirmedPaymentResult(paymentId);
+      if (result.success) {
+        onPaymentSuccess(result);
+        return true;
+      }
+
+      if (result.status === 'expired') {
+        setError('This payment request expired. Ask the driver to create a new fare request.');
+      } else if (result.status === 'failed') {
+        setError('The payment failed. Please try again or pay cash.');
+      } else if (!silent) {
+        setError('Still waiting for PayMongo confirmation. Complete checkout, then check again.');
+      }
+      return false;
+    } catch (err: any) {
+      if (!silent) setError(err.message || 'Could not check payment status.');
+      return false;
+    } finally {
+      if (!silent) setChecking(false);
+    }
+  }, [onPaymentSuccess, paymentId]);
+
+  useEffect(() => {
+    if (isMock || !checkoutOpened) return;
+
+    let cancelled = false;
+    const poll = async () => {
+      if (cancelled) return;
+      const complete = await checkPaymentStatus(true);
+      if (complete) cancelled = true;
+    };
+
+    poll();
+    const timer = window.setInterval(poll, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [checkPaymentStatus, checkoutOpened, isMock]);
+
   const handleConfirmAndPay = async () => {
     setLoading(true);
     setError('');
-    try {
-      const res = await api.confirmPayment({
-        paymentId,
-        provider: selectedProvider,
-        passengerId: 'USR-COM-001',
-        passengerName: 'Maria Santos',
-        approximateLocation: 'Tagum City Commercial Center'
-      });
-      if (res.success) {
-        onPaymentSuccess(res);
-      } else {
-        setError(res.error || 'Payment confirmation failed');
+
+    if (isMock) {
+      try {
+        const res = await api.confirmPayment({
+          paymentId,
+          provider: selectedProvider,
+          passengerId: 'USR-COM-001',
+          passengerName: 'Maria Santos',
+          approximateLocation: 'Tagum City Commercial Center'
+        });
+        if (res.success) onPaymentSuccess(res);
+        else setError(res.error || 'Payment confirmation failed');
+      } catch (err: any) {
+        setError(err.message || 'Payment processing error');
+      } finally {
+        setLoading(false);
       }
+      return;
+    }
+
+    const checkoutWindow = window.open('about:blank', 'talaride-paymongo-checkout');
+    try {
+      const status = await api.getPaymentStatus(paymentId);
+
+      if (status.payment.payment_status === 'paid') {
+        checkoutWindow?.close();
+        await checkPaymentStatus();
+        return;
+      }
+
+      if (status.payment.payment_status === 'expired') {
+        checkoutWindow?.close();
+        setError('This payment request expired. Ask the driver to create a new one.');
+        return;
+      }
+
+      const checkoutUrl = status.checkoutUrl || status.payment.checkout_url;
+      if (!checkoutUrl) {
+        checkoutWindow?.close();
+        throw new Error('PayMongo checkout is not available for this payment.');
+      }
+
+      if (checkoutWindow) {
+        checkoutWindow.opener = null;
+        checkoutWindow.location.href = checkoutUrl;
+      } else {
+        window.location.href = checkoutUrl;
+        return;
+      }
+
+      setCheckoutOpened(true);
     } catch (err: any) {
-      setError(err.message || 'Payment processing error');
+      checkoutWindow?.close();
+      setError(err.message || 'Could not open PayMongo checkout.');
     } finally {
       setLoading(false);
     }
@@ -47,7 +133,6 @@ export const CommuterConfirmRide: React.FC<Props> = ({
 
   return (
     <div className="min-h-full flex flex-col justify-between p-4 bg-slate-50 text-slate-900 select-none">
-      {/* Top Bar */}
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <button
@@ -62,7 +147,9 @@ export const CommuterConfirmRide: React.FC<Props> = ({
 
         <div>
           <h1 className="text-xl font-black text-slate-900">Confirm Payment</h1>
-          <p className="text-xs text-slate-500">Verify tricycle and fare details before authorizing payment</p>
+          <p className="text-xs text-slate-500">
+            Verify the vehicle and fare before opening secure checkout.
+          </p>
         </div>
 
         {error && (
@@ -71,7 +158,13 @@ export const CommuterConfirmRide: React.FC<Props> = ({
           </div>
         )}
 
-        {/* Section 9 Ride Confirmation Card */}
+        {checkoutOpened && !error && (
+          <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl font-medium flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+            <span>PayMongo checkout is open. Waiting for provider confirmation…</span>
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
@@ -87,75 +180,87 @@ export const CommuterConfirmRide: React.FC<Props> = ({
           <div className="text-center py-2 bg-slate-50 rounded-xl border border-slate-100">
             <span className="text-xs uppercase font-bold tracking-wider text-slate-400">Fare Amount</span>
             <div className="text-4xl font-black font-mono text-emerald-600 my-0.5">₱{fare}</div>
-            <span className="text-[11px] text-slate-500">Method: Digital (QR Ph Interoperable)</span>
+            <span className="text-[11px] text-slate-500">
+              {isMock ? 'Local payment simulator' : 'Secure checkout powered by PayMongo'}
+            </span>
           </div>
 
-          {/* Payment Method Selector */}
-          <div className="space-y-2 pt-1">
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Pay using e-Wallet / Bank:
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedProvider('gcash')}
-                className={`py-3 px-2 rounded-xl text-xs font-bold border-2 transition flex flex-col items-center gap-1 ${
-                  selectedProvider === 'gcash'
-                    ? 'bg-blue-50 border-blue-500 text-blue-800 shadow-xs'
-                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-                }`}
-              >
-                <span>GCash</span>
-                {selectedProvider === 'gcash' && <Check className="w-3.5 h-3.5 text-blue-600" />}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedProvider('maya')}
-                className={`py-3 px-2 rounded-xl text-xs font-bold border-2 transition flex flex-col items-center gap-1 ${
-                  selectedProvider === 'maya'
-                    ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-xs'
-                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-                }`}
-              >
-                <span>Maya</span>
-                {selectedProvider === 'maya' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedProvider('gotyme')}
-                className={`py-3 px-2 rounded-xl text-xs font-bold border-2 transition flex flex-col items-center gap-1 ${
-                  selectedProvider === 'gotyme'
-                    ? 'bg-cyan-50 border-cyan-500 text-cyan-800 shadow-xs'
-                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-                }`}
-              >
-                <span>GoTyme</span>
-                {selectedProvider === 'gotyme' && <Check className="w-3.5 h-3.5 text-cyan-600" />}
-              </button>
+          {isMock ? (
+            <div className="space-y-2 pt-1">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Simulate provider:
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['gcash', 'maya', 'gotyme'] as const).map((provider) => (
+                  <button
+                    key={provider}
+                    type="button"
+                    onClick={() => setSelectedProvider(provider)}
+                    className={`py-3 px-2 rounded-xl text-xs font-bold border-2 transition capitalize ${
+                      selectedProvider === provider
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    {provider}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 leading-relaxed">
+              PayMongo Checkout will show the payment methods enabled for this test account, including
+              supported e-wallet, card, and QR Ph options. TalaRide marks the ride paid only after the
+              backend receives provider confirmation.
+            </div>
+          )}
 
           <div className="flex items-center gap-2 p-2.5 bg-emerald-50/60 rounded-xl text-[11px] text-emerald-800 border border-emerald-100">
             <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Earns +1 TalaPoint towards free promotional discounts.</span>
+            <span>Payment status is verified by the TalaRide backend, not by this browser.</span>
           </div>
         </div>
       </div>
 
-      {/* Confirm CTA */}
-      <div className="pt-4">
+      <div className="pt-4 space-y-2">
         <button
           onClick={handleConfirmAndPay}
-          disabled={loading}
-          className="w-full py-4.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-lg rounded-2xl transition shadow-xl shadow-emerald-600/25 flex items-center justify-center gap-2 disabled:opacity-50"
+          disabled={loading || checking}
+          className="w-full py-4.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-base rounded-2xl transition shadow-xl shadow-emerald-600/25 flex items-center justify-center gap-2 disabled:opacity-50"
         >
-          <span>{loading ? 'Processing Payment...' : `CONFIRM & PAY ₱${fare}`}</span>
-          <ChevronRight className="w-5 h-5" />
+          {loading ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : isMock ? (
+            <ChevronRight className="w-5 h-5" />
+          ) : (
+            <ExternalLink className="w-5 h-5" />
+          )}
+          <span>
+            {loading
+              ? 'Opening…'
+              : isMock
+                ? `CONFIRM DEMO PAYMENT ₱${fare}`
+                : checkoutOpened
+                  ? 'REOPEN PAYMONGO CHECKOUT'
+                  : 'OPEN PAYMONGO CHECKOUT'}
+          </span>
         </button>
-        <p className="text-[11px] text-center text-slate-400 mt-2">
-          Secure payment authorized via Philippine QR Ph national rails.
+
+        {!isMock && checkoutOpened && (
+          <button
+            onClick={() => checkPaymentStatus(false)}
+            disabled={checking}
+            className="w-full py-3 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 transition flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
+            <span>{checking ? 'Checking…' : 'Check payment status'}</span>
+          </button>
+        )}
+
+        <p className="text-[11px] text-center text-slate-400">
+          {isMock
+            ? 'Simulator-only payment. No real provider request is made.'
+            : 'Test-mode PayMongo checkout. Provider webhook confirmation is required.'}
         </p>
       </div>
     </div>

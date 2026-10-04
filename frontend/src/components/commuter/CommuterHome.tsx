@@ -1,5 +1,5 @@
 import React from 'react';
-import { QrCode, Shield, Award, Clock, ArrowRight, ChevronRight, Sparkles } from 'lucide-react';
+import { QrCode, Shield, Award, Clock, ChevronRight } from 'lucide-react';
 import { Ride } from '../../types';
 
 interface Props {

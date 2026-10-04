@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Smartphone, Zap, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Smartphone, Zap } from 'lucide-react';
 import { DriverMainFare } from '../driver/DriverMainFare';
 import { DriverQRScreen } from '../driver/DriverQRScreen';
 import { DriverPaymentSuccess } from '../driver/DriverPaymentSuccess';
@@ -9,6 +9,34 @@ import { CommuterConfirmRide } from '../commuter/CommuterConfirmRide';
 import { CommuterPaymentSuccess } from '../commuter/CommuterPaymentSuccess';
 import { GuestQRPhPayment } from '../guest/GuestQRPhPayment';
 import { playPaymentChime } from '../../utils/audio';
+
+const driverProfile = {
+  driver_id: 'DR-000481',
+  user_id: 'USR-DRV-001',
+  name: 'Juan Dela Cruz',
+  mobile_number: '09171234567',
+  verification_status: 'verified' as const,
+  toda_operator: 'Tagum Poblacion TODA',
+  assigned_vehicle_id: 'TR-01842',
+  shift_status: 'active' as const,
+  license_number: 'N02-14-098765',
+  created_at: '2026-09-01T08:00:00.000Z'
+};
+
+const shiftData = {
+  shift_id: 'SHIFT-2026-001',
+  driver_id: 'DR-000481',
+  vehicle_id: 'TR-01842',
+  start_time: '2026-10-03T06:00:00.000Z',
+  end_time: null,
+  status: 'active' as const,
+  digital_rides_count: 18,
+  digital_gross_total: 620,
+  provider_platform_fees: 10.85,
+  digital_net_total: 609.15,
+  cash_rides_count: 12,
+  cash_gross_total: 360
+};
 
 export const DualScreenSimulator: React.FC = () => {
   // Driver state
@@ -20,34 +48,6 @@ export const DualScreenSimulator: React.FC = () => {
   // Commuter state
   const [commuterMode, setCommuterMode] = useState<'app' | 'guest'>('app');
   const [commuterState, setCommuterState] = useState<'idle' | 'confirm' | 'success'>('idle');
-
-  const driverProfile = {
-    driver_id: 'DR-000481',
-    user_id: 'USR-DRV-001',
-    name: 'Juan Dela Cruz',
-    mobile_number: '09171234567',
-    verification_status: 'verified' as const,
-    toda_operator: 'Tagum Poblacion TODA',
-    assigned_vehicle_id: 'TR-01842',
-    shift_status: 'active' as const,
-    license_number: 'N02-14-098765',
-    created_at: new Date().toISOString()
-  };
-
-  const shiftData = {
-    shift_id: 'SHIFT-2026-001',
-    driver_id: 'DR-000481',
-    vehicle_id: 'TR-01842',
-    start_time: new Date().toISOString(),
-    end_time: null,
-    status: 'active' as const,
-    digital_rides_count: 18,
-    digital_gross_total: 620,
-    provider_platform_fees: 10.85,
-    digital_net_total: 609.15,
-    cash_rides_count: 12,
-    cash_gross_total: 360
-  };
 
   const handleGeneratePaymentQR = (amount: number, custom: boolean) => {
     setCurrentFare(amount);

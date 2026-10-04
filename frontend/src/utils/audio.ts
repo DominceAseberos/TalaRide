@@ -68,7 +68,7 @@ export function playAlertChime() {
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       navigator.vibrate([100, 50, 100]);
     }
-  } catch (e) {
+  } catch {
     // ignore
   }
 }

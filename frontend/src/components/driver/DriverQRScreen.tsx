@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Loader2, ArrowLeft, Banknote, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { Payment } from '../../types';
-import { api, connectSSE } from '../../services/api';
+import { api, connectSSE, getWebPaymentMode } from '../../services/api';
 import { playPaymentChime } from '../../utils/audio';
 
 interface Props {
@@ -26,9 +26,11 @@ export const DriverQRScreen: React.FC<Props> = ({
 }) => {
   const [payment, setPayment] = useState<Payment | null>(null);
   const [loading, setLoading] = useState(true);
-  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes
+  const [timeLeft, setTimeLeft] = useState(300);
   const [simulating, setSimulating] = useState(false);
   const [paymentError, setPaymentError] = useState('');
+
+  const isMock = getWebPaymentMode() === 'mock';
 
   // 1. Generate QR on mount
   useEffect(() => {
@@ -39,6 +41,8 @@ export const DriverQRScreen: React.FC<Props> = ({
         const res = await api.createPaymentQR(driverId, vehicleId, fareAmount, isCustom);
         if (mounted && res.success) {
           setPayment(res.payment);
+          const expiresAt = new Date(res.payment.expires_at).getTime();
+          setTimeLeft(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)));
         }
       } catch (err: any) {
         console.error('Failed to create payment QR', err);
@@ -78,7 +82,7 @@ export const DriverQRScreen: React.FC<Props> = ({
 
   // 4. Quick Simulator trigger
   const handleSimulatePayment = async (provider: 'gcash' | 'maya' | 'gotyme') => {
-    if (!payment) return;
+    if (!payment || !isMock) return;
     setSimulating(true);
     try {
       const res = await api.confirmPayment({
@@ -155,7 +159,7 @@ export const DriverQRScreen: React.FC<Props> = ({
               <div className="w-full flex items-center justify-between pb-2 mb-2 border-b border-slate-200">
                 <span className="text-[10px] font-black tracking-widest text-slate-900 flex items-center gap-1 font-mono">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  QR Ph NATIONAL STANDARD
+                  TALARIDE PAYMENT QR
                 </span>
                 <span className="text-[10px] text-slate-500 font-mono">TAGUM CITY</span>
               </div>
@@ -170,7 +174,7 @@ export const DriverQRScreen: React.FC<Props> = ({
               )}
 
               <div className="mt-2 text-[10px] font-semibold text-slate-600">
-                GCash • Maya • GoTyme • TalaRide
+                Scan with TalaRide to continue to secure PayMongo checkout
               </div>
             </div>
 
@@ -182,7 +186,8 @@ export const DriverQRScreen: React.FC<Props> = ({
               </span>
             </div>
             <p className="text-[11px] text-slate-400 max-w-xs">
-              Passenger scans this QR using GCash, Maya, or any QR Ph banking app.
+              This QR identifies the TalaRide payment request. PayMongo handles the actual wallet,
+              card, or QR Ph payment and the server confirms settlement.
             </p>
           </>
         )}
@@ -199,35 +204,40 @@ export const DriverQRScreen: React.FC<Props> = ({
           <span>Passenger Wants to Pay Cash (₱{fareAmount})</span>
         </button>
 
-        {/* Demo Fast Simulator triggers */}
-        <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 space-y-1.5">
-          <div className="text-[10px] uppercase font-bold text-slate-400 text-center tracking-wider">
-            Simulate Passenger Instant Scan:
+        {isMock ? (
+          <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 space-y-1.5">
+            <div className="text-[10px] uppercase font-bold text-slate-400 text-center tracking-wider">
+              Simulator-only instant confirmation:
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                onClick={() => handleSimulatePayment('gcash')}
+                disabled={simulating || !payment}
+                className="py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold rounded-lg transition disabled:opacity-50"
+              >
+                GCash Pay
+              </button>
+              <button
+                onClick={() => handleSimulatePayment('maya')}
+                disabled={simulating || !payment}
+                className="py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition disabled:opacity-50"
+              >
+                Maya Pay
+              </button>
+              <button
+                onClick={() => handleSimulatePayment('gotyme')}
+                disabled={simulating || !payment}
+                className="py-1.5 bg-cyan-700 hover:bg-cyan-600 text-white text-[11px] font-bold rounded-lg transition disabled:opacity-50"
+              >
+                GoTyme Pay
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-3 gap-1.5">
-            <button
-              onClick={() => handleSimulatePayment('gcash')}
-              disabled={simulating || !payment}
-              className="py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold rounded-lg transition disabled:opacity-50"
-            >
-              GCash Pay
-            </button>
-            <button
-              onClick={() => handleSimulatePayment('maya')}
-              disabled={simulating || !payment}
-              className="py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition disabled:opacity-50"
-            >
-              Maya Pay
-            </button>
-            <button
-              onClick={() => handleSimulatePayment('gotyme')}
-              disabled={simulating || !payment}
-              className="py-1.5 bg-cyan-700 hover:bg-cyan-600 text-white text-[11px] font-bold rounded-lg transition disabled:opacity-50"
-            >
-              GoTyme Pay
-            </button>
+        ) : (
+          <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-400 text-center">
+            Live staging waits for PayMongo provider confirmation. No browser button can mark this ride paid.
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

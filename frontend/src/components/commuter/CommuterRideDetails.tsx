@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Shield, AlertTriangle, HelpCircle, CheckCircle2, MapPin, Calendar, Clock, Bike, User } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, HelpCircle, CheckCircle2, MapPin, Calendar, Clock, Bike, User } from 'lucide-react';
 import { Ride } from '../../types';
 import { api } from '../../services/api';
 

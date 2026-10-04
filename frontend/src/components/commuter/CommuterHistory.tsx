@@ -10,23 +10,22 @@ interface Props {
 
 export const CommuterHistory: React.FC<Props> = ({ onSelectRide, onBack }) => {
   const [rides, setRides] = useState<Ride[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadRides();
-  }, []);
-
-  const loadRides = async () => {
-    setLoading(true);
-    try {
-      const data = await api.getRides({ passengerId: 'USR-COM-001' });
-      setRides(data);
-    } catch (e) {
-      console.warn('Rides fetch fallback', e);
-    } finally {
-      setLoading(false);
+    let mounted = true;
+    async function loadRides() {
+      try {
+        const data = await api.getRides({ passengerId: 'USR-COM-001' });
+        if (mounted) setRides(data);
+      } catch (e) {
+        console.warn('Rides fetch fallback', e);
+      }
     }
-  };
+    loadRides();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <div className="min-h-full flex flex-col justify-between p-4 bg-slate-50 text-slate-900 pb-20 select-none">

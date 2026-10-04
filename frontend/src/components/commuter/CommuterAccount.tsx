@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Shield, MapPin, FileText, PhoneCall, ChevronRight, Lock, ExternalLink, HelpCircle } from 'lucide-react';
+import { MapPin, FileText, PhoneCall, ChevronRight, Lock } from 'lucide-react';
 import { DisclaimersModal } from '../common/DisclaimersModal';
 
 interface Props {
@@ -112,6 +112,16 @@ export const CommuterAccount: React.FC<Props> = ({ onLogout }) => {
             </div>
             <ChevronRight className="w-4 h-4 text-slate-400" />
           </button>
+
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="w-full p-4 flex items-center justify-between hover:bg-red-50 text-left transition text-red-600 border-t border-slate-100"
+            >
+              <span className="text-xs font-bold">Sign Out</span>
+              <ChevronRight className="w-4 h-4 text-red-400" />
+            </button>
+          )}
         </div>
       </div>
 
