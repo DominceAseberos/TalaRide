@@ -31,7 +31,7 @@
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
     @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
 
-    .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 22px; display: flex; flex-col; gap: 16px; }
+    .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
     .card-title { font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
     .card-title span.badge { font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #1e293b; color: var(--text-muted); font-weight: normal; }
 
@@ -175,6 +175,8 @@
   </div>
 
   <script>
+    const IS_LOCAL = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    const API_BASE = IS_LOCAL ? 'http://localhost:4000/api' : 'https://talaride-web.onrender.com/api';
     let currentFareCentavos = 3000;
     let activePaymentId = null;
     let pollInterval = null;
@@ -198,7 +200,7 @@
       document.getElementById('btnMockConfirm').style.display = 'none';
 
       try {
-        const res = await fetch('http://localhost:4000/api/payment-intent', {
+        const res = await fetch(`${API_BASE}/payment-intent`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -214,11 +216,21 @@
         activePaymentId = data.payment_id;
         expiresAt = new Date(data.expires_at).getTime();
 
-        // Render QR
+        // Normal phone cameras need an HTTPS URL, not TalaRide's internal JSON payload.
+        const scanParams = new URLSearchParams({
+          payment_id: data.payment_id,
+          amount: String(data.amount_centavos / 100),
+          vehicle: data.vehicle_code || 'TR-01842',
+          driver_id: data.driver_code || 'DR-000481',
+          driver_name: 'Juan Dela Cruz'
+        });
+        const scanUrl = `${window.location.origin}/guest?${scanParams.toString()}`;
+
+        // Render a no-app web QR that any phone camera can open.
         const container = document.getElementById('dynamicQrContainer');
         container.innerHTML = '';
         new QRCode(container, {
-          text: data.qr_payload,
+          text: scanUrl,
           width: 210,
           height: 210,
           colorDark: '#000000',
@@ -226,9 +238,10 @@
           correctLevel: QRCode.CorrectLevel.M
         });
 
-        document.getElementById('dynamicPayloadPreview').innerText = data.qr_payload;
-        statusEl.innerText = `Awaiting Scan: ₱${(data.amount_centavos / 100).toFixed(2)} (${data.payment_id})`;
-        document.getElementById('btnMockConfirm').style.display = 'block';
+        document.getElementById('dynamicPayloadPreview').innerText =
+          `Phone camera URL:\n${scanUrl}\n\nSigned TalaRide intent:\n${data.qr_payload}`;
+        statusEl.innerText = `Ready to scan: ₱${(data.amount_centavos / 100).toFixed(2)} (${data.payment_id})`;
+        document.getElementById('btnMockConfirm').style.display = IS_LOCAL ? 'block' : 'none';
 
         const pmBtn = document.getElementById('paymongoCheckoutBtn');
         if (data.checkout_url) {
@@ -269,9 +282,9 @@
     function pollPaymentStatus(paymentId) {
       pollInterval = setInterval(async () => {
         try {
-          const res = await fetch(`http://localhost:4000/api/payment-status?id=${paymentId}`);
+          const res = await fetch(`${API_BASE}/payment-status?payment_id=${encodeURIComponent(paymentId)}`);
           const data = await res.json();
-          if (data.status === 'confirmed') {
+          if (data.payment_status === 'confirmed') {
             clearInterval(pollInterval);
             clearInterval(timerInterval);
             const statusEl = document.getElementById('dynamicStatus');
@@ -286,7 +299,8 @@
     async function triggerMockConfirm() {
       if (!activePaymentId) return;
       try {
-        await fetch('http://localhost:4000/api/mock-confirm', {
+        if (!IS_LOCAL) throw new Error('Mock confirmation is disabled on deployed staging.');
+        await fetch(`${API_BASE}/mock-confirm`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ payment_id: activePaymentId })

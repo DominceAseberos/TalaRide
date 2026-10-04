@@ -474,9 +474,11 @@ export function App() {
         {activePortal === 'guest' && (
           <div className="w-full max-w-md h-[100dvh] md:h-[780px] bg-slate-900 md:rounded-[36px] shadow-2xl overflow-hidden flex flex-col relative border-0 md:border-8 md:border-slate-800">
             <GuestQRPhPayment
-              fareAmount={activeFareAmount || 30}
-              vehicleId={driver?.assigned_vehicle_id || 'TR-01842'}
-              driverName={driver?.name || 'Juan Dela Cruz'}
+              fareAmount={Number(currentSearch.get('amount')) || activeFareAmount || 30}
+              vehicleId={currentSearch.get('vehicle') || driver?.assigned_vehicle_id || 'TR-01842'}
+              driverId={currentSearch.get('driver_id') || driver?.driver_id || 'DR-000481'}
+              driverName={currentSearch.get('driver_name') || driver?.name || 'Juan Dela Cruz'}
+              paymentId={currentSearch.get('payment_id') || undefined}
               onOpenCommuterApp={() => setActivePortal('commuter')}
             />
           </div>
