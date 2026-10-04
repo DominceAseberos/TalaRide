@@ -11,16 +11,16 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
-    "cors": "^2.8.5",
-    "dotenv": "^18.0.5",
-    "express": "^4.21.2",
-    "zod": "^4.6.5"
-  },
-  "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.2",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "cors": "^2.8.5",
+    "dotenv": "^18.0.5",
+    "express": "^4.21.2",
+    "typescript": "^5.7.2",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
   }
 }
