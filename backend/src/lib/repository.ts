@@ -41,7 +41,9 @@ export class TalaRideRepository {
   private isSupabaseConfigured: boolean;
 
   constructor() {
-    this.localDataDir = path.resolve(process.cwd(), 'data');
+    this.localDataDir = env.DATA_DIR
+      ? path.resolve(env.DATA_DIR)
+      : path.resolve(process.cwd(), 'data');
     this.localFilePath = path.join(this.localDataDir, 'talaride-persistence.json');
     this.isSupabaseConfigured =
       Boolean(env.SUPABASE_URL) &&
@@ -219,11 +221,18 @@ export class TalaRideRepository {
       Boolean(env.QR_INTENT_SECRET) &&
       Boolean(env.PAYMENT_WEBHOOK_SECRET);
 
+    const durablePersistenceReady =
+      env.NODE_ENV !== 'production' ||
+      Boolean(env.DATA_DIR) ||
+      env.ALLOW_EPHEMERAL_STATE;
+
     return {
-      ready: hasSecrets,
+      ready: hasSecrets && durablePersistenceReady,
       details: {
         supabaseConfigured: this.isSupabaseConfigured,
-        durablePersistenceReady: true,
+        durablePersistenceReady,
+        ephemeralStateAllowed: env.ALLOW_EPHEMERAL_STATE,
+        dataDirectory: env.DATA_DIR ? 'configured' : 'local-filesystem',
         environment: env.NODE_ENV,
         paymentMode: env.PAYMENT_MODE
       }

@@ -14,6 +14,8 @@ const envSchema = z.object({
   PAYMENT_PROVIDER_KEY: z.string().default(''),
   PAYMENT_WEBHOOK_SECRET: z.string().default('mock_webhook_secret_key_2026'),
   WEB_ORIGIN: z.string().default('http://localhost:3000,http://localhost:5173'),
+  DATA_DIR: z.string().default(''),
+  ALLOW_EPHEMERAL_STATE: z.string().default('false').transform((v) => v === 'true'),
   DEMO_AUTH: z.string().default('false').transform((v) => v === 'true')
 });
 
