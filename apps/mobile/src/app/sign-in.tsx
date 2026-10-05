@@ -305,9 +305,9 @@ export default function SignInScreen() {
             marginTop: 24,
             padding: 16,
             borderRadius: 14,
-            backgroundColor: '#075B3A12',
+            backgroundColor: colors.paleGreen,
             borderWidth: 1,
-            borderColor: '#075B3A33',
+            borderColor: colors.border,
             gap: 10,
           }}
         >
