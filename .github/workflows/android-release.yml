@@ -92,16 +92,16 @@ jobs:
           EOF
           python - <<'PY'
           from pathlib import Path
+          import re
+
           path = Path("apps/mobile/android/app/build.gradle")
           text = path.read_text()
-          debug = """        debug {
-              storeFile file('debug.keystore')
-              storePassword 'android'
-              keyAlias 'androiddebugkey'
-              keyPassword 'android'
-          }
-          """
-          release = debug + """        release {
+
+          marker = "    signingConfigs {\n"
+          if marker not in text:
+              raise SystemExit("Android signingConfigs block was not found.")
+
+          release = """        release {
               storeFile file(TALARIDE_UPLOAD_STORE_FILE)
               storePassword TALARIDE_UPLOAD_STORE_PASSWORD
               keyAlias TALARIDE_UPLOAD_KEY_ALIAS
@@ -109,14 +109,14 @@ jobs:
           }
           """
           if "storeFile file(TALARIDE_UPLOAD_STORE_FILE)" not in text:
-              if debug not in text:
-                  raise SystemExit("Expected Android debug signing block was not found.")
-              text = text.replace(debug, release, 1)
-          old = "signingConfig signingConfigs.debug\n            def enableShrinkResources"
-          new = "signingConfig signingConfigs.release\n            def enableShrinkResources"
-          if old not in text:
-              raise SystemExit("Expected Android release signing line was not found.")
-          text = text.replace(old, new, 1)
+              pos = text.index(marker) + len(marker)
+              text = text[:pos] + release + text[pos:]
+
+          pattern = r"(release\s*\{.*?signingConfig\s+)signingConfigs\.debug"
+          text, count = re.subn(pattern, r"\1signingConfigs.release", text, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit("Android release signing assignment was not found.")
+
           path.write_text(text)
           PY
 
