@@ -2,25 +2,28 @@ import { Animated, Easing, Pressable, useWindowDimensions, View } from 'react-na
 import { useEffect, useState } from 'react';
 import { Screen } from '@/components/Screen';
 import { TalaIllustration, type IllustrationName } from '@/components/TalaIllustration';
-import { Button, Copy, Title, replace, s } from '@/components/ui';
+import { Brand, Button, Copy, Title, replace } from '@/components/ui';
 import { colors } from '@/constants/theme';
 import { useMock } from '@/mocks/MockProvider';
 
 const pages = [
   {
     art: 'scan' as IllustrationName,
-    title: 'Scan and Remember',
-    body: 'Scan a tricycle or pedicab’s MTOP, body, or plate number and keep a private record of your ride.',
+    eyebrow: 'FAST & VERIFIED',
+    title: 'Scan the TalaRide QR',
+    body: 'Scan the permanent vehicle sticker. TalaRide verifies the vehicle and active driver before you continue.',
   },
   {
     art: 'privacy' as IllustrationName,
-    title: 'Your Privacy Matters',
-    body: 'Your ride records stay on your device. We only use the minimum data needed for lost-item assistance.',
+    eyebrow: 'YOU STAY IN CONTROL',
+    title: 'Choose fare, then pay',
+    body: 'Pick the exact fare and payment method first. Nothing is created or charged until you tap Proceed.',
   },
   {
     art: 'community' as IllustrationName,
-    title: 'A Stronger Community',
-    body: 'If you lose an item, other passengers can help when they scan the same vehicle later.',
+    eyebrow: 'USEFUL AFTER THE RIDE',
+    title: 'Keep every ride useful',
+    body: 'Your ride history can help with lost-item follow-up and future rewards while keeping data collection minimal.',
   },
 ] as const;
 
@@ -31,73 +34,154 @@ export default function OnboardingScreen() {
   const [contentX] = useState(() => new Animated.Value(0));
   const { width, height } = useWindowDimensions();
   const current = pages[page];
+
   function finish() {
     void completeOnboarding().finally(() => replace('/sign-in'));
   }
+
   useEffect(() => {
     contentOpacity.setValue(0);
-    contentX.setValue(18);
+    contentX.setValue(20);
     Animated.parallel([
       Animated.timing(contentOpacity, {
         toValue: 1,
-        duration: 320,
+        duration: 280,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.timing(contentX, {
         toValue: 0,
-        duration: 320,
+        duration: 280,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     ]).start();
   }, [contentOpacity, contentX, page]);
+
+  const illustrationWidth = Math.min(width - 72, 300);
+  const illustrationHeight = Math.min(Math.max(height * 0.31, 220), 310);
+
   return (
-    <Screen style={{ paddingTop: 32 }}>
+    <Screen
+      scroll={false}
+      style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 }}
+      footer={
+        <View
+          style={{
+            paddingHorizontal: 20,
+            paddingTop: 12,
+            paddingBottom: 18,
+            backgroundColor: colors.background,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+          }}
+        >
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {page > 0 && (
+              <Button
+                label="Back"
+                variant="outline"
+                onPress={() => setPage((value) => Math.max(0, value - 1))}
+                style={{ flex: 1 }}
+              />
+            )}
+            <Button
+              label={page === pages.length - 1 ? 'Continue to TalaRide' : 'Next'}
+              onPress={() => (page < pages.length - 1 ? setPage(page + 1) : finish())}
+              style={{ flex: page > 0 ? 1.65 : 1 }}
+            />
+          </View>
+        </View>
+      }
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Brand />
+        {page < pages.length - 1 && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Skip onboarding"
+            onPress={finish}
+            hitSlop={10}
+            style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 }}
+          >
+            <Copy bold style={{ color: colors.green, fontSize: 13 }}>
+              Skip
+            </Copy>
+          </Pressable>
+        )}
+      </View>
+
+      <View style={{ marginTop: 22 }}>
+        <View
+          accessibilityLabel={'Step ' + (page + 1) + ' of ' + pages.length}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+        >
+          <Copy bold style={{ fontSize: 12, color: colors.muted, minWidth: 42 }}>
+            {page + 1} of {pages.length}
+          </Copy>
+          <View style={{ flex: 1, flexDirection: 'row', gap: 6 }}>
+            {pages.map((item, index) => (
+              <Pressable
+                key={item.title}
+                accessibilityRole="button"
+                accessibilityLabel={'Go to onboarding page ' + (index + 1)}
+                onPress={() => setPage(index)}
+                hitSlop={8}
+                style={{
+                  flex: 1,
+                  height: 5,
+                  borderRadius: 999,
+                  backgroundColor: index <= page ? colors.green : colors.border,
+                }}
+              />
+            ))}
+          </View>
+        </View>
+      </View>
+
       <Animated.View
         style={{
           flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: Math.min(height * 0.57, 440),
-          gap: 24,
           opacity: contentOpacity,
           transform: [{ translateX: contentX }],
+          paddingTop: 18,
         }}
       >
-        <TalaIllustration
-          name={current.art}
-          width={Math.min(width - 80, 285)}
-          style={{ borderRadius: 26 }}
-        />
-        <Title style={{ textAlign: 'center', fontSize: 23 }}>{current.title}</Title>
-        <Copy style={{ textAlign: 'center', lineHeight: 24, maxWidth: 340 }}>{current.body}</Copy>
-      </Animated.View>
-      <View style={[s.row, { justifyContent: 'center', gap: 10, paddingVertical: 30 }]}>
-        {pages.map((item, index) => (
-          <Pressable
-            key={item.title}
-            accessibilityRole="button"
-            accessibilityLabel={`Page ${index + 1}${index === page ? ', current' : ''}`}
-            onPress={() => setPage(index)}
-            hitSlop={12}
+        <View
+          style={{
+            minHeight: illustrationHeight,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 28,
+            backgroundColor: colors.paleGreen,
+            borderWidth: 1,
+            borderColor: '#D8E8DC',
+            overflow: 'hidden',
+          }}
+        >
+          <TalaIllustration name={current.art} width={illustrationWidth} />
+        </View>
+
+        <View style={{ marginTop: 24 }}>
+          <Copy
+            bold
             style={{
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: index === page ? colors.darkGreen : '#C3C9CC',
+              fontSize: 11,
+              lineHeight: 16,
+              letterSpacing: 1.4,
+              color: colors.green,
             }}
-          />
-        ))}
-      </View>
-      <View style={[s.row, { marginBottom: 20 }]}>
-        {page < 2 && <Button label="Skip" variant="subtle" onPress={finish} style={{ flex: 1 }} />}
-        <Button
-          label={page === 2 ? 'Get Started' : 'Next'}
-          onPress={() => (page < 2 ? setPage(page + 1) : finish())}
-          style={{ flex: 1 }}
-        />
-      </View>
+          >
+            {current.eyebrow}
+          </Copy>
+          <Title style={{ marginTop: 8, fontSize: 28, lineHeight: 34, color: colors.darkGreen }}>
+            {current.title}
+          </Title>
+          <Copy style={{ marginTop: 10, fontSize: 16, lineHeight: 24, color: colors.muted }}>
+            {current.body}
+          </Copy>
+        </View>
+      </Animated.View>
     </Screen>
   );
 }
