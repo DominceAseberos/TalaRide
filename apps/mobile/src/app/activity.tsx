@@ -77,10 +77,7 @@ export default function ActivityScreen() {
       )
     : undefined;
   return (
-    <Screen
-      style={{ paddingHorizontal: 12, paddingTop: 10 }}
-      footer={<BottomNav active="Activity" />}
-    >
+    <Screen style={{ paddingHorizontal: 12, paddingTop: 10 }} footer={<BottomNav active="" />}>
       <View
         style={[
           s.row,

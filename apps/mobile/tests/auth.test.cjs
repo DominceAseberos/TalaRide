@@ -449,9 +449,14 @@ test('protected route declarations hide private screens during initialization, o
     '@expo-google-fonts/roboto/500Medium': {},
     '@expo-google-fonts/roboto/700Bold': {},
     '@/scan/draft': { prepareScanCache: async () => {} },
+    '@/api/sync': { triggerSync: async () => ({ sent: 0, pending: 0 }) },
     '@/auth/AuthProvider': { AuthProvider: wrapper },
     '@/notifications/NotificationProvider': { NotificationProvider: wrapper },
-    'react-native': { View: 'view', ActivityIndicator: 'spinner' },
+    'react-native': {
+      View: 'view',
+      ActivityIndicator: 'spinner',
+      AppState: { addEventListener: () => ({ remove: () => {} }) },
+    },
   });
   let tree;
   const element = () => React.createElement(layout.default);
@@ -464,12 +469,12 @@ test('protected route declarations hide private screens during initialization, o
   await act(async () => {
     tree.update(element());
   });
-  assert.deepEqual(routes(), ['index', 'auth-callback', 'onboarding']);
+  assert.deepEqual(routes(), ['index', 'auth-callback', 'v/[vehicle]', 'ride-confirm', 'payment-status', 'onboarding']);
   state = { ready: true, onboardingComplete: true, signedIn: false };
   await act(async () => {
     tree.update(element());
   });
-  assert.deepEqual(routes(), ['index', 'auth-callback', 'sign-in']);
+  assert.deepEqual(routes(), ['index', 'auth-callback', 'v/[vehicle]', 'ride-confirm', 'payment-status', 'sign-in']);
   state = { ready: true, onboardingComplete: true, signedIn: true };
   await act(async () => {
     tree.update(element());

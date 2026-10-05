@@ -8,8 +8,9 @@ import { Roboto_700Bold } from '@expo-google-fonts/roboto/700Bold';
 import { useEffect } from 'react';
 import { prepareScanCache } from '@/scan/draft';
 import { AuthProvider } from '@/auth/AuthProvider';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, AppState, View } from 'react-native';
 import { NotificationProvider } from '@/notifications/NotificationProvider';
+import { triggerSync } from '@/api/sync';
 
 function AppStack() {
   const { ready, onboardingComplete, signedIn } = useMock();
@@ -24,6 +25,9 @@ function AppStack() {
     <Stack screenOptions={{ headerShown: false, animation: 'fade', animationDuration: 450 }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="auth-callback" />
+      <Stack.Screen name="v/[vehicle]" />
+      <Stack.Screen name="ride-confirm" />
+      <Stack.Screen name="payment-status" />
       <Stack.Protected guard={!onboardingComplete}>
         <Stack.Screen name="onboarding" />
       </Stack.Protected>
@@ -34,7 +38,10 @@ function AppStack() {
         {[
           'home',
           'scan',
+          'scan-ride',
+          'driver',
           'confirm',
+          'rewards',
           'receipt',
           'rides',
           'ride/[id]',
@@ -52,6 +59,11 @@ function AppStack() {
 export default function RootLayout() {
   useEffect(() => {
     void prepareScanCache().catch(() => {});
+    void triggerSync().catch(() => {});
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void triggerSync().catch(() => {});
+    });
+    return () => sub.remove();
   }, []);
   // Render immediately with the platform font while the optional Roboto assets load.
   // This keeps every route available if a font asset is temporarily unavailable.

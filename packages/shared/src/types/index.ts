@@ -121,4 +121,5 @@ export interface UserProfile {
 }
 
 export * from './database';
+export * from './payments';
 

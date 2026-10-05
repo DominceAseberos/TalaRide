@@ -65,6 +65,11 @@ function receiptHarness(respondToPrompt) {
       replace() {},
     },
     '@/components/MissingRide': { MissingRide: 'missing-ride' },
+    '@/components/Disclaimers': {
+      PaymentDisclaimer: () => null,
+      SafetyDisclaimer: () => null,
+      RewardsDisclaimer: () => null,
+    },
     '@/components/Notice': {
       Notice: (props) => React.createElement('notice', props, props.children),
     },

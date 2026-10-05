@@ -44,7 +44,7 @@ async function database() {
           'SELECT version FROM schema_migrations',
           [],
         );
-        if (versions.some((item) => item.version > 1))
+        if (versions.some((item) => item.version > 2))
           throw new Error('Unsupported database version.');
         if (!versions.some((item) => item.version === 1))
           await db.withTransactionAsync(async () => {
@@ -63,6 +63,22 @@ async function database() {
         CREATE INDEX IF NOT EXISTS rides_account_date_idx ON rides(account_id, ride_datetime DESC);
         CREATE INDEX IF NOT EXISTS rides_account_vehicle_idx ON rides(account_id, vehicle_number);
         INSERT OR IGNORE INTO schema_migrations(version) VALUES (1);
+      `);
+          });
+        // v2: server sync columns. Local stays offline cache, server is canonical when synced.
+        if (!versions.some((item) => item.version === 2))
+          await db.withTransactionAsync(async () => {
+            await db.execAsync(`
+        ALTER TABLE rides ADD COLUMN server_id TEXT;
+        ALTER TABLE rides ADD COLUMN driver_code TEXT NOT NULL DEFAULT '';
+        ALTER TABLE rides ADD COLUMN payment_id TEXT NOT NULL DEFAULT '';
+        ALTER TABLE rides ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'cash';
+        ALTER TABLE rides ADD COLUMN amount_centavos INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE rides ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'completed';
+        ALTER TABLE rides ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'local';
+        ALTER TABLE rides ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
+        CREATE INDEX IF NOT EXISTS rides_account_sync_idx ON rides(account_id, sync_status);
+        INSERT OR IGNORE INTO schema_migrations(version) VALUES (2);
       `);
           });
         return db;
@@ -144,4 +160,79 @@ export async function clearRides(accountId: string) {
   const db = await database();
   const result = await db.runAsync('DELETE FROM rides WHERE account_id = ?', [accountId]);
   return result.changes;
+}
+
+export async function markRideSynced(accountId: string, id: string, serverId: string) {
+  const db = await database();
+  await db.runAsync(
+    "UPDATE rides SET server_id = ?, sync_status = 'synced', updated_at = ? WHERE id = ? AND account_id = ?",
+    [serverId, new Date().toISOString(), id, accountId],
+  );
+}
+
+export async function markRidePending(accountId: string, id: string) {
+  const db = await database();
+  await db.runAsync(
+    "UPDATE rides SET sync_status = 'pending', updated_at = ? WHERE id = ? AND account_id = ?",
+    [new Date().toISOString(), id, accountId],
+  );
+}
+
+// Merge server history into local cache by server_id. Local-first, never blocks UI.
+export async function upsertServerRides(
+  accountId: string,
+  items: {
+    ride_id: string;
+    vehicle_code: string;
+    driver_code?: string;
+    date: string;
+    amount_centavos: number;
+    payment_method: string;
+    status: string;
+  }[],
+) {
+  if (!items.length) return;
+  const db = await database();
+  await db.withTransactionAsync(async () => {
+    for (const item of items) {
+      const existing = await db.getFirstAsync<{ id: string }>(
+        'SELECT id FROM rides WHERE account_id = ? AND server_id = ?',
+        [accountId, item.ride_id],
+      );
+      if (existing) {
+        await db.runAsync(
+          'UPDATE rides SET vehicle_number = ?, driver_code = ?, payment_method = ?, amount_centavos = ?, payment_status = ?, ride_datetime = ?, sync_status = ?, updated_at = ? WHERE id = ?',
+          [
+            item.vehicle_code,
+            item.driver_code ?? '',
+            item.payment_method,
+            item.amount_centavos,
+            item.status,
+            item.date,
+            'synced',
+            new Date().toISOString(),
+            existing.id,
+          ],
+        );
+      } else {
+        await db.runAsync(
+          `INSERT INTO rides (id, account_id, server_id, vehicle_number, driver_code, payment_method, amount_centavos, payment_status, sync_status, identifier_type, ride_datetime, note, location, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'synced', 'Body #', ?, '', '', ?, ?)`,
+          [
+            newId('ride'),
+            accountId,
+            item.ride_id,
+            item.vehicle_code,
+            item.driver_code ?? '',
+            item.payment_method,
+            item.amount_centavos,
+            item.status,
+            item.date,
+            item.date,
+            item.date,
+          ],
+        );
+      }
+    }
+  });
 }

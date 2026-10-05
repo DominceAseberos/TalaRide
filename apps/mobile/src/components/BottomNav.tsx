@@ -2,17 +2,14 @@ import { Pressable, View } from 'react-native';
 import { Copy, Icon, replace, type IconName } from './ui';
 import { colors } from '@/constants/theme';
 import { useNotifications } from '@/notifications/NotificationProvider';
+
+// MVP nav: Home | Scan | History | Rewards | Account. Scan is hero + tab.
 const tabs: { label: string; route: string; icon: IconName; activeIcon: IconName }[] = [
   { label: 'Home', route: '/home', icon: 'home-outline', activeIcon: 'home' },
-  { label: 'Scan', route: '/scan', icon: 'scan-outline', activeIcon: 'scan' },
-  { label: 'Rides', route: '/rides', icon: 'calendar-outline', activeIcon: 'calendar' },
-  {
-    label: 'Activity',
-    route: '/activity',
-    icon: 'notifications-outline',
-    activeIcon: 'notifications',
-  },
-  { label: 'Profile', route: '/profile', icon: 'person-outline', activeIcon: 'person' },
+  { label: 'Scan', route: '/scan-ride', icon: 'scan-outline', activeIcon: 'scan' },
+  { label: 'History', route: '/rides', icon: 'calendar-outline', activeIcon: 'calendar' },
+  { label: 'Rewards', route: '/rewards', icon: 'gift-outline', activeIcon: 'gift' },
+  { label: 'Account', route: '/profile', icon: 'person-outline', activeIcon: 'person' },
 ];
 export function BottomNav({ active }: { active: string }) {
   const { notifications } = useNotifications();
@@ -41,7 +38,7 @@ export function BottomNav({ active }: { active: string }) {
               size={22}
               color={active === tab.label ? colors.green : colors.muted}
             />
-            {tab.label === 'Activity' && notifications.some((item) => item.unread) && (
+            {tab.label === 'Home' && notifications.some((item) => item.unread) && (
               <View
                 style={{
                   position: 'absolute',

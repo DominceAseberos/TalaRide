@@ -7,6 +7,11 @@ import { Copy, Field, Icon, Title, s } from '@/components/ui';
 import { Notice } from '@/components/Notice';
 import { colors } from '@/constants/theme';
 import { useMock } from '@/mocks/MockProvider';
+import { useAuth } from '@/auth/AuthProvider';
+import { fetchRides } from '@/api/rides';
+import { listPendingOutbox } from '@/offline/queue';
+import { upsertServerRides } from '@/db/rides';
+import { triggerSync } from '@/api/sync';
 import type { IdentifierType } from '@/types/models';
 
 export default function RidesScreen() {
@@ -17,6 +22,27 @@ export default function RidesScreen() {
   const query = search.trim().toLowerCase();
   const [items, setItems] = useState(rides);
   const [searchError, setSearchError] = useState('');
+  const [pendingCount, setPendingCount] = useState(0);
+  const { session } = useAuth();
+  // Local-first: show SQLite immediately, then merge server history + flush outbox.
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const pending = await listPendingOutbox(100);
+        if (active) setPendingCount(pending.length);
+      } catch {}
+      await triggerSync().catch(() => {});
+      if (!session) return;
+      try {
+        const data = await fetchRides(50);
+        await upsertServerRides(session.user.id, data.rides);
+      } catch {}
+    })();
+    return () => {
+      active = false;
+    };
+  }, [session]);
   useEffect(() => {
     let active = true;
     void searchRides(query, filter)
@@ -34,8 +60,13 @@ export default function RidesScreen() {
     };
   }, [query, filter, rides, searchRides]);
   return (
-    <Screen scroll={false} footer={<BottomNav active="Rides" />}>
-      <Title style={{ marginBottom: 12 }}>My Rides</Title>
+    <Screen scroll={false} footer={<BottomNav active="History" />}>
+      <Title style={{ marginBottom: 4 }}>Ride history</Title>
+      {pendingCount > 0 && (
+        <Copy style={{ marginBottom: 8 }}>
+          {pendingCount} offline {pendingCount === 1 ? 'ride' : 'rides'} waiting to sync.
+        </Copy>
+      )}
       {!!searchError && <Copy accessibilityRole="alert">{searchError}</Copy>}
       <View style={[s.row, { gap: 10, marginBottom: 8 }]}>
         <View style={{ flex: 1 }}>

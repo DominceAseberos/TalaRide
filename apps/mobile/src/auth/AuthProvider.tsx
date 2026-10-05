@@ -12,6 +12,57 @@ import { authConfigurationError, requireSupabase, supabase } from './client';
 import { loadProfile, saveProfile, type UserProfile } from './profiles';
 import { clearDraft } from '@/scan/draft';
 
+export const DEMO_USERS = {
+  passenger: {
+    id: 'USR-COM-001',
+    aud: 'authenticated',
+    role: 'passenger',
+    email: 'maria.santos@talaride.ph',
+    app_metadata: { provider: 'demo' },
+    user_metadata: { display_name: 'Maria Santos' },
+    created_at: '2026-09-10T10:00:00.000Z',
+  },
+  driver: {
+    id: 'USR-DRV-001',
+    aud: 'authenticated',
+    role: 'driver',
+    email: 'juan.delacruz@talaride.ph',
+    app_metadata: { provider: 'demo' },
+    user_metadata: { display_name: 'Juan Dela Cruz' },
+    created_at: '2026-09-01T08:00:00.000Z',
+  },
+};
+
+let inMemoryDemoSession: Session | null = null;
+
+function getStoredDemoSession(): Session | null {
+  if (inMemoryDemoSession) return inMemoryDemoSession;
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const raw = window.localStorage.getItem('talaride.demo_session');
+      return raw ? (JSON.parse(raw) as Session) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function saveStoredDemoSession(session: Session | null) {
+  inMemoryDemoSession = session;
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+    try {
+      if (session) {
+        window.localStorage.setItem('talaride.demo_session', JSON.stringify(session));
+      } else {
+        window.localStorage.removeItem('talaride.demo_session');
+      }
+    } catch {
+      // ignore
+    }
+  }
+}
+
 type AuthState = {
   ready: boolean;
   session: Session | null;
@@ -24,6 +75,7 @@ type AuthState = {
   signOut: () => Promise<void>;
   updateProfile: (name: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
+  signInAsDemo: (role?: 'passenger' | 'driver') => Promise<void>;
 };
 const Context = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -62,12 +114,27 @@ export function AuthProvider({ children }: PropsWithChildren) {
         if (!active) return;
         if (failure) setError('Your saved session could not be restored. Please sign in again.');
         if (!eventReceived) {
-          account.current = result.session?.user.id ?? null;
-          setSession(result.session);
+          if (result.session) {
+            account.current = result.session?.user.id ?? null;
+            setSession(result.session);
+          } else {
+            const demoSession = getStoredDemoSession();
+            if (demoSession && active && !eventReceived) {
+              account.current = demoSession.user.id;
+              setSession(demoSession);
+            }
+          }
         }
       })
       .catch(() => {
-        if (active) setError('Your saved session could not be restored. Please sign in again.');
+        if (!active) return;
+        const demoSession = getStoredDemoSession();
+        if (demoSession && active && !eventReceived) {
+          account.current = demoSession.user.id;
+          setSession(demoSession);
+          return;
+        }
+        setError('Your saved session could not be restored. Please sign in again.');
       })
       .finally(() => {
         if (active) setReady(true);
@@ -115,15 +182,38 @@ export function AuthProvider({ children }: PropsWithChildren) {
         profileError: profileFailure?.id === id ? profileFailure.message : null,
         displayName: currentProfile?.display_name || 'Passenger',
         setRecovery,
+        async signInAsDemo(role: 'passenger' | 'driver' = 'passenger') {
+          const user = DEMO_USERS[role];
+          const demoSession: Session = {
+            access_token: `demo-${role}-token`,
+            refresh_token: `demo-${role}-refresh-token`,
+            expires_in: 86400,
+            token_type: 'bearer',
+            user: user as any,
+          };
+          account.current = user.id;
+          setSession(demoSession);
+          setProfile({
+            id: user.id,
+            display_name: user.user_metadata.display_name,
+          });
+          setError(null);
+          saveStoredDemoSession(demoSession);
+        },
         async signOut() {
-          // Local sign-out works offline and removes this device's persisted session.
-          const client = requireSupabase();
-          const { error: failure } = await client.auth.signOut({ scope: 'local' });
-          if (failure) {
-            // Current SDK clears device storage even when server revocation fails offline.
-            const restored = await client.auth.getSession();
-            if (restored.error || restored.data.session)
-              throw new Error('Sign-out failed. Please try again.');
+          saveStoredDemoSession(null);
+          try {
+            if (supabase) {
+              const client = requireSupabase();
+              const { error: failure } = await client.auth.signOut({ scope: 'local' });
+              if (failure) {
+                const restored = await client.auth.getSession();
+                if (restored.error || restored.data.session)
+                  throw new Error('Sign-out failed. Please try again.');
+              }
+            }
+          } catch {
+            // Local sign-out should always succeed on device
           }
           setSession(null);
           setRecovery(false);

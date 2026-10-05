@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { Button, Card, Copy, Detail, Icon, Title, replace } from '@/components/ui';
+import { PaymentDisclaimer, SafetyDisclaimer } from '@/components/Disclaimers';
 import { MissingRide } from '@/components/MissingRide';
 import { Notice } from '@/components/Notice';
 import { useMock } from '@/mocks/MockProvider';
@@ -64,12 +65,16 @@ export default function ReceiptScreen() {
         <Detail icon="location-outline" label="Location" value={ride.location || 'Not saved'} />
       </Card>
       <View style={{ gap: 10, marginTop: 16 }}>
-        <Button label="View in My Rides" onPress={() => replace('/rides')} />
+        <Button label="View history" onPress={() => replace('/rides')} />
         <Button
-          label="Scan Another Vehicle"
+          label="Scan ride"
           variant="outline"
-          onPress={() => router.dismissTo('/scan')}
+          onPress={() => router.dismissTo('/scan-ride')}
         />
+      </View>
+      <View style={{ marginTop: 16, gap: 8 }}>
+        <PaymentDisclaimer />
+        <SafetyDisclaimer />
       </View>
       {prompt && hiddenPromptId !== prompt.matchId && (
         <Notice

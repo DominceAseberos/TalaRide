@@ -12,7 +12,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow TalaRide to read vehicle numbers using your camera.",
+          "cameraPermission": "Allow TalaRide to scan the permanent vehicle QR.",
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
@@ -55,7 +55,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.beepanjero.talaride",
+      "associatedDomains": [
+        "applinks:talaride-web-frontend.vercel.app"
+      ]
     },
     "android": {
       "package": "com.beepanjero.talaride",
@@ -66,7 +70,26 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["android.permission.CAMERA"]
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "talaride-web-frontend.vercel.app",
+              "pathPrefix": "/v/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",

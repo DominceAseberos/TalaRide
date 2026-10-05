@@ -73,7 +73,7 @@ export default function RideDetailsScreen() {
         <View style={s.row}>
           <ReferenceArt name="thumbnail" width={70} />
           <View>
-            <Title>#{ride.number}</Title>
+            <Title>TR-{ride.number.replace(/^TR-/i, '')}</Title>
             <Copy
               style={{
                 color: colors.darkGreen,
@@ -91,14 +91,34 @@ export default function RideDetailsScreen() {
         </View>
       </Card>
       <View style={{ padding: 8, marginVertical: 10 }}>
-        <Detail icon="calendar-outline" label="Date & Time" value={formatDate(ride.date)} />
+        <Detail icon="bus-outline" label="Vehicle" value={ride.number} />
+        <Detail icon="calendar-outline" label="Date" value={formatDate(ride.date)} />
+        <Detail
+          icon="pricetag-outline"
+          label="Payment"
+          value="Ride record (MVP: amount on receipt)"
+        />
+        <Detail
+          icon="checkmark-circle-outline"
+          label="Status"
+          value="Completed · local + queued sync"
+        />
         <Detail icon="document-text-outline" label="Note" value={ride.note || 'None'} />
-        <Detail icon="location-outline" label="Location" value={ride.location || 'Not saved'} />
+        <Detail
+          icon="location-outline"
+          label="Approximate pickup"
+          value={ride.location || 'Not saved'}
+        />
       </View>
       <ActionRow
         icon="notifications"
-        label="Report Lost Item"
+        label="Report lost item"
         danger
+        onPress={() => go(`/report-lost-item?id=${ride.id}`)}
+      />
+      <ActionRow
+        icon="alert-circle-outline"
+        label="Report ride issue"
         onPress={() => go(`/report-lost-item?id=${ride.id}`)}
       />
       <ActionRow icon="pencil-outline" label="Edit Note / Location" onPress={openEdit} />

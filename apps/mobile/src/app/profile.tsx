@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { BottomNav } from '@/components/BottomNav';
 import { Notice } from '@/components/Notice';
-import { ActionRow, Button, Copy, Field, Icon, s, type IconName } from '@/components/ui';
+import { ActionRow, Button, Copy, Field, Icon, go, s, type IconName } from '@/components/ui';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/auth/AuthProvider';
 import { useNotifications } from '@/notifications/NotificationProvider';
@@ -52,7 +52,7 @@ export default function ProfileScreen() {
   const [selected, setSelected] = useState<(typeof settings)[number] | null>(null);
   const [confirmation, setConfirmation] = useState<'history' | 'account' | null>(null);
   return (
-    <Screen footer={<BottomNav active="Profile" />}>
+    <Screen footer={<BottomNav active="Account" />}>
       <View
         style={[
           s.row,
@@ -110,6 +110,10 @@ export default function ProfileScreen() {
           }}
         />
       ))}
+      <View style={{ marginTop: 4 }}>
+        <ActionRow icon="car-outline" label="Driver mode" onPress={() => go('/driver')} />
+        <ActionRow icon="gift-outline" label="Rewards" onPress={() => go('/rewards')} />
+      </View>
       <View style={{ marginTop: 12 }}>
         <ActionRow
           icon="trash-outline"
