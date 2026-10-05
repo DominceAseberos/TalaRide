@@ -108,17 +108,17 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
     (result?.payment?.amount_centavos ? result.payment.amount_centavos / 100 : null);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-5">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
+    <div className="min-h-screen bg-[#FFFEF9] text-[#101A20] flex items-center justify-center p-5">
+      <div className="w-full max-w-md bg-white border border-[#DFE6DF] rounded-3xl p-6 shadow-xl shadow-[#003D2B]/5 space-y-5">
         <div className="flex items-center gap-3">
           {state === 'confirmed' ? (
-            <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+            <CheckCircle2 className="w-10 h-10 text-[#006B3D]" />
           ) : state === 'failed' ? (
-            <XCircle className="w-10 h-10 text-rose-400" />
+            <XCircle className="w-10 h-10 text-[#C73E3A]" />
           ) : state === 'checking' ? (
-            <RotateCw className="w-10 h-10 text-amber-300 animate-spin" />
+            <RotateCw className="w-10 h-10 text-[#C88913] animate-spin" />
           ) : (
-            <Clock3 className="w-10 h-10 text-amber-300" />
+            <Clock3 className="w-10 h-10 text-[#C88913]" />
           )}
           <div>
             <h1 className="text-xl font-black">
@@ -128,26 +128,26 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
                   ? 'Payment not completed'
                   : 'Verifying payment'}
             </h1>
-            <p className="text-xs text-slate-400 mt-1">{message}</p>
+            <p className="text-xs text-[#66756D] mt-1">{message}</p>
           </div>
         </div>
 
         {paymentId && (
-          <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-sm space-y-2">
+          <div className="bg-[#F7F9F6] border border-[#DFE6DF] rounded-2xl p-4 text-sm space-y-2">
             <div className="flex justify-between gap-4">
-              <span className="text-slate-500">Payment ID</span>
+              <span className="text-[#7A8580]">Payment ID</span>
               <span className="font-mono text-right break-all">{paymentId}</span>
             </div>
             {result?.payment?.vehicle_id && (
               <div className="flex justify-between gap-4">
-                <span className="text-slate-500">Vehicle</span>
+                <span className="text-[#7A8580]">Vehicle</span>
                 <span className="font-mono">{result.payment.vehicle_id}</span>
               </div>
             )}
             {amount !== null && amount !== undefined && (
               <div className="flex justify-between gap-4">
-                <span className="text-slate-500">Amount</span>
-                <span className="font-black text-emerald-400">₱{Number(amount).toFixed(2)}</span>
+                <span className="text-[#7A8580]">Amount</span>
+                <span className="font-black text-[#006B3D]">₱{Number(amount).toFixed(2)}</span>
               </div>
             )}
           </div>
@@ -156,7 +156,7 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
         {state === 'pending' && !cancelled && (
           <button
             onClick={() => void verify()}
-            className="w-full py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl transition"
+            className="w-full py-3 bg-[#E7B342] hover:bg-[#D9A630] text-[#173329] font-black rounded-xl transition"
           >
             Check again
           </button>
@@ -164,25 +164,25 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
 
         {state === 'confirmed' && (
           <div className="space-y-3">
-            <div className="rounded-2xl border border-emerald-800 bg-emerald-950/30 p-4">
-              <div className="text-sm font-black text-emerald-300">Continue in TalaRide</div>
-              <p className="mt-1 text-xs leading-relaxed text-emerald-100/70">
+            <div className="rounded-2xl border border-[#CFE0D5] bg-[#EEF7EB] p-4">
+              <div className="text-sm font-black text-[#006B3D]">Continue in TalaRide</div>
+              <p className="mt-1 text-xs leading-relaxed text-[#53606D]">
                 If TalaRide is installed, return to the app for your payment status and ride history.
                 No app yet? You can stay on this receipt page.
               </p>
               <button
                 onClick={() => openTalaRide(false)}
-                className="mt-3 w-full rounded-xl bg-emerald-500 py-3 text-xs font-black text-slate-950"
+                className="mt-3 w-full rounded-xl bg-[#006B3D] py-3 text-xs font-black text-white"
               >
                 OPEN TALARIDE
               </button>
-              <p className="mt-2 text-center text-[10px] text-emerald-100/50">
+              <p className="mt-2 text-center text-[10px] text-[#78847E]">
                 App-store installation links will be added when TalaRide is published.
               </p>
             </div>
-            <div className="rounded-2xl border border-amber-800/60 bg-amber-950/20 p-4">
-              <div className="text-sm font-black text-amber-300">🎟 Vouchers & rewards</div>
-              <p className="mt-1 text-xs text-amber-100/60">Coming soon.</p>
+            <div className="rounded-2xl border border-[#EBD7A2] bg-[#FFF8E5] p-4">
+              <div className="text-sm font-black text-[#C88913]">🎟 Vouchers & rewards</div>
+              <p className="mt-1 text-xs text-[#7E6B3E]">Coming soon.</p>
             </div>
           </div>
         )}
@@ -191,12 +191,12 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
           onClick={() => {
             window.location.href = '/';
           }}
-          className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-black rounded-xl transition"
+          className="w-full py-3 bg-[#F1F4F0] hover:bg-[#E7ECE8] text-[#003D2B] border border-[#D8E1DB] font-black rounded-xl transition"
         >
           Done
         </button>
 
-        <p className="text-[11px] text-slate-500 text-center leading-relaxed">
+        <p className="text-[11px] text-[#7A8580] text-center leading-relaxed">
           A redirect alone never marks a TalaRide payment as paid. Success appears only after the
           backend reports provider-confirmed settlement.
         </p>
