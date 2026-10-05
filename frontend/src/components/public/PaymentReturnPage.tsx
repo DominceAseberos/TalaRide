@@ -55,14 +55,28 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
           return;
         }
 
-        if (res.status === 'expired' || res.status === 'failed') {
+        const expiresAtMs = res.payment?.expires_at
+          ? Date.parse(res.payment.expires_at)
+          : Number.NaN;
+        const expiredByTime =
+          Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now();
+        const terminalFailure =
+          res.status === 'expired' ||
+          res.status === 'failed' ||
+          res.status === 'refunded' ||
+          res.status === 'reversed' ||
+          expiredByTime;
+
+        if (terminalFailure) {
           terminalStateReached.current = true;
           stopPolling();
           setState('failed');
           setMessage(
-            res.status === 'expired'
+            res.status === 'expired' || expiredByTime
               ? 'This payment request expired before confirmation.'
-              : 'The payment could not be confirmed.'
+              : res.status === 'refunded' || res.status === 'reversed'
+                ? 'This payment is no longer active.'
+                : 'The payment could not be confirmed.'
           );
           return;
         }
