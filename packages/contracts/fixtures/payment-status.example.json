@@ -1,0 +1,16 @@
+{
+  "payment_id": "PAY-842109",
+  "ride_id": "RIDE-842109",
+  "driver_code": "DR-000481",
+  "vehicle_code": "TR-01842",
+  "amount_centavos": 3000,
+  "provider": "gcash",
+  "provider_ref": "GCASH-REF-8842109",
+  "payment_status": "confirmed",
+  "provider_fee_centavos": 53,
+  "talaride_fee_centavos": 0,
+  "net_centavos": 2947,
+  "created_at": "2026-10-04T00:00:00.000Z",
+  "expires_at": "2026-10-04T00:05:00.000Z",
+  "confirmed_at": "2026-10-04T00:01:23.000Z"
+}

@@ -61,7 +61,7 @@ test('Expo/mobile-facing HTTP contract completes a payment end to end', async ()
     assert.equal(intent.body.payment_status, 'awaiting_confirmation');
     assert.ok(intent.body.payment_id);
     assert.ok(intent.body.ride_id);
-    assert.match(intent.body.checkout_url, /^https:\/\/checkout\.paymongo\.com\//);
+    assert.equal(intent.body.checkout_url, null, 'mock payment mode must not call an external provider');
 
     const qr = JSON.parse(intent.body.qr_payload);
     assert.equal(qr.v, 1);

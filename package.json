@@ -1,7 +1,7 @@
 {
   "name": "talaride",
   "private": true,
-  "packageManager": "pnpm@12.6.0",
+  "packageManager": "pnpm@9.15.9",
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
@@ -9,12 +9,21 @@
     "test": "turbo test",
     "typecheck": "turbo typecheck",
     "mobile": "pnpm --filter @talaride/mobile start",
-    "web": "pnpm --filter @talaride/web dev"
+    "frontend": "pnpm --dir apps/frontend dev",
+    "backend": "pnpm --dir apps/backend dev",
+    "web": "pnpm --dir apps/frontend dev",
+    "build:frontend": "pnpm --dir apps/frontend build",
+    "build:backend": "pnpm --dir apps/backend build",
+    "test:mobile": "pnpm --filter @talaride/mobile test",
+    "test:backend": "pnpm --dir apps/backend test"
   },
   "devDependencies": {
     "turbo": "^2.5.0"
   },
   "pnpm": {
-    "trustedDependencies": ["tesseract.js", "unrs-resolver"]
+    "trustedDependencies": [
+      "tesseract.js",
+      "unrs-resolver"
+    ]
   }
 }

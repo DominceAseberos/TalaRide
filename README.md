@@ -1,139 +1,110 @@
 # TalaRide
 
-TalaRide is a privacy-first mobile app for recording tricycle and pedicab rides. It helps passengers keep track of vehicle identifiers and ride details so they have useful information if an item is lost.
+TalaRide is maintained as a single monorepo for the mobile app, public/admin web frontend, backend API, shared code, and Supabase schema.
 
-Ride records stay on the user's device. Supabase is used only for authentication and basic profile information; ride history and scanned images are not uploaded.
+## Repository layout
 
-## Features
+```text
+TalaRide/
+├─ apps/
+│  ├─ mobile/       Expo / React Native Android app
+│  ├─ frontend/     React + Vite web app deployed to Vercel
+│  └─ backend/      Node + Express API deployed to Render
+├─ packages/
+│  ├─ shared/       Shared TypeScript code used by TalaRide apps
+│  └─ contracts/    Cross-app API/QR contract fixtures
+├─ supabase/        Canonical Supabase migrations and functions
+├─ docs/
+├─ render.yaml
+├─ pnpm-workspace.yaml
+└─ turbo.json
+```
 
-- Email registration, sign-in, password recovery, and session management
-- Editable passenger profile
-- Camera and gallery scanning for vehicle identifiers
-- On-device OCR with manual review and correction before saving
-- Manual vehicle identifier entry when OCR is unavailable
-- Local ride history stored with SQLite
-- Search and filtering by vehicle type and date
-- View, edit, and delete saved rides
-- Optional ride notes and location details
-- Lost-item reporting flow
-- Offline access to locally stored rides
-- Android, iOS, and web support through Expo
+The former standalone `Talaride-web` repository is preserved as migration history, but production source now belongs in this repository.
 
-> [!NOTE]
-> The community relay is currently a demonstration feature. Native OCR requires a development build and is not available in Expo Go. The web version performs OCR locally in the browser; manual entry remains available when recognition is uncertain.
+## Requirements
 
-## Tech Stack
+- Node.js
+- pnpm 9.15.9
+- Android SDK / JDK for native Android builds
+- Supabase project credentials
+- Backend provider credentials when running live payments
 
-- **Frontend:** React 19, React Native 0.86, TypeScript
-- **Framework:** Expo SDK 57 and Expo Router
-- **Authentication and profiles:** Supabase
-- **Local storage:** Expo SQLite and AsyncStorage
-- **Secure session storage:** Expo SecureStore
-- **Camera and image selection:** Expo Camera and Expo Image Picker
-- **OCR:** `expo-mlkit-ocr` using ML Kit on Android and Apple Vision on iOS; `tesseract.js` in the browser
-- **Notifications:** Expo Notifications
-- **Testing and quality:** Node test runner, TypeScript, ESLint, and Prettier
+## Install
 
-## Setup
-
-### Prerequisites
-
-Install the following before starting:
-
-- [Node.js](https://nodejs.org/) LTS
-- npm
-- An Android emulator or physical Android device, or macOS with Xcode for iOS development
-- A [Supabase](https://supabase.com/) project
-
-### 1. Install dependencies
-
-Clone the repository, open the project directory, and install the locked dependency versions:
+From the repository root:
 
 ```bash
-npm ci
+pnpm install
 ```
 
-### 2. Configure environment variables
+Environment files are app-specific and are not committed:
 
-Copy `.env.example` to `.env`:
+- `apps/mobile/.env` or `apps/mobile/.env.production`
+- `apps/frontend/.env`
+- `apps/backend/.env`
+
+Use the corresponding `.env.example` files as templates. Never commit signing keys, service-role keys, webhook secrets, or production env files.
+
+## Development
+
+Run an individual app:
 
 ```bash
-cp .env.example .env
+pnpm mobile
+pnpm frontend
+pnpm backend
 ```
 
-On Windows PowerShell, use:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Add your public Supabase project values to `.env`:
-
-```env
-EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
-```
-
-Only use the public project URL and publishable key. Never place a service-role key, database password, or other secret in an `EXPO_PUBLIC_*` variable.
-
-### 3. Configure Supabase
-
-Follow the [Supabase setup guide](supabase/README.md) to apply the profile migration and Row Level Security policies, configure authentication callback URLs, and deploy the relay Edge Function when needed.
-
-### 4. Create a native development build
-
-A native development build is required for on-device OCR and SecureStore integration:
+Or run workspace tasks with Turborepo:
 
 ```bash
-npx expo run:android
+pnpm build
+pnpm test
+pnpm lint
+pnpm typecheck
 ```
 
-For iOS, run the following on macOS with Xcode configured:
+Useful targeted checks:
 
 ```bash
-npx expo run:ios --device
+pnpm test:mobile
+pnpm test:backend
+pnpm build:frontend
+pnpm build:backend
 ```
 
-iOS 16.4 or later is required. On Windows, use a short project path if a native Android build fails because of path-length limits.
+## Production deployment roots
 
-For the signed Android testing APK, follow the
-[Phase 11 Android setup](docs/phase-11-release.md). It uses the linked EAS project
-and its managed Android signing keystore.
+### Android / Expo
 
-## Run the App
+- App root: `apps/mobile`
+- Android package: `com.beepanjero.talaride`
+- GitHub APK releases are published from this repository.
 
-Start the development server for an installed native development build:
+### Vercel frontend
 
-```bash
-npx expo start --dev-client
-```
+- Repository: `DominceAseberos/TalaRide`
+- Root directory: `apps/frontend`
+- Build command: `npm run build`
+- Output directory: `dist`
 
-You can also launch a platform directly:
+### Render backend
 
-```bash
-npm run android
-npm run ios
-npm run web
-```
+- Repository: `DominceAseberos/TalaRide`
+- Root directory: `apps/backend`
+- Build command: `npm ci --include=dev && npm run build`
+- Start command: `npm start`
+- Health check: `/api/health`
 
-Expo Go can be used for a limited preview, but native OCR is unavailable there. Use manual vehicle identifier entry or install a development build for the complete scanning flow.
+The root `render.yaml` is configured for `apps/backend`.
 
-## Checks and Tests
+## Supabase
 
-```bash
-npm test
-npm run check
-```
+`supabase/` is the canonical schema/function directory for the unified repository. Historical uncommitted migrations from the former web checkout were not merged automatically; they must be reviewed against the canonical migration history before adoption.
 
-`npm test` runs the automated tests. `npm run check` verifies TypeScript, ESLint, and Prettier formatting.
+## Migration notes
 
-## Privacy Notes
+The production Vite frontend and Express backend were imported from the latest `DominceAseberos/Talaride-web/main`. The previous experimental Next.js frontend is preserved under `legacy/next-web/` but is outside the active workspace so there is only one production frontend.
 
-- Ride records are stored locally and are not synchronized to Supabase.
-- Captured images are temporarily cached for recognition and removed after the scan flow.
-- Photos, raw OCR text, and local file paths are not stored in ride records.
-- The local SQLite database is not currently encrypted. The device sandbox and lock screen provide baseline protection, but production use with sensitive data should add and validate database encryption.
-
-## License
-
-This project is licensed under the terms in [LICENSE](LICENSE).
+Historical mobile/web documentation is retained under `docs/archive/`. The old uncommitted web Supabase migrations are preserved under `supabase/archive/talaride-web-uncommitted/` for review only and are not applied automatically.

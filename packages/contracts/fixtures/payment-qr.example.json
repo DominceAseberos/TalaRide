@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "payment_id": "PAY-842109",
+  "ride_id": "RIDE-842109",
+  "vehicle_code": "TR-01842",
+  "amount_centavos": 3000,
+  "expires_at": "2026-10-04T00:05:00.000Z",
+  "nonce": "e4f8d9b1a2c3",
+  "sig": "3a8c547841c6d708e928f6e2b10a4f5b9c7d8e1a2b3c4d5e6f7a8b9c0d1e2f3"
+}

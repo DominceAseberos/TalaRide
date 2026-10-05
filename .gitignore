@@ -1,58 +1,58 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# Dependencies
 node_modules/
 
-# Expo
+# Expo / web build output
 .expo/
 .expo-*/
 dist/
 web-build/
 expo-env.d.ts
-
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-firebase-service-account*.json
-*-firebase-adminsdk-*.json
-
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env
-.env.*
-!.env.example
-
-# typescript
-*.tsbuildinfo
-
-# generated native folders
-/ios
-/android
-
-# Local Supabase CLI cache
-/supabase/.temp/
-/supabase/.branches/
-
-.idea/
-
-# Turborepo and Next.js
 .turbo/
 .next/
 out/
 
+# Native / local build output
+.kotlin/
+.gradle/
+*.orig.*
+*.apk
+*.aab
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+keystore.pass
+firebase-service-account*.json
+*-firebase-adminsdk-*.json
+
+# Local developer tooling / generated state
+.lynx/
+.metro-health-check*
+legacy/dirty-web-local/
+apps/backend/data/
+apps/mobile/android/
+apps/mobile/ios/
+supabase/.temp/
+supabase/.branches/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+pnpm-debug.log*
+*.log
+
+# TypeScript
+*.tsbuildinfo
+
+# OS / editors
+.DS_Store
+.idea/
+*.pem

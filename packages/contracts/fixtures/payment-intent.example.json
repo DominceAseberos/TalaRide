@@ -1,0 +1,14 @@
+{
+  "success": true,
+  "payment_id": "PAY-842109",
+  "ride_id": "RIDE-842109",
+  "driver_code": "DR-000481",
+  "vehicle_code": "TR-01842",
+  "amount_centavos": 3000,
+  "provider_fee_centavos": 53,
+  "talaride_fee_centavos": 0,
+  "net_centavos": 2947,
+  "payment_status": "awaiting_confirmation",
+  "expires_at": "2026-10-04T00:05:00.000Z",
+  "qr_payload": "{\"v\":1,\"payment_id\":\"PAY-842109\",\"ride_id\":\"RIDE-842109\",\"vehicle_code\":\"TR-01842\",\"amount_centavos\":3000,\"expires_at\":\"2026-10-04T00:05:00.000Z\",\"nonce\":\"e4f8d9b1a2c3\",\"sig\":\"test_sig\"}"
+}

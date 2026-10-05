@@ -1,13 +1,14 @@
 {
-  "name": "talaride-backend",
+  "name": "@talaride/backend",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "start": "node dist/index.js",
-    "test": "tsx --test --test-concurrency=1 tests/**/*.test.ts"
+    "test": "tsx --import ./tests/setup-env.ts --test --test-concurrency=1 tests/**/*.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
