@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: talaride-api-staging
+    name: talaride-web
     runtime: node
     region: singapore
     plan: free
