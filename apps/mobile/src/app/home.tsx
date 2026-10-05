@@ -25,9 +25,9 @@ export default function HomeScreen() {
           onPress={() => go('/activity?tab=notifications')}
         />
       </View>
-      <Title style={{ fontSize: 23, lineHeight: 28 }}>TalaRide</Title>
+      <Title style={{ fontSize: 25, lineHeight: 30, color: colors.darkGreen }}>Ready for your next ride?</Title>
       <Copy style={{ fontSize: 13, color: colors.muted, marginTop: 6, marginBottom: 20 }}>
-        Hi {displayName.split(' ')[0]} — Scan → Choose fare → Choose payment → Pay → ✓.
+        Hi {displayName.split(' ')[0]}. Scan the vehicle QR, verify your ride, then choose your fare and payment.
       </Copy>
       {/* Primary CTA — SCAN RIDE */}
       <Pressable
@@ -36,7 +36,7 @@ export default function HomeScreen() {
         onPress={() => go('/scan-ride')}
       >
         <LinearGradient
-          colors={['#00844A', '#006435']}
+          colors={[colors.green, colors.darkGreen]}
           style={{
             alignItems: 'center',
             justifyContent: 'center',
