@@ -96,7 +96,7 @@ function normalizeVehicle(raw: any): Vehicle {
     qr_code_payload:
       raw.qr_code_payload ??
       (raw.vehicle_code && raw.qr_checksum
-        ? `https://web.talaride.ph/v/${raw.vehicle_code}?c=${raw.qr_checksum}`
+        ? `https://talaride-web-frontend.vercel.app/v/${raw.vehicle_code}?c=${raw.qr_checksum}`
         : ''),
     created_at: raw.created_at
   };
