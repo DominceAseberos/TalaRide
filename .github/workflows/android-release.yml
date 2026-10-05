@@ -1,0 +1,170 @@
+name: Android Release APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: GitHub release tag to build and publish
+        required: true
+        default: v1.2.2
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      EXPECTED_SIGNER_SHA256: AD:1C:AC:12:00:08:24:5B:12:92:3F:71:74:BF:DB:73:78:BB:46:DF:9E:F3:66:D3:95:E3:5F:91:35:F1:77:EE
+
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.6.0
+          run_install: false
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;27.1.12297006" "cmake;3.22.1"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Write production mobile environment
+        shell: bash
+        run: |
+          cat > apps/mobile/.env.production <<'EOF'
+          EXPO_PUBLIC_SUPABASE_URL=${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          EXPO_PUBLIC_WEB_API=${{ secrets.EXPO_PUBLIC_WEB_API }}
+          EXPO_PUBLIC_PAYMENT_MODE=${{ secrets.EXPO_PUBLIC_PAYMENT_MODE }}
+          EXPO_PUBLIC_VEHICLE_QR_BASE=${{ secrets.EXPO_PUBLIC_VEHICLE_QR_BASE }}
+          EXPO_PUBLIC_QR_EXPIRY_SEC=${{ secrets.EXPO_PUBLIC_QR_EXPIRY_SEC }}
+          EXPO_PUBLIC_DEMO_MODE=${{ secrets.EXPO_PUBLIC_DEMO_MODE }}
+          EOF
+
+      - name: Verify release environment
+        run: pnpm --filter @talaride/mobile release:verify-env
+
+      - name: Generate native Android project
+        env:
+          NODE_ENV: production
+          CI: "1"
+        run: |
+          cd apps/mobile
+          npx expo prebuild --platform android --clean --no-install
+
+      - name: Configure permanent release signing
+        shell: bash
+        run: |
+          printf '%s' "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > apps/mobile/android/app/talaride-release.jks
+          cat >> apps/mobile/android/gradle.properties <<'EOF'
+          TALARIDE_UPLOAD_STORE_FILE=talaride-release.jks
+          TALARIDE_UPLOAD_STORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          TALARIDE_UPLOAD_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}
+          TALARIDE_UPLOAD_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("apps/mobile/android/app/build.gradle")
+          text = path.read_text()
+          debug = """        debug {
+              storeFile file('debug.keystore')
+              storePassword 'android'
+              keyAlias 'androiddebugkey'
+              keyPassword 'android'
+          }
+          """
+          release = debug + """        release {
+              storeFile file(TALARIDE_UPLOAD_STORE_FILE)
+              storePassword TALARIDE_UPLOAD_STORE_PASSWORD
+              keyAlias TALARIDE_UPLOAD_KEY_ALIAS
+              keyPassword TALARIDE_UPLOAD_KEY_PASSWORD
+          }
+          """
+          if "storeFile file(TALARIDE_UPLOAD_STORE_FILE)" not in text:
+              if debug not in text:
+                  raise SystemExit("Expected Android debug signing block was not found.")
+              text = text.replace(debug, release, 1)
+          old = "signingConfig signingConfigs.debug\n            def enableShrinkResources"
+          new = "signingConfig signingConfigs.release\n            def enableShrinkResources"
+          if old not in text:
+              raise SystemExit("Expected Android release signing line was not found.")
+          text = text.replace(old, new, 1)
+          path.write_text(text)
+          PY
+
+      - name: Verify signing certificate
+        shell: bash
+        run: |
+          ACTUAL="$(keytool -list -v             -keystore apps/mobile/android/app/talaride-release.jks             -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"             -alias "${{ secrets.ANDROID_KEY_ALIAS }}"             | sed -n 's/^[[:space:]]*SHA256: //p' | head -n 1)"
+          echo "Release signer SHA-256: $ACTUAL"
+          test "$ACTUAL" = "$EXPECTED_SIGNER_SHA256"
+
+      - name: Build signed Android APK
+        env:
+          NODE_ENV: production
+          CI: "1"
+        run: |
+          cd apps/mobile/android
+          ./gradlew app:assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          APK="TalaRide-v${VERSION}.apk"
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "$APK"
+          sha256sum "$APK" > "$APK.sha256"
+          echo "APK_NAME=$APK" >> "$GITHUB_ENV"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: talaride-${{ env.RELEASE_TAG }}-android
+          path: |
+            ${{ env.APK_NAME }}
+            ${{ env.APK_NAME }}.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach APK to draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$RELEASE_TAG" "$APK_NAME" "$APK_NAME.sha256" --clobber
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "$RELEASE_TAG" --draft=false --latest
+
+      - name: Verify published asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$RELEASE_TAG" --json tagName,isDraft,publishedAt,assets,url
