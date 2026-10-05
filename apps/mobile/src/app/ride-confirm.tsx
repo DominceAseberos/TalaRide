@@ -26,6 +26,8 @@ import { enqueueOutbox } from '@/offline/queue';
 import { triggerSync } from '@/api/sync';
 import { useMock } from '@/mocks/MockProvider';
 
+const MIN_FARE_CENTAVOS = 1500;
+
 const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; subtitle: string }[] = [
   { id: 'gcash', label: 'GCash', subtitle: 'E-wallet' },
   { id: 'maya', label: 'Maya', subtitle: 'E-wallet' },
@@ -133,7 +135,7 @@ export default function RideConfirmScreen() {
     !!vehicle?.driver_code &&
     vehicle.status === 'Active' &&
     vehicle.shift_status === 'Active' &&
-    amountCentavos >= 100 &&
+    amountCentavos >= MIN_FARE_CENTAVOS &&
     !!paymentMethod &&
     !busy;
 
@@ -365,28 +367,29 @@ export default function RideConfirmScreen() {
                     borderColor: colors.border,
                     borderRadius: 10,
                     paddingHorizontal: 12,
+                    backgroundColor: colors.field,
                     color: colors.ink,
                   }}
                 />
               )}
             </View>
-            {customMode && customFare.length > 0 && amountCentavos === 0 && (
+            {customMode && customFare.length > 0 && amountCentavos < MIN_FARE_CENTAVOS && (
               <Copy style={{ marginTop: 8, color: colors.red, fontSize: 12 }}>
-                Enter a valid fare of at least ₱1.
+                Enter a fare of at least ₱15.
               </Copy>
             )}
           </Card>
 
-          <Card style={{ marginTop: 12, opacity: amountCentavos >= 100 ? 1 : 0.55 }}>
+          <Card style={{ marginTop: 12, opacity: amountCentavos >= MIN_FARE_CENTAVOS ? 1 : 0.55 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
               <Copy bold>2. Select payment</Copy>
-              {amountCentavos >= 100 && (
+              {amountCentavos >= MIN_FARE_CENTAVOS && (
                 <Copy bold style={{ color: colors.green }}>
                   {formatCentavos(amountCentavos)}
                 </Copy>
               )}
             </View>
-            {amountCentavos < 100 ? (
+            {amountCentavos < MIN_FARE_CENTAVOS ? (
               <Copy style={{ marginTop: 8, color: colors.muted }}>Choose or enter the fare first.</Copy>
             ) : (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
@@ -427,7 +430,7 @@ export default function RideConfirmScreen() {
               label={
                 busy
                   ? 'Starting payment…'
-                  : amountCentavos < 100
+                  : amountCentavos < MIN_FARE_CENTAVOS
                     ? '3. Choose fare first'
                     : !paymentMethod
                       ? '3. Select payment'
