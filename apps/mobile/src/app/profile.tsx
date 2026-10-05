@@ -88,7 +88,7 @@ export default function ProfileScreen() {
             justifyContent: 'center',
           }}
         >
-          <Icon name="person-circle" size={66} color=colors.disabled />
+          <Icon name="person-circle" size={66} color={colors.disabled} />
         </View>
         <View style={{ flex: 1 }}>
           <Copy bold style={{ fontSize: 18 }}>
