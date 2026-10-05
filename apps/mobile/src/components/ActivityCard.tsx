@@ -21,7 +21,7 @@ export function ActivityCard({
   unread?: boolean;
   onPress: () => void;
 }) {
-  const color = tone === 'active' ? colors.yellow : tone === 'found' ? colors.green : '#78858B';
+  const color = tone === 'active' ? colors.yellow : tone === 'found' ? colors.green : colors.subdued;
   return (
     <Pressable
       accessibilityRole="button"
@@ -63,7 +63,7 @@ export function ActivityCard({
               paddingHorizontal: 7,
               paddingVertical: 2,
               borderRadius: 7,
-              backgroundColor: tone === 'active' ? '#FFE594' : '#DEE2E3',
+              backgroundColor: tone === 'active' ? colors.paleYellow : colors.field,
             }}
           >
             {badge}
