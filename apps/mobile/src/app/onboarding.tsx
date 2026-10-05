@@ -155,7 +155,7 @@ export default function OnboardingScreen() {
             borderRadius: 28,
             backgroundColor: colors.paleGreen,
             borderWidth: 1,
-            borderColor: '#D8E8DC',
+            borderColor: colors.border,
             overflow: 'hidden',
           }}
         >
