@@ -86,11 +86,12 @@ export default function RideConfirmScreen() {
     if (!c) return;
 
     let live = true;
-    Promise.all([fetchPublicVehicle(code, String(c)), fetchFares()])
-      .then(([verifiedVehicle, fareButtons]) => {
+
+    fetchPublicVehicle(code, String(c))
+      .then((verifiedVehicle) => {
         if (!live) return;
         setVehicle(verifiedVehicle);
-        setFares(fareButtons);
+        setError('');
       })
       .catch((e) => {
         if (!live) return;
@@ -98,6 +99,14 @@ export default function RideConfirmScreen() {
       })
       .finally(() => {
         if (live) setVerifying(false);
+      });
+
+    fetchFares()
+      .then((fareButtons) => {
+        if (live) setFares(fareButtons);
+      })
+      .catch(() => {
+        // Fare loading must not block vehicle verification.
       });
 
     return () => {
