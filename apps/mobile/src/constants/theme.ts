@@ -18,6 +18,7 @@ export const colors = {
   paleYellow: '#FFF8E5',
   disabled: '#C9D5CE',
   overlay: '#00000066',
+  overlayStrong: '#00000088',
 };
 
 const isWeb = Platform.OS === 'web';
