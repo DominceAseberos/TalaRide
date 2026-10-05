@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Smartphone,
-  Layers,
-  Sparkles,
   Home,
   QrCode,
   Clock,
@@ -173,90 +170,14 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
-      {/* Universal Ecosystem Mode Switcher HUD */}
-      <header className="bg-slate-950 border-b border-slate-800 sticky top-0 z-50 px-4 py-2.5 shadow-md">
-        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-600 flex items-center justify-center font-black text-white text-base shadow-xs">
-              T
-            </div>
-            <div>
-              <span className="font-black text-white text-sm tracking-tight">TalaRide MVP</span>
-              <span className="text-[10px] text-slate-400 block -mt-0.5">Tagum City Micro-Transit</span>
-            </div>
-          </div>
-
-          {/* Switcher Pills */}
-          <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-2xl border border-slate-800 text-xs font-bold overflow-x-auto no-scrollbar">
-            <button
-              onClick={() => setActivePortal('commuter')}
-              className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${
-                activePortal === 'commuter'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>Commuter App</span>
-            </button>
-
-            <button
-              onClick={() => setActivePortal('driver')}
-              className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${
-                activePortal === 'driver'
-                  ? 'bg-emerald-500 text-slate-950 font-black shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>Driver App</span>
-            </button>
-
-            <button
-              onClick={() => setActivePortal('guest')}
-              className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${
-                activePortal === 'guest'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>Guest QR Ph</span>
-            </button>
-
-            <button
-              onClick={() => setActivePortal('admin')}
-              className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${
-                activePortal === 'admin'
-                  ? 'bg-purple-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Admin Portal</span>
-            </button>
-
-            <button
-              onClick={() => setActivePortal('simulator')}
-              className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${
-                activePortal === 'simulator'
-                  ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
-                  : 'text-amber-400 hover:text-amber-300'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Dual Live Simulator</span>
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#FFFEF9] text-[#101A20] flex flex-col font-sans">
+      {/* Role portals are route-driven. The production UI intentionally has no visible role switcher. */}
 
       {/* Main Dynamic Viewport */}
-      <main className="flex-1 flex justify-center items-center p-0 md:p-6 overflow-hidden">
+      <main className="flex-1 flex justify-center items-stretch p-0 overflow-hidden">
         {/* VIEW 1: COMMUTER APP */}
         {activePortal === 'commuter' && (
-          <div className="w-full max-w-md h-[100dvh] md:h-[780px] bg-slate-50 md:rounded-[36px] shadow-2xl overflow-hidden flex flex-col relative border-0 md:border-8 md:border-slate-800">
+          <div className="w-full min-h-[100dvh] bg-[#FFFEF9] overflow-hidden flex flex-col relative">
             {/* Phone Screen Container */}
             <div className="flex-1 overflow-y-auto">
               {isScanning ? (
@@ -401,7 +322,7 @@ export function App() {
 
         {/* VIEW 2: DRIVER APP */}
         {activePortal === 'driver' && (
-          <div className="w-full max-w-md h-[100dvh] md:h-[780px] bg-slate-950 md:rounded-[36px] shadow-2xl overflow-hidden flex flex-col relative border-0 md:border-8 md:border-slate-800">
+          <div className="w-full min-h-[100dvh] bg-[#FFFEF9] overflow-hidden flex flex-col relative">
             <div className="flex-1 overflow-y-auto">
               {!driver || driverScreen === 'login' ? (
                 <DriverLogin
@@ -472,7 +393,7 @@ export function App() {
 
         {/* VIEW 3: GUEST QR PH CHECKOUT */}
         {activePortal === 'guest' && (
-          <div className="w-full max-w-md h-[100dvh] md:h-[780px] bg-slate-900 md:rounded-[36px] shadow-2xl overflow-hidden flex flex-col relative border-0 md:border-8 md:border-slate-800">
+          <div className="w-full min-h-[100dvh] bg-[#FFFEF9] overflow-hidden flex flex-col relative">
             <GuestQRPhPayment
               fareAmount={Number(currentSearch.get('amount')) || activeFareAmount || 30}
               vehicleId={currentSearch.get('vehicle') || driver?.assigned_vehicle_id || 'TR-01842'}
