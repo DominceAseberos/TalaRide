@@ -2,11 +2,11 @@ const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
 
 const projectRoot = __dirname;
-const monorepoRoot = path.resolve(projectRoot, '../..');
+const monorepoRoot = path.resolve(projectRoot, '..');
 
 const config = getDefaultConfig(projectRoot);
 
-// Watch shared workspace package only (avoiding heavy apps/web and .turbo directories)
+// Watch the shared workspace package from the flat monorepo root.
 config.watchFolders = [path.resolve(monorepoRoot, 'packages/shared')];
 
 // Resolve modules from both the app and the monorepo root
