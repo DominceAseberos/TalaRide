@@ -5,6 +5,10 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
+    "dev:mobile": "pnpm --dir mobile start",
+    "dev:frontend": "pnpm --dir frontend dev",
+    "dev:backend": "pnpm --dir backend dev",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "lint": "turbo lint",
     "test": "turbo test",
     "typecheck": "turbo typecheck",

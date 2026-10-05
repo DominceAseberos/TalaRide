@@ -6,10 +6,9 @@ TalaRide is maintained as a single monorepo for the mobile app, public/admin web
 
 ```text
 TalaRide/
-├─ apps/
-│  ├─ mobile/       Expo / React Native Android app
-│  ├─ frontend/     React + Vite web app deployed to Vercel
-│  └─ backend/      Node + Express API deployed to Render
+├─ mobile/          Expo / React Native Android app
+├─ frontend/        React + Vite web app deployed to Vercel
+├─ backend/         Node + Express API deployed to Render
 ├─ packages/
 │  ├─ shared/       Shared TypeScript code used by TalaRide apps
 │  └─ contracts/    Cross-app API/QR contract fixtures
@@ -51,12 +50,20 @@ Use the corresponding `.env.example` files as templates. Never commit signing ke
 Run an individual app:
 
 ```bash
-pnpm mobile
-pnpm frontend
-pnpm backend
+pnpm dev:mobile
+pnpm dev:frontend
+pnpm dev:backend
 ```
 
-Or run workspace tasks with Turborepo:
+`pnpm dev` runs workspace packages that expose a `dev` script (currently frontend and backend). Mobile stays separate because Expo is interactive.
+
+Run the complete verification gate with:
+
+```bash
+pnpm check
+```
+
+Or run workspace tasks individually with Turborepo:
 
 ```bash
 pnpm build
