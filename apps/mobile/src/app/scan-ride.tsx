@@ -7,6 +7,7 @@ import { Screen } from '@/components/Screen';
 import { Button, Copy, Header, Title, go } from '@/components/ui';
 import { parseDynamicQr, parseVehicleQr } from '@talaride/shared';
 import { decodeQrImageUri } from '@/scan/decodeImage';
+import { colors } from '@/constants/theme';
 
 export default function ScanRideScreen() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -96,7 +97,7 @@ export default function ScanRideScreen() {
           </View>
         )}
       </View>
-      {!!error && <Copy style={{ color: '#B3261E', marginTop: 8 }}>{error}</Copy>}
+      {!!error && <Copy style={{ color: colors.red, marginTop: 8 }}>{error}</Copy>}
       <View style={{ marginTop: 12 }}>
         <Button
           label={decoding ? 'Decoding image…' : 'Upload QR image instead'}
