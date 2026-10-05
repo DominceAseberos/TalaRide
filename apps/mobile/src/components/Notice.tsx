@@ -20,7 +20,7 @@ export function Notice({
         onPress={onClose}
         style={{
           flex: 1,
-          backgroundColor: '#00000066',
+          backgroundColor: colors.overlay,
           alignItems: 'center',
           justifyContent: 'center',
           padding: 24,
@@ -34,7 +34,7 @@ export function Notice({
             borderRadius: 18,
             padding: 24,
             gap: 18,
-            backgroundColor: colors.background,
+            backgroundColor: colors.surface,
           }}
         >
           <Title>{title}</Title>
