@@ -98,7 +98,7 @@ export function Button({
     >
       {variant === 'primary' ? (
         <LinearGradient
-          colors={['#00572F', '#00844A']}
+          colors={[colors.darkGreen, colors.green]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ borderRadius: 10 }}
@@ -239,7 +239,7 @@ export const s = StyleSheet.create({
     gap: 10,
   },
   outline: { borderWidth: 1, borderColor: colors.green },
-  subtle: { backgroundColor: '#F0F3EE' },
+  subtle: { backgroundColor: colors.paleGreen },
   iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row',
@@ -273,7 +273,7 @@ export const s = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 12,
     padding: 14,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
   },
   action: {
     flexDirection: 'row',
@@ -282,7 +282,7 @@ export const s = StyleSheet.create({
     padding: 12,
     minHeight: 50,
     borderBottomWidth: 1,
-    borderColor: '#EDF0E9',
+    borderColor: colors.border,
     borderRadius: 10,
   },
 });
