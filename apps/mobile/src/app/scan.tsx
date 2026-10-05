@@ -107,7 +107,7 @@ export default function ScanScreen() {
     }
   }
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#17241C' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.darkGreen }}>
       <StatusBar style="light" />
       <View style={{ flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', padding: 20 }}>
         <View style={[s.row, { justifyContent: 'space-between' }]}>
@@ -186,7 +186,7 @@ export default function ScanScreen() {
               style={{
                 position: 'absolute',
                 inset: 0,
-                backgroundColor: '#00000088',
+                backgroundColor: colors.overlayStrong,
                 justifyContent: 'center',
                 alignItems: 'center',
                 gap: 12,
@@ -201,7 +201,7 @@ export default function ScanScreen() {
           style={{
             textAlign: 'center',
             color: colors.white,
-            backgroundColor: '#00000066',
+            backgroundColor: colors.overlay,
             padding: 12,
             borderRadius: 10,
           }}
