@@ -2,17 +2,22 @@ import { Platform } from 'react-native';
 
 export const colors = {
   background: '#FFFEF9',
+  surface: '#FFFFFF',
   white: '#FFFFFF',
   ink: '#101A20',
   muted: '#53606D',
+  subdued: '#78847E',
   green: '#006B3D',
   darkGreen: '#003D2B',
   paleGreen: '#EEF7EB',
   border: '#DFE6DF',
-  field: '#F6F7F3',
-  red: '#E60012',
-  paleRed: '#FFF0EB',
-  yellow: '#FFA800',
+  field: '#F6F8F5',
+  red: '#C73E3A',
+  paleRed: '#FFF3F1',
+  yellow: '#E7B342',
+  paleYellow: '#FFF8E5',
+  disabled: '#C9D5CE',
+  overlay: '#00000066',
 };
 
 const isWeb = Platform.OS === 'web';
