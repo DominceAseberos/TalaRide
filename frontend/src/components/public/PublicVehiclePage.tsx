@@ -31,7 +31,8 @@ interface Props {
   onGoHome?: () => void;
 }
 
-const PRESET_FARES = [15, 20, 30, 40, 50];
+const PRESET_FARES = [15, 20, 25, 30, 40];
+const MIN_FARE = 15;
 
 export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) => {
   const [data, setData] = useState<PublicVehicleData | null>(null);
@@ -113,7 +114,7 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
     return Number.isFinite(parsed) ? parsed : 0;
   }, [customFare, customMode, presetFare]);
 
-  const hasValidFare = finalFare >= 1 && finalFare <= 100000;
+  const hasValidFare = finalFare >= MIN_FARE && finalFare <= 100000;
   const canPay =
     !!data?.driver_code &&
     data.status === 'Active' &&
@@ -150,7 +151,7 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
         paymentMethod
       );
       if (!result.checkoutUrl) {
-        throw new Error('Payment gateway is unavailable right now.');
+        throw new Error('The payment gateway is unavailable right now.');
       }
       window.location.assign(result.checkoutUrl);
     } catch (err: any) {
@@ -165,103 +166,113 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
     subtitle: string;
     icon: React.ReactNode;
   }> = [
-    { id: 'gcash', label: 'GCash', subtitle: 'E-wallet', icon: <Smartphone className="w-4 h-4" /> },
-    { id: 'maya', label: 'Maya', subtitle: 'E-wallet', icon: <Smartphone className="w-4 h-4" /> },
-    { id: 'card', label: 'Card', subtitle: 'Visa / Mastercard', icon: <CreditCard className="w-4 h-4" /> },
-    { id: 'qrph', label: 'QR Ph', subtitle: 'Bank / wallet', icon: <ShieldCheck className="w-4 h-4" /> }
+    { id: 'gcash', label: 'GCash', subtitle: 'E-wallet', icon: <Smartphone className="h-4 w-4" /> },
+    { id: 'maya', label: 'Maya', subtitle: 'E-wallet', icon: <Smartphone className="h-4 w-4" /> },
+    { id: 'card', label: 'Card', subtitle: 'Visa / Mastercard', icon: <CreditCard className="h-4 w-4" /> },
+    { id: 'qrph', label: 'QR Ph', subtitle: 'Bank / wallet', icon: <ShieldCheck className="h-4 w-4" /> }
   ];
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-5 text-white">
-      <div className="mx-auto w-full max-w-md">
-        <div className="mb-4 flex items-center justify-between">
+    <main className="min-h-screen bg-[#FFFEF9] text-[#101A20]">
+      <div className="mx-auto w-full max-w-lg px-4 pb-10 pt-5 sm:px-6">
+        <header className="mb-5 flex items-center justify-between gap-4">
           <div>
-            <div className="text-lg font-black tracking-tight">TalaRide</div>
-            <div className="text-[11px] text-slate-500">Scan • Choose fare • Pay</div>
+            <div className="text-2xl font-black tracking-tight text-[#003D2B]">TalaRide</div>
+            <div className="mt-0.5 text-xs font-medium text-[#53606D]">Verified ride checkout</div>
           </div>
           <button
             type="button"
             onClick={() => { window.location.href = appDeepLink; }}
-            className="flex items-center gap-1 text-[10px] font-bold text-emerald-400"
+            className="flex min-h-11 items-center gap-1.5 rounded-xl border border-[#CFE0D5] bg-white px-3 text-xs font-bold text-[#006B3D] shadow-sm transition hover:bg-[#EEF7EB]"
           >
-            OPEN APP <ExternalLink className="h-3 w-3" />
+            Open app <ExternalLink className="h-3.5 w-3.5" />
           </button>
-        </div>
+        </header>
 
         {loading && (
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center">
-            <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-emerald-400" />
-            <p className="text-xs text-slate-400">Verifying vehicle…</p>
+          <div className="rounded-3xl border border-[#DFE6DF] bg-white p-10 text-center shadow-sm">
+            <Loader2 className="mx-auto mb-3 h-7 w-7 animate-spin text-[#006B3D]" />
+            <p className="text-sm font-semibold text-[#53606D]">Verifying TalaRide vehicle…</p>
           </div>
         )}
 
         {!loading && errorMessage && !data && (
-          <div className="rounded-2xl border border-rose-800 bg-rose-950/40 p-5 text-center">
-            <AlertTriangle className="mx-auto mb-2 h-7 w-7 text-rose-400" />
-            <div className="font-bold text-rose-200">Unable to continue</div>
-            <p className="mt-1 text-xs text-rose-300">{errorMessage}</p>
+          <div className="rounded-3xl border border-[#F0C8C5] bg-[#FFF3F1] p-6 text-center shadow-sm">
+            <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-[#C73E3A]" />
+            <div className="font-black text-[#8A2926]">Unable to verify this vehicle</div>
+            <p className="mt-1 text-sm leading-relaxed text-[#9A4B47]">{errorMessage}</p>
           </div>
         )}
 
         {!loading && data && (
-          <div className="space-y-3">
-            <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-                    <CheckCircle2 className="h-4 w-4" />
-                    Verified driver
-                  </div>
-                  <div className="mt-2 text-xl font-black">{data.driver_name}</div>
-                  <div className="mt-0.5 text-xs text-slate-400">
-                    {data.vehicle_code} • Body {data.plate_body_number}
-                  </div>
-                  <div className="text-xs text-slate-500">{data.toda}</div>
+          <div className="space-y-4">
+            <section className="overflow-hidden rounded-3xl border border-[#CFE0D5] bg-white shadow-sm">
+              <div className="bg-[#003D2B] px-5 py-4 text-white">
+                <div className="flex items-center gap-2 text-sm font-bold text-[#D7F2E2]">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Verified TalaRide
                 </div>
-                <div className="rounded-xl bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold text-emerald-400">
-                  {data.shift_status}
+                <div className="mt-2 text-2xl font-black">{data.driver_name}</div>
+                <div className="mt-1 text-sm text-[#D7E5DE]">
+                  {data.vehicle_code} • Body {data.plate_body_number}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-px bg-[#DFE6DF]">
+                <div className="bg-white px-4 py-3.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-[#76827C]">TODA</div>
+                  <div className="mt-1 text-sm font-bold text-[#1D2D26]">{data.toda}</div>
+                </div>
+                <div className="bg-white px-4 py-3.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-[#76827C]">Shift</div>
+                  <div className="mt-1 inline-flex items-center gap-1.5 text-sm font-black text-[#006B3D]">
+                    <span className="h-2 w-2 rounded-full bg-[#18A566]" />
+                    {data.shift_status}
+                  </div>
                 </div>
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-              <div className="mb-1 text-sm font-bold">1. Choose fare</div>
-              <p className="mb-3 text-[11px] text-slate-500">
-                Select a fare or enter the amount before choosing how to pay.
+            <section className="rounded-3xl border border-[#DFE6DF] bg-white p-5 shadow-sm">
+              <div className="text-base font-black text-[#173329]">1. Choose fare</div>
+              <p className="mt-1 text-xs leading-relaxed text-[#66756D]">
+                Select the exact fare before choosing how to pay.
               </p>
-              <div className="grid grid-cols-5 gap-2">
-                {PRESET_FARES.map((amount) => (
-                  <button
-                    key={amount}
-                    type="button"
-                    onClick={() => choosePreset(amount)}
-                    className={
-                      'rounded-xl border py-2.5 text-xs font-black transition ' +
-                      (!customMode && presetFare === amount
-                        ? 'border-emerald-500 bg-emerald-500 text-slate-950'
-                        : 'border-slate-700 bg-slate-950 text-slate-300')
-                    }
-                  >
-                    ₱{amount}
-                  </button>
-                ))}
+              <div className="mt-4 grid grid-cols-5 gap-2">
+                {PRESET_FARES.map((amount) => {
+                  const selected = !customMode && presetFare === amount;
+                  return (
+                    <button
+                      key={amount}
+                      type="button"
+                      onClick={() => choosePreset(amount)}
+                      className={
+                        'min-h-11 rounded-xl border text-sm font-black transition ' +
+                        (selected
+                          ? 'border-[#006B3D] bg-[#006B3D] text-white shadow-sm'
+                          : 'border-[#D8E1DB] bg-[#F7F9F6] text-[#244235] hover:border-[#A9C5B5]')
+                      }
+                    >
+                      ₱{amount}
+                    </button>
+                  );
+                })}
               </div>
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-3 flex items-center gap-2">
                 <button
                   type="button"
                   onClick={chooseCustom}
                   className={
-                    'shrink-0 rounded-xl border px-3 py-2.5 text-xs font-bold ' +
+                    'min-h-11 shrink-0 rounded-xl border px-4 text-sm font-bold transition ' +
                     (customMode
-                      ? 'border-emerald-500 text-emerald-400'
-                      : 'border-slate-700 text-slate-400')
+                      ? 'border-[#006B3D] bg-[#EEF7EB] text-[#006B3D]'
+                      : 'border-[#D8E1DB] bg-white text-[#53606D]')
                   }
                 >
                   Other
                 </button>
                 {customMode && (
-                  <div className="flex flex-1 items-center rounded-xl border border-slate-700 bg-slate-950 px-3">
-                    <span className="text-sm text-slate-500">₱</span>
+                  <div className="flex min-h-11 flex-1 items-center rounded-xl border border-[#D8E1DB] bg-[#F7F9F6] px-3 focus-within:border-[#006B3D]">
+                    <span className="text-sm font-bold text-[#66756D]">₱</span>
                     <input
                       autoFocus
                       inputMode="decimal"
@@ -271,61 +282,64 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
                         setPaymentMethod(null);
                       }}
                       placeholder="Enter fare"
-                      className="w-full bg-transparent px-2 py-2.5 text-sm font-bold outline-none"
+                      className="w-full bg-transparent px-2 py-2.5 text-sm font-bold text-[#101A20] outline-none placeholder:text-[#98A39D]"
                     />
                   </div>
                 )}
               </div>
               {customMode && customFare && !hasValidFare && (
-                <p className="mt-2 text-[11px] text-rose-400">Enter a fare from ₱1 to ₱100,000.</p>
+                <p className="mt-2 text-xs font-medium text-[#C73E3A]">Enter a fare of at least ₱15.</p>
               )}
             </section>
 
             <section
               className={
-                'rounded-2xl border p-4 ' +
+                'rounded-3xl border p-5 shadow-sm transition ' +
                 (hasValidFare
-                  ? 'border-slate-800 bg-slate-900'
-                  : 'border-slate-800/60 bg-slate-900/50')
+                  ? 'border-[#DFE6DF] bg-white'
+                  : 'border-[#E5E9E5] bg-[#F7F8F5]')
               }
             >
-              <div className="mb-1 flex items-center justify-between">
-                <div className="text-sm font-bold">2. Select payment</div>
+              <div className="flex items-center justify-between">
+                <div className="text-base font-black text-[#173329]">2. Select payment</div>
                 {hasValidFare && (
-                  <div className="text-xs font-black text-emerald-400">₱{finalFare.toFixed(2)}</div>
+                  <div className="text-sm font-black text-[#006B3D]">₱{finalFare.toFixed(2)}</div>
                 )}
               </div>
               {!hasValidFare ? (
-                <p className="mt-2 text-xs text-slate-500">Choose or enter the fare first.</p>
+                <p className="mt-2 text-sm text-[#7C8781]">Choose or enter the fare first.</p>
               ) : (
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {paymentOptions.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => setPaymentMethod(option.id)}
-                      className={
-                        'flex items-center gap-2.5 rounded-xl border p-3 text-left transition ' +
-                        (paymentMethod === option.id
-                          ? 'border-emerald-500 bg-emerald-500/10'
-                          : 'border-slate-700 bg-slate-950')
-                      }
-                    >
-                      <span className={paymentMethod === option.id ? 'text-emerald-400' : 'text-slate-400'}>
-                        {option.icon}
-                      </span>
-                      <span>
-                        <span className="block text-xs font-black">{option.label}</span>
-                        <span className="block text-[10px] text-slate-500">{option.subtitle}</span>
-                      </span>
-                    </button>
-                  ))}
+                <div className="mt-4 grid grid-cols-2 gap-2.5">
+                  {paymentOptions.map((option) => {
+                    const selected = paymentMethod === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setPaymentMethod(option.id)}
+                        className={
+                          'flex min-h-[64px] items-center gap-3 rounded-2xl border p-3 text-left transition ' +
+                          (selected
+                            ? 'border-[#006B3D] bg-[#EEF7EB]'
+                            : 'border-[#D8E1DB] bg-[#FAFBF9] hover:border-[#A9C5B5]')
+                        }
+                      >
+                        <span className={selected ? 'text-[#006B3D]' : 'text-[#617069]'}>
+                          {option.icon}
+                        </span>
+                        <span>
+                          <span className="block text-sm font-black text-[#173329]">{option.label}</span>
+                          <span className="block text-[11px] text-[#7A8580]">{option.subtitle}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </section>
 
             {errorMessage && (
-              <div className="rounded-xl border border-rose-800 bg-rose-950/40 px-3 py-2.5 text-xs text-rose-300">
+              <div className="rounded-2xl border border-[#F0C8C5] bg-[#FFF3F1] px-4 py-3 text-sm font-medium text-[#9B3833]">
                 {errorMessage}
               </div>
             )}
@@ -334,13 +348,13 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
               type="button"
               onClick={proceed}
               disabled={!canPay}
-              className="flex w-full items-center justify-between rounded-2xl bg-emerald-500 px-4 py-4 text-slate-950 shadow-lg shadow-emerald-950/30 transition disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex min-h-[64px] w-full items-center justify-between rounded-2xl bg-[#006B3D] px-5 py-4 text-white shadow-lg shadow-[#003D2B]/15 transition hover:bg-[#005C35] disabled:cursor-not-allowed disabled:bg-[#C9D5CE] disabled:text-[#718079] disabled:shadow-none"
             >
               <span className="text-left">
-                <span className="block text-[10px] font-bold uppercase tracking-wider opacity-70">
+                <span className="block text-[10px] font-bold uppercase tracking-[0.16em] opacity-80">
                   3. Proceed to payment
                 </span>
-                <span className="block text-lg font-black">
+                <span className="mt-0.5 block text-lg font-black">
                   {!hasValidFare
                     ? 'Choose fare first'
                     : !paymentMethod
@@ -354,8 +368,8 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
               {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <ChevronRight className="h-5 w-5" />}
             </button>
 
-            <p className="px-4 text-center text-[10px] leading-relaxed text-slate-500">
-              No payment is created until you tap Proceed. The selected fare and payment method are then locked into that payment.
+            <p className="px-4 text-center text-[11px] leading-relaxed text-[#78847E]">
+              Nothing is charged until you tap Proceed. TalaRide marks the ride paid only after the payment provider confirms it.
             </p>
           </div>
         )}
