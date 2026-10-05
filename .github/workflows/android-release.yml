@@ -14,7 +14,7 @@ permissions:
 jobs:
   build-release:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
       RELEASE_TAG: ${{ inputs.release_tag }}
       EXPECTED_SIGNER_SHA256: AD:1C:AC:12:00:08:24:5B:12:92:3F:71:74:BF:DB:73:78:BB:46:DF:9E:F3:66:D3:95:E3:5F:91:35:F1:77:EE
@@ -45,6 +45,9 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Install Android packages
         run: |
