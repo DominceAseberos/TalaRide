@@ -9,10 +9,10 @@ export function getPaymentMode(): PaymentMode {
   return 'mock-local';
 }
 
+const DEFAULT_WEB_API = 'https://talaride-web.onrender.com/api';
+
 export function getWebApiBase(): string {
-  const base = (process.env.EXPO_PUBLIC_WEB_API ?? '').trim().replace(/\/$/, '');
-  if (!base) throw new Error('Backend API is not configured. Set EXPO_PUBLIC_WEB_API.');
-  return base;
+  return (process.env.EXPO_PUBLIC_WEB_API ?? DEFAULT_WEB_API).trim().replace(/\/$/, '');
 }
 
 export class ApiError extends Error {
