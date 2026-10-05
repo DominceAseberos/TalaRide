@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: talaride-web
+    runtime: node
+    region: singapore
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PAYMENT_MODE
+        value: live
+      - key: DEMO_AUTH
+        value: "false"
+      - key: ALLOW_EPHEMERAL_STATE
+        value: "true"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: QR_INTENT_SECRET
+        sync: false
+      - key: PAYMENT_PROVIDER_KEY
+        sync: false
+      - key: PAYMENT_WEBHOOK_SECRET
+        sync: false
+      - key: WEB_ORIGIN
+        sync: false

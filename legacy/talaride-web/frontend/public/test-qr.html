@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TalaRide Permanent QR Test</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    :root { color-scheme: dark; --bg:#090d16; --card:#131b2e; --border:#1f2a44; --green:#10b981; --muted:#94a3b8; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:var(--bg); color:#f8fafc; font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif; padding:24px; }
+    .wrap { max-width:720px; margin:0 auto; }
+    .brand { display:flex; align-items:center; gap:12px; margin-bottom:24px; }
+    .mark { width:42px; height:42px; border-radius:12px; display:grid; place-items:center; background:var(--green); color:#04120c; font-weight:900; }
+    h1 { margin:0; font-size:22px; }
+    .sub { margin-top:4px; color:var(--muted); font-size:13px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:22px; }
+    .badge { display:inline-flex; padding:5px 9px; border-radius:999px; color:#6ee7b7; background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.25); font-size:11px; font-weight:800; }
+    .grid { display:grid; grid-template-columns:280px 1fr; gap:24px; align-items:center; margin-top:18px; }
+    .qr { width:260px; min-height:260px; padding:18px; border-radius:18px; background:white; display:grid; place-items:center; }
+    .steps { display:grid; gap:10px; margin-top:14px; }
+    .step { border:1px solid var(--border); border-radius:12px; padding:12px; background:#0b1120; font-size:13px; }
+    .step b { color:#6ee7b7; }
+    .link { margin-top:16px; padding:12px; border-radius:10px; background:#080d19; border:1px solid var(--border); color:var(--muted); font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+    a.btn { text-decoration:none; padding:11px 14px; border-radius:10px; font-size:12px; font-weight:800; }
+    .primary { background:var(--green); color:#03140d; }
+    .secondary { border:1px solid var(--border); color:#e2e8f0; background:#1a233a; }
+    .note { margin-top:18px; color:var(--muted); font-size:12px; line-height:1.6; }
+    @media (max-width:680px) { body{padding:16px}.grid{grid-template-columns:1fr}.qr{margin:0 auto;width:240px;min-height:240px} }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="brand">
+      <div class="mark">TR</div>
+      <div>
+        <h1>TalaRide Permanent Vehicle QR</h1>
+        <div class="sub">This is the QR passengers scan for the MVP.</div>
+      </div>
+    </div>
+
+    <section class="card">
+      <span class="badge">NON-EXPIRING VEHICLE STICKER</span>
+      <div class="grid">
+        <div id="qr" class="qr"></div>
+        <div>
+          <h2 style="margin:0 0 6px;font-size:20px">TR-01842</h2>
+          <div style="color:var(--muted);font-size:13px">Scan with the phone's normal Camera app.</div>
+          <div class="steps">
+            <div class="step"><b>1.</b> If TalaRide is installed, open the app checkout.</div>
+            <div class="step"><b>2.</b> Otherwise stay on the web checkout.</div>
+            <div class="step"><b>3.</b> Verify driver and vehicle.</div>
+            <div class="step"><b>4.</b> Choose a fare or enter the exact fare.</div>
+            <div class="step"><b>5.</b> Choose payment, then tap Proceed.</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="url" class="link"></div>
+      <div class="actions">
+        <a id="openNormal" class="btn primary" target="_blank">OPEN NORMAL QR LINK</a>
+        <a id="openWeb" class="btn secondary" target="_blank">OPEN WEB FALLBACK</a>
+      </div>
+      <p class="note">
+        This permanent sticker does not contain a fare and does not create a payment. The payment is
+        created only after the passenger chooses or enters a fare, selects a payment method, and taps
+        Proceed.
+      </p>
+    </section>
+  </main>
+
+  <script>
+    const vehicleCode = 'TR-01842';
+    const checksum = '2ab48c98297c';
+    const normalUrl = window.location.origin + '/v/' + vehicleCode + '?c=' + checksum;
+    const webUrl = normalUrl + '&web=1';
+
+    document.getElementById('url').textContent = normalUrl;
+    document.getElementById('openNormal').href = normalUrl;
+    document.getElementById('openWeb').href = webUrl;
+
+    new QRCode(document.getElementById('qr'), {
+      text: normalUrl,
+      width: 220,
+      height: 220,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  </script>
+</body>
+</html>

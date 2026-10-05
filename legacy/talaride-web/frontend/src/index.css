@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    --talaride-bg: #FFFEF9;
+    --talaride-surface: #FFFFFF;
+    --talaride-ink: #101A20;
+    --talaride-muted: #53606D;
+    --talaride-green: #006B3D;
+    --talaride-green-dark: #003D2B;
+    --talaride-green-soft: #EEF7EB;
+    --talaride-border: #DFE6DF;
+    --talaride-danger: #C73E3A;
+    --talaride-warning: #C88913;
+  }
+
+  html, body, #root {
+    min-height: 100%;
+    background: var(--talaride-bg);
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background-color: var(--talaride-bg);
+    color: var(--talaride-ink);
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  button, input, select, textarea {
+    font: inherit;
+  }
+
+  button {
+    touch-action: manipulation;
+  }
+}
+
+/* Custom animations & pulsing status */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s infinite ease-in-out;
+}
+
+/* Hide scrollbar for clean horizontal swipe */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
