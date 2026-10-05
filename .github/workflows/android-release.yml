@@ -30,6 +30,10 @@ jobs:
         with:
           node-version: 22
 
+      - name: Align pnpm with the release lockfile
+        run: |
+          node -e "const fs=require('fs'); const p=require('./package.json'); p.packageManager='pnpm@9.15.9'; fs.writeFileSync('package.json', JSON.stringify(p,null,2)+'\\n')"
+
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
