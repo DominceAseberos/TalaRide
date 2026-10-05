@@ -62,7 +62,7 @@ jobs:
       - name: Write production mobile environment
         shell: bash
         run: |
-          cat > apps/mobile/.env.production <<'EOF'
+          cat > mobile/.env.production <<'EOF'
           EXPO_PUBLIC_SUPABASE_URL=${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           EXPO_PUBLIC_WEB_API=${{ secrets.EXPO_PUBLIC_WEB_API }}
@@ -80,18 +80,18 @@ jobs:
           NODE_ENV: production
           CI: "1"
         run: |
-          cd apps/mobile
+          cd mobile
           npx expo prebuild --platform android --clean --no-install
 
       - name: Configure permanent release signing
         shell: bash
         run: |
-          printf '%s' "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > apps/mobile/android/app/talaride-release.jks
+          printf '%s' "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > mobile/android/app/talaride-release.jks
           python - <<'PY'
           from pathlib import Path
           import re
 
-          path = Path("apps/mobile/android/app/build.gradle")
+          path = Path("mobile/android/app/build.gradle")
           text = path.read_text()
 
           marker = "    signingConfigs {\n"
@@ -120,7 +120,7 @@ jobs:
       - name: Verify signing certificate
         shell: bash
         run: |
-          ACTUAL="$(keytool -list -v             -keystore apps/mobile/android/app/talaride-release.jks             -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"             -alias "${{ secrets.ANDROID_KEY_ALIAS }}"             | sed -n 's/^[[:space:]]*SHA256: //p' | head -n 1)"
+          ACTUAL="$(keytool -list -v             -keystore mobile/android/app/talaride-release.jks             -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"             -alias "${{ secrets.ANDROID_KEY_ALIAS }}"             | sed -n 's/^[[:space:]]*SHA256: //p' | head -n 1)"
           echo "Release signer SHA-256: $ACTUAL"
           test "$ACTUAL" = "$EXPECTED_SIGNER_SHA256"
 
@@ -132,7 +132,7 @@ jobs:
           TALARIDE_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           TALARIDE_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          cd apps/mobile/android
+          cd mobile/android
           ./gradlew app:assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
 
       - name: Prepare release assets
@@ -140,7 +140,7 @@ jobs:
         run: |
           VERSION="${RELEASE_TAG#v}"
           APK="TalaRide-v${VERSION}.apk"
-          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "$APK"
+          cp mobile/android/app/build/outputs/apk/release/app-release.apk "$APK"
           sha256sum "$APK" > "$APK.sha256"
           echo "APK_NAME=$APK" >> "$GITHUB_ENV"
 

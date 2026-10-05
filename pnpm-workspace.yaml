@@ -1,5 +1,7 @@
 packages:
-  - "apps/*"
+  - "mobile"
+  - "frontend"
+  - "backend"
   - "packages/*"
 allowBuilds:
   tesseract.js: true

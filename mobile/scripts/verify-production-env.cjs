@@ -13,7 +13,7 @@ const required = [
 
 const file = path.join(__dirname, '..', '.env.production');
 if (!fs.existsSync(file)) {
-  console.error('Missing apps/mobile/.env.production');
+  console.error('Missing mobile/.env.production');
   process.exit(1);
 }
 

@@ -14,7 +14,7 @@ function load(path) {
 }
 
 test('money formats centavos and parses pesos with ₱1 floor', () => {
-  const { formatCentavos, parsePesoToCentavos } = load('../../packages/shared/src/money.ts');
+  const { formatCentavos, parsePesoToCentavos } = load('../packages/shared/src/money.ts');
   assert.equal(formatCentavos(3000), '₱30');
   assert.equal(formatCentavos(1550), '₱15.50');
   assert.equal(parsePesoToCentavos('₱30'), 3000);
@@ -22,7 +22,7 @@ test('money formats centavos and parses pesos with ₱1 floor', () => {
 });
 
 test('vehicle QR builds and parses offline, rejects bad checksum', () => {
-  const { buildVehicleQrUrl, parseVehicleQr } = load('../../packages/shared/src/qr.ts');
+  const { buildVehicleQrUrl, parseVehicleQr } = load('../packages/shared/src/qr.ts');
   const url = buildVehicleQrUrl('https://talaride.ph/v', 'TR-01842', 'ab12');
   assert.equal(url, 'https://talaride.ph/v/TR-01842?c=ab12');
   assert.equal(parseVehicleQr(url).vehicle_code, 'TR-01842');
@@ -32,7 +32,7 @@ test('vehicle QR builds and parses offline, rejects bad checksum', () => {
 
 test('dynamic QR parses, detects expiry and intent string stable', () => {
   const { parseDynamicQr, isDynamicQrExpired, dynamicIntentString } = load(
-    '../../packages/shared/src/qr.ts',
+    '../packages/shared/src/qr.ts',
   );
   const base = {
     payment_id: 'pay-1',

@@ -31,9 +31,9 @@ firebase-service-account*.json
 .lynx/
 .metro-health-check*
 legacy/dirty-web-local/
-apps/backend/data/
-apps/mobile/android/
-apps/mobile/ios/
+backend/data/
+mobile/android/
+mobile/ios/
 supabase/.temp/
 supabase/.branches/
 

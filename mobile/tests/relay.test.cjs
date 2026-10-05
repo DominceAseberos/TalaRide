@@ -4,7 +4,7 @@ const { existsSync, readFileSync } = require('node:fs');
 const path = require('node:path');
 
 const readRepoFile = (file) =>
-  readFileSync(existsSync(file) ? file : path.resolve(__dirname, '../../../', file), 'utf8');
+  readFileSync(existsSync(file) ? file : path.resolve(__dirname, '../../', file), 'utf8');
 const { PGlite } = require('@electric-sql/pglite');
 
 test('relay migration enforces ownership, expiration, response uniqueness and restricted writes', async () => {

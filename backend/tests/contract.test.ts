@@ -5,7 +5,7 @@ import path from 'node:path';
 import { verifyVehicleChecksum } from '../src/lib/qr.js';
 
 describe('Cross-Repository Contract Verification (Section 1, 30)', () => {
-  const contractsDir = path.resolve(process.cwd(), '../../packages/contracts/fixtures');
+  const contractsDir = path.resolve(process.cwd(), '../packages/contracts/fixtures');
 
   test('✓ payment-intent fixture conforms to canonical contract', () => {
     const filePath = path.join(contractsDir, 'payment-intent.example.json');

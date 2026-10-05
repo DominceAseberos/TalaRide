@@ -12,7 +12,7 @@ The app is configured with:
 - Runtime version policy: `appVersion`
 - Production channel: `production`
 
-Publish an OTA update from `apps/mobile`:
+Publish an OTA update from `mobile`:
 
 ```bash
 eas update --channel production --message "Describe the update"
@@ -32,7 +32,7 @@ Use an APK update when changing native configuration or dependencies, including:
 
 For a native release:
 
-1. Bump `expo.version` and `android.versionCode` in `apps/mobile/app.json`.
+1. Bump `expo.version` and `android.versionCode` in `mobile/app.json`.
 2. Build with the `production` EAS profile.
 3. Create a GitHub release in `DominceAseberos/TalaRide` with a matching version tag.
 4. Attach the signed `.apk` as a release asset.

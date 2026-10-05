@@ -9,13 +9,13 @@
     "test": "turbo test",
     "typecheck": "turbo typecheck",
     "mobile": "pnpm --filter @talaride/mobile start",
-    "frontend": "pnpm --dir apps/frontend dev",
-    "backend": "pnpm --dir apps/backend dev",
-    "web": "pnpm --dir apps/frontend dev",
-    "build:frontend": "pnpm --dir apps/frontend build",
-    "build:backend": "pnpm --dir apps/backend build",
+    "frontend": "pnpm --dir frontend dev",
+    "backend": "pnpm --dir backend dev",
+    "web": "pnpm --dir frontend dev",
+    "build:frontend": "pnpm --dir frontend build",
+    "build:backend": "pnpm --dir backend build",
     "test:mobile": "pnpm --filter @talaride/mobile test",
-    "test:backend": "pnpm --dir apps/backend test"
+    "test:backend": "pnpm --dir backend test"
   },
   "devDependencies": {
     "turbo": "^2.5.0"

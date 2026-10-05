@@ -40,9 +40,9 @@ pnpm install
 
 Environment files are app-specific and are not committed:
 
-- `apps/mobile/.env` or `apps/mobile/.env.production`
-- `apps/frontend/.env`
-- `apps/backend/.env`
+- `mobile/.env` or `mobile/.env.production`
+- `frontend/.env`
+- `backend/.env`
 
 Use the corresponding `.env.example` files as templates. Never commit signing keys, service-role keys, webhook secrets, or production env files.
 
@@ -78,26 +78,26 @@ pnpm build:backend
 
 ### Android / Expo
 
-- App root: `apps/mobile`
+- App root: `mobile`
 - Android package: `com.beepanjero.talaride`
 - GitHub APK releases are published from this repository.
 
 ### Vercel frontend
 
 - Repository: `DominceAseberos/TalaRide`
-- Root directory: `apps/frontend`
+- Root directory: `frontend`
 - Build command: `npm run build`
 - Output directory: `dist`
 
 ### Render backend
 
 - Repository: `DominceAseberos/TalaRide`
-- Root directory: `apps/backend`
+- Root directory: `backend`
 - Build command: `npm ci --include=dev && npm run build`
 - Start command: `npm start`
 - Health check: `/api/health`
 
-The root `render.yaml` is configured for `apps/backend`.
+The root `render.yaml` is configured for `backend`.
 
 ## Supabase
 

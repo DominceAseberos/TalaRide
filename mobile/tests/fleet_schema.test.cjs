@@ -5,7 +5,7 @@ const path = require('node:path');
 const { PGlite } = require('@electric-sql/pglite');
 
 const readRepoFile = (file) =>
-  readFileSync(existsSync(file) ? file : path.resolve(__dirname, '../../../', file), 'utf8');
+  readFileSync(existsSync(file) ? file : path.resolve(__dirname, '../../', file), 'utf8');
 
 test('fleet management migration establishes organizations, vehicles, drivers and enforces multi-tenant RLS', async () => {
   const db = new PGlite();

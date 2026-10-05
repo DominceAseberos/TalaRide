@@ -27,14 +27,14 @@ function load(path, dependencies = {}) {
 }
 
 test('payment intent uses centavos, never float fare', () => {
-  const { parsePesoToCentavos } = load('../../packages/shared/src/money.ts');
+  const { parsePesoToCentavos } = load('../packages/shared/src/money.ts');
   assert.equal(parsePesoToCentavos('₱30'), 3000);
   assert.equal(parsePesoToCentavos('120'), 12000);
   assert.throws(() => parsePesoToCentavos('30.001'), /Invalid fare/);
 });
 
 test('canonical dynamic QR required; QRPH-scheme QR rejected', () => {
-  const { parseDynamicQr, DYNAMIC_QR_EXPIRY_SEC } = load('../../packages/shared/src/qr.ts');
+  const { parseDynamicQr, DYNAMIC_QR_EXPIRY_SEC } = load('../packages/shared/src/qr.ts');
   assert.equal(DYNAMIC_QR_EXPIRY_SEC, 300);
   const canonical = JSON.stringify({
     v: 1,
@@ -54,7 +54,7 @@ test('canonical dynamic QR required; QRPH-scheme QR rejected', () => {
 });
 
 test('expired QR rejected; status labels match contract', () => {
-  const qr = load('../../packages/shared/src/qr.ts');
+  const qr = load('../packages/shared/src/qr.ts');
   const payments = load('src/api/payments.ts', {
     './client': { apiRequest: async () => ({}) },
   });

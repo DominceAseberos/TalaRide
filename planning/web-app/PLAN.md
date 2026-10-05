@@ -319,7 +319,7 @@ lgu_admin   →  web dashboard, read-only across their municipality
 
 ```
 packages/shared    →  NO secrets (types/schemas only)
-apps/mobile        →  EXPO_PUBLIC_SUPABASE_URL
+mobile        →  EXPO_PUBLIC_SUPABASE_URL
                       EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 apps/web           →  NEXT_PUBLIC_SUPABASE_URL
                       NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -335,7 +335,7 @@ apps/web           →  NEXT_PUBLIC_SUPABASE_URL
 
 ### Phase 1 — Monorepo Setup *(Completed)*
 - [x] Init Turborepo at repo root, create `pnpm-workspace.yaml`
-- [x] Move Expo app → `apps/mobile/`, update all internal paths
+- [x] Move Expo app → `mobile/`, update all internal paths
 - [x] Scaffold `apps/web/` with Next.js App Router & TypeScript
 - [x] Create `packages/shared/`, migrate shared models and Zod validation schemas
 - [x] Link `@talaride/shared` as workspace dependency across apps
@@ -381,7 +381,7 @@ apps/web           →  NEXT_PUBLIC_SUPABASE_URL
 
 ```
 TalaRide monorepo
-├── apps/mobile      Expo passenger app — free, privacy-first, unchanged
+├── mobile      Expo passenger app — free, privacy-first, unchanged
 ├── apps/web         Next.js operator/LGU SaaS dashboard — the revenue engine
 └── packages/shared  Types + Supabase client + Zod schemas — shared truth
 ```

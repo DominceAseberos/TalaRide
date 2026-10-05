@@ -98,7 +98,7 @@ app_notifications(id uuid PK, user_id uuid→profiles NOT NULL, kind TEXT NOT NU
   is_read BOOLEAN DEFAULT false, created_at timestamptz DEFAULT now());
 ```
 
-Client offline mirror (SQLite `talaride.db`, no server): `rides(...)` existing + `outbox(id, kind, payload, created_at, attempts, last_error)` in `apps/mobile/src/offline/queue.ts`. Flush order: `checkin, cash_ride, payment_confirm, payment_issue, lost_report`.
+Client offline mirror (SQLite `talaride.db`, no server): `rides(...)` existing + `outbox(id, kind, payload, created_at, attempts, last_error)` in `mobile/src/offline/queue.ts`. Flush order: `checkin, cash_ride, payment_confirm, payment_issue, lost_report`.
 
 Seed `reward_rules`: `min_eligible_centavos=1500, points_per_ride=1, daily_cap=3, reward_threshold=10`. Seed `fares`: ₱15/20/25/30/40.
 

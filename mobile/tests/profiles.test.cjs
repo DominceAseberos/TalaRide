@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const ts = require('typescript');
 
 const readRepoFile = (file) =>
-  readFileSync(existsSync(file) ? file : path.resolve(__dirname, '../../../', file), 'utf8');
+  readFileSync(existsSync(file) ? file : path.resolve(__dirname, '../../', file), 'utf8');
 
 test('profile migration runs in PostgreSQL and enforces per-user RLS and restricted writes', async () => {
   const db = new PGlite();

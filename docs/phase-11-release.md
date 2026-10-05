@@ -88,7 +88,7 @@ Before publishing the APK:
 pnpm --filter @talaride/mobile typecheck
 pnpm --filter @talaride/mobile lint
 pnpm --filter @talaride/mobile test
-cd apps/mobile
+cd mobile
 npm run release:verify-env
 npx eas-cli build --platform android --profile production
 ```

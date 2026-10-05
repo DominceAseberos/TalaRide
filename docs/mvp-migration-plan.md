@@ -5,7 +5,7 @@ Current: passenger-only local-first recorder + fleet registry mock. No payments,
 
 ## 0. Current inventory
 
-- Mobile `apps/mobile/src/app/`: `index.tsx` splash, `onboarding.tsx`, `sign-in.tsx`, `home.tsx`, `confirm.tsx`, `scan.tsx`, `rides.tsx`, `ride/[id].tsx`, `receipt.tsx`, `activity.tsx`, `report-lost-item.tsx`, `profile.tsx`
+- Mobile `mobile/src/app/`: `index.tsx` splash, `onboarding.tsx`, `sign-in.tsx`, `home.tsx`, `confirm.tsx`, `scan.tsx`, `rides.tsx`, `ride/[id].tsx`, `receipt.tsx`, `activity.tsx`, `report-lost-item.tsx`, `profile.tsx`
 - Mobile data: `src/db/rides.ts` SQLite `rides(id, account_id, vehicle_number, identifier_type, ride_datetime, note, location)`. `src/auth/*` email + Supabase session (SecureStore). `src/scan/ocr.ts`, `identifiers.ts`, `draft.ts`. `src/mocks/MockProvider.tsx`. `src/relay/api.ts` → `community-relay` Edge Function.
 - Shared `packages/shared/src/`: `types/index.ts` (`Ride, LostRequest, RelayPrompt, Vehicle, Driver, Organization, UserProfile`), `types/database.ts`, `validation/vehicle.ts`, `validation/driver.ts`
 - Web `apps/web/`: `app/page.tsx` + `lib/store.ts` localStorage fleet + `lib/mock-data.ts` + `components/*`. `lib/supabase.ts` unused.

@@ -56,7 +56,7 @@ test('uploaded vehicle sticker QR decodes end-to-end without camera', () => {
     'react-native': { Platform: { OS: 'web' } },
     jsqr: require('jsqr'),
   });
-  const { buildVehicleQrUrl } = load('../../packages/shared/src/qr.ts');
+  const { buildVehicleQrUrl } = load('../packages/shared/src/qr.ts');
   const url = buildVehicleQrUrl('https://web.talaride.ph/v', 'TR-01842', 'ab12');
   const { data, width, height } = rasterize(url);
   assert.equal(decodeQrFromPixels(data, width, height), url);
@@ -67,7 +67,7 @@ test('uploaded dynamic payment QR decodes and parses', () => {
     'react-native': { Platform: { OS: 'web' } },
     jsqr: require('jsqr'),
   });
-  const shared = load('../../packages/shared/src/qr.ts');
+  const shared = load('../packages/shared/src/qr.ts');
   const payload = shared.buildDynamicQrPayload(
     {
       payment_id: 'pay-e2e-1',
