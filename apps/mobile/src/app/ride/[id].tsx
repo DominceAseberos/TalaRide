@@ -77,7 +77,7 @@ export default function RideDetailsScreen() {
             <Copy
               style={{
                 color: colors.darkGreen,
-                backgroundColor: '#D4EDDA',
+                backgroundColor: colors.paleGreen,
                 borderRadius: 7,
                 paddingHorizontal: 8,
                 paddingVertical: 2,
