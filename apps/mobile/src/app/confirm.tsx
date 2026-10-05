@@ -95,9 +95,9 @@ export default function ConfirmScreen() {
             style={[
               s.row,
               {
-                backgroundColor: '#E9F5E7',
+                backgroundColor: colors.paleGreen,
                 borderWidth: 1,
-                borderColor: '#D6E8D7',
+                borderColor: colors.border,
                 borderRadius: 10,
                 paddingHorizontal: 12,
               },
