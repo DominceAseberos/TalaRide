@@ -4,6 +4,7 @@ import { Screen } from '@/components/Screen';
 import { useEffect, useState } from 'react';
 import { replace } from '@/components/ui';
 import { useMock } from '@/mocks/MockProvider';
+import { colors } from '@/constants/theme';
 
 export default function SplashScreen() {
   const { ready, onboardingComplete, signedIn } = useMock();
@@ -53,10 +54,10 @@ export default function SplashScreen() {
       >
         <TalaIllustration name="mark" width={92} />
         <View style={{ alignItems: 'center', marginTop: 14 }}>
-          <Text style={{ fontSize: 42, fontWeight: '800', color: '#075B3A', letterSpacing: -1.5 }}>
+          <Text style={{ fontSize: 42, fontWeight: '800', color: colors.darkGreen, letterSpacing: -1.5 }}>
             TalaRide
           </Text>
-          <Text style={{ fontSize: 16, fontStyle: 'italic', color: '#087348' }}>
+          <Text style={{ fontSize: 16, fontStyle: 'italic', color: colors.green }}>
             Remember every ride.
           </Text>
         </View>
