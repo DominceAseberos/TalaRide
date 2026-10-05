@@ -16,38 +16,68 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
     cancelled ? 'Checkout was cancelled. No payment was marked successful.' : 'Checking payment status…'
   );
   const autoOpenAttempted = useRef(false);
+  const pollTimer = useRef<number | null>(null);
+  const verifyInFlight = useRef(false);
+  const terminalStateReached = useRef(cancelled);
 
-  const verify = useCallback(async () => {
-    if (!paymentId || cancelled) return;
-    setState('checking');
-    setMessage('Checking payment status…');
-
-    try {
-      const res = await api.getConfirmedPaymentResult(paymentId);
-      if (res.success) {
-        setResult(res);
-        setState('confirmed');
-        setMessage('Payment confirmed by TalaRide.');
-        return;
-      }
-
-      if (res.status === 'expired' || res.status === 'failed') {
-        setState('failed');
-        setMessage(
-          res.status === 'expired'
-            ? 'This payment request expired before confirmation.'
-            : 'The payment could not be confirmed.'
-        );
-        return;
-      }
-
-      setState('pending');
-      setMessage('Payment is still awaiting provider confirmation.');
-    } catch (err: any) {
-      setState('pending');
-      setMessage(err.message || 'Could not verify payment yet.');
+  const stopPolling = useCallback(() => {
+    if (pollTimer.current !== null) {
+      window.clearInterval(pollTimer.current);
+      pollTimer.current = null;
     }
-  }, [cancelled, paymentId]);
+  }, []);
+
+  const verify = useCallback(
+    async (showChecking = false) => {
+      if (
+        !paymentId ||
+        cancelled ||
+        terminalStateReached.current ||
+        verifyInFlight.current
+      ) {
+        return;
+      }
+
+      verifyInFlight.current = true;
+      if (showChecking) {
+        setState('checking');
+        setMessage('Checking payment status…');
+      }
+
+      try {
+        const res = await api.getConfirmedPaymentResult(paymentId);
+        if (res.success) {
+          terminalStateReached.current = true;
+          stopPolling();
+          setResult(res);
+          setState('confirmed');
+          setMessage('Payment confirmed by TalaRide.');
+          return;
+        }
+
+        if (res.status === 'expired' || res.status === 'failed') {
+          terminalStateReached.current = true;
+          stopPolling();
+          setState('failed');
+          setMessage(
+            res.status === 'expired'
+              ? 'This payment request expired before confirmation.'
+              : 'The payment could not be confirmed.'
+          );
+          return;
+        }
+
+        setState('pending');
+        setMessage('Payment is still awaiting provider confirmation.');
+      } catch (err: any) {
+        setState('pending');
+        setMessage(err.message || 'Could not verify payment yet.');
+      } finally {
+        verifyInFlight.current = false;
+      }
+    },
+    [cancelled, paymentId, stopPolling]
+  );
 
   const openTalaRide = useCallback(
     (silent = false) => {
@@ -86,19 +116,31 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
   );
 
   useEffect(() => {
-    if (cancelled || state === 'confirmed' || state === 'failed') return;
-    const initial = window.setTimeout(() => void verify(), 0);
-    const timer = window.setInterval(() => void verify(), 3000);
+    stopPolling();
+    terminalStateReached.current = cancelled;
+    verifyInFlight.current = false;
+
+    if (cancelled || !paymentId) return;
+
+    const initial = window.setTimeout(() => void verify(true), 0);
+    pollTimer.current = window.setInterval(() => void verify(false), 3000);
+
     return () => {
       window.clearTimeout(initial);
-      window.clearInterval(timer);
+      stopPolling();
     };
-  }, [cancelled, state, verify]);
+  }, [cancelled, paymentId, stopPolling, verify]);
 
   useEffect(() => {
     if (state !== 'confirmed' || autoOpenAttempted.current) return;
+
+    const isBrowserFallback =
+      new URLSearchParams(window.location.search).get('web') === '1';
+    if (isBrowserFallback) return;
+
     autoOpenAttempted.current = true;
     if (!/Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent)) return;
+
     const timer = window.setTimeout(() => openTalaRide(true), 900);
     return () => window.clearTimeout(timer);
   }, [openTalaRide, state]);
@@ -155,7 +197,7 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
 
         {state === 'pending' && !cancelled && (
           <button
-            onClick={() => void verify()}
+            onClick={() => void verify(false)}
             className="w-full py-3 bg-[#E7B342] hover:bg-[#D9A630] text-[#173329] font-black rounded-xl transition"
           >
             Check again
