@@ -50,7 +50,15 @@
     "experiments": {
       "typedRoutes": true
     },
-    "version": "1.0.0",
+    "version": "1.2.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/05dd99d8-b198-4386-bdc7-e85e4d5df01c",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -63,6 +71,7 @@
     },
     "android": {
       "package": "com.beepanjero.talaride",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#FFFEF9",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -71,7 +80,8 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.REQUEST_INSTALL_PACKAGES"
       ],
       "intentFilters": [
         {

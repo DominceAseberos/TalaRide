@@ -8,6 +8,12 @@ import { colors } from '@/constants/theme';
 import { useAuth } from '@/auth/AuthProvider';
 import { useNotifications } from '@/notifications/NotificationProvider';
 import { useMock } from '@/mocks/MockProvider';
+import {
+  applyUpdate,
+  checkForUpdates,
+  getCurrentAppVersion,
+  type AvailableUpdate,
+} from '@/updates/updateManager';
 
 const settings: { label: string; icon: IconName; message: string }[] = [
   {
@@ -35,6 +41,12 @@ const settings: { label: string; icon: IconName; message: string }[] = [
       'Scan a vehicle, confirm its number, and find your receipt in My Rides. If you left something behind, open the ride and choose Report Lost Item.',
   },
   {
+    label: 'App Updates',
+    icon: 'cloud-download-outline',
+    message:
+      'Check for TalaRide updates. Small app updates can install instantly and restart the app. Native Android updates download from the official TalaRide GitHub release and open the Android installer.',
+  },
+  {
     label: 'About TalaRide',
     icon: 'information-circle-outline',
     message:
@@ -51,6 +63,8 @@ export default function ProfileScreen() {
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<(typeof settings)[number] | null>(null);
   const [confirmation, setConfirmation] = useState<'history' | 'account' | null>(null);
+  const [availableUpdate, setAvailableUpdate] = useState<AvailableUpdate | null>(null);
+  const [updateMessage, setUpdateMessage] = useState('');
   return (
     <Screen footer={<BottomNav active="Account" />}>
       <View
@@ -232,6 +246,102 @@ export default function ProfileScreen() {
                     });
                 }}
               />
+            </>
+          )}
+          {selected.label === 'App Updates' && (
+            <>
+              <Copy>
+                Current version: <Copy bold>{getCurrentAppVersion()}</Copy>
+              </Copy>
+              <Copy style={{ color: colors.muted }}>
+                OTA updates apply without reinstalling the APK. Native Android updates download
+                inside TalaRide, then Android asks you to approve the package update.
+              </Copy>
+              {!!updateMessage && (
+                <Copy style={{ color: colors.muted }}>{updateMessage}</Copy>
+              )}
+              {!!error && (
+                <Copy accessibilityRole="alert" style={{ color: colors.red }}>
+                  {error}
+                </Copy>
+              )}
+              <Button
+                label={busy ? 'Checking…' : 'Check for Updates'}
+                disabled={busy}
+                icon="refresh-outline"
+                onPress={() => {
+                  if (locked.current) return;
+                  locked.current = true;
+                  setBusy(true);
+                  setError('');
+                  setAvailableUpdate(null);
+                  setUpdateMessage('Checking TalaRide releases and OTA updates…');
+                  void checkForUpdates()
+                    .then((result) => {
+                      setAvailableUpdate(result);
+                      if (result.kind === 'none') {
+                        setUpdateMessage('You already have the latest available update.');
+                      } else if (result.kind === 'ota') {
+                        setUpdateMessage(
+                          'A lightweight TalaRide update is ready. It can install without a new APK.',
+                        );
+                      } else {
+                        setUpdateMessage(
+                          'TalaRide v' +
+                            result.versionLabel +
+                            ' is ready. Tap Install Update to download it inside the app.',
+                        );
+                      }
+                    })
+                    .catch((failure) =>
+                      setError(
+                        failure instanceof Error
+                          ? failure.message
+                          : 'TalaRide could not check for updates.',
+                      ),
+                    )
+                    .finally(() => {
+                      locked.current = false;
+                      setBusy(false);
+                    });
+                }}
+              />
+              {availableUpdate && availableUpdate.kind !== 'none' && (
+                <Button
+                  label={
+                    busy
+                      ? 'Preparing Update…'
+                      : availableUpdate.kind === 'ota'
+                        ? 'Install Update & Restart'
+                        : 'Install v' + availableUpdate.versionLabel
+                  }
+                  disabled={busy}
+                  icon="cloud-download-outline"
+                  onPress={() => {
+                    if (locked.current) return;
+                    locked.current = true;
+                    setBusy(true);
+                    setError('');
+                    setUpdateMessage(
+                      availableUpdate.kind === 'ota'
+                        ? 'Downloading the update…'
+                        : 'Downloading the APK. Android will ask you to approve the update.',
+                    );
+                    void applyUpdate(availableUpdate)
+                      .catch((failure) =>
+                        setError(
+                          failure instanceof Error
+                            ? failure.message
+                            : 'TalaRide could not install the update.',
+                        ),
+                      )
+                      .finally(() => {
+                        locked.current = false;
+                        setBusy(false);
+                      });
+                  }}
+                />
+              )}
             </>
           )}
           {selected.label === 'Privacy & Data' && (
