@@ -15,6 +15,7 @@ import { enqueueOutbox } from '@/offline/queue';
 import { triggerSync } from '@/api/sync';
 import { useAuth } from '@/auth/AuthProvider';
 import { useMock } from '@/mocks/MockProvider';
+import { colors } from '@/constants/theme';
 
 export default function DriverScreen() {
   const { displayName } = useAuth();
@@ -220,10 +221,10 @@ export default function DriverScreen() {
               paddingVertical: 12,
               paddingHorizontal: 16,
               borderRadius: 10,
-              backgroundColor: amount === f.amountCentavos ? '#00844A' : '#E9F5E7',
+              backgroundColor: amount === f.amountCentavos ? colors.green : colors.paleGreen,
             }}
           >
-            <Copy bold style={{ color: amount === f.amountCentavos ? '#fff' : '#075B3A' }}>
+            <Copy bold style={{ color: amount === f.amountCentavos ? colors.white : colors.darkGreen }}>
               {f.label}
             </Copy>
           </Pressable>
@@ -240,7 +241,7 @@ export default function DriverScreen() {
         />
         <Button label="Custom" onPress={applyCustom} />
       </View>
-      {!!error && <Copy style={{ color: '#B3261E', marginTop: 8 }}>{error}</Copy>}
+      {!!error && <Copy style={{ color: colors.red, marginTop: 8 }}>{error}</Copy>}
       {mode === 'live' ? (
         <Card style={{ marginTop: 16 }}>
           <Copy bold>PERMANENT VEHICLE QR</Copy>
@@ -311,7 +312,7 @@ export default function DriverScreen() {
           variant="outline"
           onPress={recordCash}
         />
-        {!!cashMsg && <Copy style={{ color: '#075B3A' }}>{cashMsg}</Copy>}
+        {!!cashMsg && <Copy style={{ color: colors.darkGreen }}>{cashMsg}</Copy>}
       </View>
       {mode !== 'live' && (
         <Copy bold style={{ marginTop: 16 }}>
