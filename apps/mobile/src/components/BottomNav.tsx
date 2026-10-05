@@ -19,7 +19,7 @@ export function BottomNav({ active }: { active: string }) {
         flexDirection: 'row',
         borderTopWidth: 1,
         borderColor: colors.border,
-        backgroundColor: colors.background,
+        backgroundColor: colors.surface,
         paddingTop: 5,
       }}
     >
