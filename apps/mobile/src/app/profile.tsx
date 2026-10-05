@@ -83,12 +83,12 @@ export default function ProfileScreen() {
             width: 68,
             height: 68,
             borderRadius: 34,
-            backgroundColor: '#E8EBE7',
+            backgroundColor: colors.field,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Icon name="person-circle" size={66} color="#BCC4BD" />
+          <Icon name="person-circle" size={66} color=colors.disabled />
         </View>
         <View style={{ flex: 1 }}>
           <Copy bold style={{ fontSize: 18 }}>
