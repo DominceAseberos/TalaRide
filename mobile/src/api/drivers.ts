@@ -15,3 +15,10 @@ export async function fetchDriverNotifications(driverCode: string, since?: strin
     `/drivers/${encodeURIComponent(driverCode)}/notifications${suffix}`,
   );
 }
+
+export async function updateDriverPhoto(photoUrl: string | null) {
+  return apiRequest<{ driver: unknown }>('/drivers/me/profile', {
+    method: 'PATCH',
+    body: JSON.stringify({ photo_url: photoUrl }),
+  });
+}

@@ -99,6 +99,18 @@ driversRouter.get('/:id/notifications', optionalAuth, async (req: Request, res: 
   }
 });
 
+// Driver self-service profile update. The server resolves the driver's code
+// from the authenticated account so clients never need to trust a path value.
+driversRouter.patch('/me/profile', optionalAuth, async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+  if (!req.user.driver_code) return res.status(403).json({ error: 'Driver account required' });
+  const parsed = DriverPhotoSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'A valid profile image URL is required.' });
+  const driver = await repository.updateDriverPhoto(req.user.driver_code, parsed.data.photo_url);
+  if (!driver) return res.status(404).json({ error: 'Driver not found' });
+  return res.json({ driver });
+});
+
 driversRouter.patch('/:id/profile', optionalAuth, async (req: Request, res: Response) => {
   if (!req.user) return res.status(401).json({ error: 'Authentication required' });
   const canEdit =

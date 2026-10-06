@@ -7,7 +7,9 @@ import { Notice } from '@/components/Notice';
 import { ActionRow, Button, Copy, Field, Icon, go, s, type IconName } from '@/components/ui';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/auth/AuthProvider';
+import { supabase } from '@/auth/client';
 import { uploadProfileImage } from '@/auth/profiles';
+import { updateDriverPhoto } from '@/api/drivers';
 import { useNotifications } from '@/notifications/NotificationProvider';
 import { useMock } from '@/mocks/MockProvider';
 import {
@@ -70,6 +72,10 @@ export default function ProfileScreen() {
   const [availableUpdate, setAvailableUpdate] = useState<AvailableUpdate | null>(null);
   const [updateMessage, setUpdateMessage] = useState('');
   const displayedAvatar = avatarUrl || profile?.avatar_url || '';
+  const isDriver =
+    session?.user.role === 'driver' ||
+    session?.user.user_metadata?.role === 'driver' ||
+    session?.user.app_metadata?.role === 'driver';
   async function chooseAvatar() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -228,6 +234,9 @@ export default function ProfileScreen() {
                       savedAvatar = await uploadProfileImage(session?.user.id ?? '', savedAvatar, avatarMime);
                     }
                     await updateProfile(name, savedAvatar);
+                    if (isDriver && supabase) {
+                      await updateDriverPhoto(savedAvatar);
+                    }
                   })()
                     .then(() => setSelected(null))
                     .catch((failure) => setError(failure.message))
