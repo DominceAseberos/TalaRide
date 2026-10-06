@@ -39,6 +39,7 @@ function AppStack() {
           'home',
           'scan',
           'scan-ride',
+          'driver-portal',
           'driver',
           'confirm',
           'rewards',

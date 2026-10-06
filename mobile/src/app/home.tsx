@@ -53,7 +53,7 @@ export default function HomeScreen() {
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        onPress={() => go('/driver')}
+        onPress={() => go('/driver-portal')}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -65,7 +65,7 @@ export default function HomeScreen() {
       >
         <Icon name="car-outline" size={18} color={colors.darkGreen} />
         <Copy style={{ color: colors.darkGreen, fontSize: 13 }}>
-          Driver mode — shift + cash
+          Driver portal — account and shifts
         </Copy>
       </Pressable>
       <View style={{ marginTop: 16, gap: 12 }}>

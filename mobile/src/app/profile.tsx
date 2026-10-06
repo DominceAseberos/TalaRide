@@ -164,7 +164,7 @@ export default function ProfileScreen() {
         />
       ))}
       <View style={{ marginTop: 4 }}>
-        <ActionRow icon="car-outline" label="Driver mode" onPress={() => go('/driver')} />
+        <ActionRow icon="car-outline" label="Driver portal" onPress={() => go('/driver-portal')} />
         <ActionRow icon="gift-outline" label="Rewards" onPress={() => go('/rewards')} />
       </View>
       <View style={{ marginTop: 12 }}>
