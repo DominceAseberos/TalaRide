@@ -13,9 +13,11 @@ import { NotificationProvider } from '@/notifications/NotificationProvider';
 import { triggerSync } from '@/api/sync';
 import { Brand, Copy } from '@/components/ui';
 import { colors } from '@/constants/theme';
+import { useAuth } from '@/auth/AuthProvider';
 
 function AppStack() {
   const { ready, onboardingComplete, signedIn } = useMock();
+  const { profile } = useAuth();
   // Protected routes are removed from the navigator, not just redirected after rendering.
   if (!ready)
     return (
@@ -37,33 +39,34 @@ function AppStack() {
     <Stack screenOptions={{ headerShown: false, animation: 'fade', animationDuration: 450 }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="auth-callback" />
-      <Stack.Screen name="v/[vehicle]" />
-      <Stack.Screen name="ride-confirm" />
-      <Stack.Screen name="payment-status" />
+      <Stack.Protected guard={!signedIn || profile?.role === 'passenger'}>
+        <Stack.Screen name="v/[vehicle]" />
+        <Stack.Screen name="ride-confirm" />
+        <Stack.Screen name="payment-status" />
+      </Stack.Protected>
       <Stack.Protected guard={!onboardingComplete}>
         <Stack.Screen name="onboarding" />
       </Stack.Protected>
       <Stack.Protected guard={onboardingComplete && !signedIn}>
         <Stack.Screen name="sign-in" />
       </Stack.Protected>
-      <Stack.Protected guard={onboardingComplete && signedIn}>
+      <Stack.Protected guard={onboardingComplete && signedIn && profile?.role === 'passenger'}>
         {[
-          'home',
-          'scan',
-          'scan-ride',
-          'driver-portal',
-          'driver',
-          'confirm',
-          'rewards',
-          'receipt',
-          'rides',
-          'ride/[id]',
-          'activity',
-          'profile',
-          'report-lost-item',
+          'home', 'scan', 'scan-ride', 'confirm', 'rewards', 'receipt', 'rides',
+          'ride/[id]', 'activity', 'profile', 'report-lost-item',
         ].map((name) => (
           <Stack.Screen key={name} name={name} />
         ))}
+      </Stack.Protected>
+      <Stack.Protected guard={onboardingComplete && signedIn && profile?.role === 'driver'}>
+        <Stack.Screen name="driver-portal" />
+        <Stack.Screen name="driver" />
+      </Stack.Protected>
+      <Stack.Protected guard={onboardingComplete && signedIn && ['admin', 'operator'].includes(profile?.role || '')}>
+        <Stack.Screen name="staff-account" />
+      </Stack.Protected>
+      <Stack.Protected guard={onboardingComplete && signedIn && !profile}>
+        <Stack.Screen name="role-access" />
       </Stack.Protected>
     </Stack>
   );

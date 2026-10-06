@@ -92,38 +92,37 @@ export function AuthProvider({ children }: PropsWithChildren) {
     };
   }, []);
   const id = session?.user.id ?? null;
+  const roleClaim = session?.user.app_metadata?.role;
   useEffect(() => {
     let active = true;
     if (id) {
       const cacheKey = PROFILE_CACHE_PREFIX + id;
-      void AsyncStorage.getItem(cacheKey)
-        .then((raw) => {
-          if (!active || account.current !== id || !raw) return;
-          try {
-            setProfile(JSON.parse(raw) as UserProfile);
-          } catch {
-            // Ignore a corrupt local profile and use the cloud copy.
-          }
-        })
-        .catch(() => {});
-      void loadProfile(id)
-        .then((value) => {
+      void (async () => {
+        let cached: UserProfile | null = null;
+        try {
+          const raw = await AsyncStorage.getItem(cacheKey);
+          if (raw) cached = JSON.parse(raw) as UserProfile;
+        } catch { /* Discard a corrupt or unavailable local copy. */ }
+        if (!active || account.current !== id) return;
+        try {
+          const value = await loadProfile(id);
           if (active && account.current === id) {
             setProfile(value);
             setProfileFailure(null);
             void AsyncStorage.setItem(cacheKey, JSON.stringify(value)).catch(() => {});
           }
-        })
-        .catch((failure) => {
+        } catch (failure) {
           if (active && account.current === id) {
-            setProfileFailure({ id, message: failure.message });
+            setProfile(cached);
+            setProfileFailure({ id, message: failure instanceof Error ? failure.message : 'Profile unavailable.' });
           }
-        });
+        }
+      })();
     }
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, roleClaim]);
   const currentProfile = profile?.id === id ? profile : null;
   return (
     <Context.Provider
@@ -161,6 +160,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
               id,
               display_name: name.trim() || 'Passenger',
               avatar_url: avatarUrl ?? profile?.avatar_url ?? null,
+              role: profile?.role || 'passenger',
             };
             setProfile(value);
             return;

@@ -10,7 +10,7 @@ export const vehiclesRouter = Router();
 vehiclesRouter.use('/', publicVehiclesRouter);
 
 // GET /api/vehicles
-vehiclesRouter.get('/', requireRole('talaride_admin', 'lgu_admin'), async (_req: Request, res: Response) => {
+vehiclesRouter.get('/', requireRole('admin'), async (_req: Request, res: Response) => {
   try {
     const vehicles = await repository.getAllVehicles();
     return res.json(vehicles);
@@ -42,7 +42,7 @@ vehiclesRouter.get('/:id', productionAuth, async (req: Request, res: Response) =
 });
 
 // POST /api/vehicles
-vehiclesRouter.post('/', requireRole('talaride_admin', 'lgu_admin'), async (req: Request, res: Response) => {
+vehiclesRouter.post('/', requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const { vehicle_id, plate_body_number, toda } = req.body;
     const vehicleCode = vehicle_id || req.body.vehicle_code;

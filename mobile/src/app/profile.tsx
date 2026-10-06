@@ -72,10 +72,7 @@ export default function ProfileScreen() {
   const [availableUpdate, setAvailableUpdate] = useState<AvailableUpdate | null>(null);
   const [updateMessage, setUpdateMessage] = useState('');
   const displayedAvatar = avatarUrl || profile?.avatar_url || '';
-  const isDriver =
-    session?.user.role === 'driver' ||
-    session?.user.user_metadata?.role === 'driver' ||
-    session?.user.app_metadata?.role === 'driver';
+  const isDriver = profile?.role === 'driver';
   async function chooseAvatar() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -164,8 +161,8 @@ export default function ProfileScreen() {
         />
       ))}
       <View style={{ marginTop: 4 }}>
-        <ActionRow icon="car-outline" label="Driver portal" onPress={() => go('/driver-portal')} />
-        <ActionRow icon="gift-outline" label="Rewards" onPress={() => go('/rewards')} />
+        {!isDriver && <ActionRow icon="car-outline" label="Driver portal" onPress={() => go('/driver-portal')} />}
+        {!isDriver && <ActionRow icon="gift-outline" label="Rewards" onPress={() => go('/rewards')} />}
       </View>
       <View style={{ marginTop: 12 }}>
         <ActionRow

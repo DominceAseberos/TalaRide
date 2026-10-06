@@ -1,4 +1,4 @@
-export type UserRole = 'driver' | 'commuter' | 'admin';
+export type UserRole = 'admin' | 'operator' | 'passenger' | 'driver';
 export type AccountStatus = 'active' | 'suspended' | 'pending';
 export type DriverVerificationStatus = 'verified' | 'pending' | 'suspended';
 export type VehicleStatus = 'active' | 'maintenance' | 'inactive';

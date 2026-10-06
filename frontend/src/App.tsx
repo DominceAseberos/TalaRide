@@ -27,7 +27,7 @@ export function App() {
     void getAuthClient().then(c => c.auth.getSession()).then(async result => {
       if (!result.data.session) return;
       const account = await api.getCurrentAccount();
-      if (active && ['operator', 'talaride_admin', 'lgu_admin'].includes(account.user.role)) {
+      if (active && ['operator', 'admin'].includes(account.user.role)) {
         setOperator({ name: account.user.full_name, role: account.user.role, group: account.user.toda_group?.name || 'TalaRide administration', email: result.data.session.user.email || '' });
       }
     }).catch(() => {});
@@ -37,7 +37,7 @@ export function App() {
     : path.startsWith('/v/') ? <PublicVehiclePage vehicleCode={path.split('/')[2]} checksum={query.get('c') || ''} />
     : <>{error && <p role="alert">{error}</p>}{operator ? operator.role === 'operator'
       ? <TodaDashboard operatorName={operator.name} onSignOut={() => void signOut().then(() => setOperator(null)).catch(e => setError(e.message))} />
-      : <AdminDashboard canVerify={operator.role === 'talaride_admin'} operatorName={operator.name} todaName={operator.group} onSignOut={() => void signOut().then(() => setOperator(null)).catch(e => setError(e.message))} /> : <TodaLogin onAuthenticated={setOperator} />}</>;
+      : <AdminDashboard canVerify operatorName={operator.name} todaName={operator.group} onSignOut={() => void signOut().then(() => setOperator(null)).catch(e => setError(e.message))} /> : <TodaLogin onAuthenticated={setOperator} />}</>;
   return <>{testPayments && <div role="status" className="bg-warning-soft px-4 py-3 text-center text-sm font-semibold text-warning">PayMongo test mode — no real money is charged.</div>}{page}</>;
 }
 export default App;

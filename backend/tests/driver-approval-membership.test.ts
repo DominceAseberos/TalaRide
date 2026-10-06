@@ -10,10 +10,12 @@ test('only admin approval unlocks a driver; operator membership is scoped, durab
   resetDatabase();
   const previous = env.DEMO_AUTH;
   env.DEMO_AUTH = false;
+  const groupA = await repository.createTodaGroup('Group A', 'account-admin');
+  const groupB = await repository.createTodaGroup('Group B', 'account-admin');
   t.mock.method(supabaseAdmin.auth, 'getUser', async (token: string) => {
-    const role = token === 'admin' ? 'talaride_admin' : token === 'driver' ? undefined : token === 'lgu' ? 'lgu_admin' : 'operator';
+    const role = token === 'admin' ? 'admin' : token === 'driver' ? undefined : token === 'lgu' ? 'lgu_admin' : 'operator';
     return { data: { user: { id: `account-${token}`, email: `${token}@example.invalid`, created_at: new Date().toISOString(),
-      app_metadata: { role, ...(token.startsWith('operator') ? { toda_group_id: token === 'operator-b' ? 'group-b' : 'group-a', toda_group_name: token === 'operator-b' ? 'Group B' : 'Group A' } : {}) },
+      app_metadata: { role, ...(token.startsWith('operator') ? { toda_group_id: token === 'operator-b' ? groupB.id : groupA.id, toda_group_name: token === 'operator-b' ? groupB.name : groupA.name } : {}) },
       user_metadata: { full_name: token, toda_group_id: 'forged-group', toda_group_name: 'Forged group' } } }, error: null } as any;
   });
   const call = (token: string, path: string, method = 'GET', body?: unknown) => request(path, { method, body, headers: { Authorization: `Bearer ${token}` } });
@@ -27,17 +29,16 @@ test('only admin approval unlocks a driver; operator membership is scoped, durab
     for (const token of ['operator-a', 'driver', 'lgu']) assert.equal((await call(token, `/api/admin/drivers/${code}/verify`, 'POST')).status, 403);
     assert.equal((await call('unassigned', '/api/toda/members')).status, 403, 'signup group metadata cannot authorize group access');
     assert.equal((await call('driver', '/api/toda/members')).status, 403);
-    assert.equal((await call('operator-a', '/api/toda/members', 'POST', { driver_code: code, toda_group_id: 'group-b' })).status, 400);
-    const added = await call('operator-a', '/api/toda/members', 'POST', { driver_code: code });
+    assert.equal((await call('operator-a', '/api/toda/members')).body.members.length, 0);
+    assert.equal((await call('operator-a', '/api/toda/members', 'POST', { driver_code: code })).status, 404, 'TODA operators have read-only membership access');
+    const added = await call('admin', `/api/admin/toda-groups/${groupA.id}/members/${code}`, 'POST');
     assert.equal(added.status, 200);
     assert.equal(added.body.driver.verification_status, 'pending');
-    assert.equal(added.body.driver.toda_operator, 'Group A');
-    assert.equal(added.body.driver.toda_group_id, 'group-a');
-    assert.equal(added.body.driver.membership_added_by, 'account-operator-a');
-    const repeated = await call('operator-a', '/api/toda/members', 'POST', { driver_code: code });
-    assert.equal(repeated.body.driver.membership_added_at, added.body.driver.membership_added_at);
+    assert.equal(added.body.driver.toda_operator, groupA.name);
+    assert.equal(added.body.driver.toda_group_id, groupA.id);
+    assert.equal((await call('operator-a', '/api/toda/members')).body.members.length, 1);
     assert.equal((await call('operator-b', '/api/toda/members')).body.members.length, 0);
-    assert.equal((await call('operator-b', '/api/toda/members', 'POST', { driver_code: code })).status, 409);
+    assert.equal((await call('operator-b', `/api/admin/toda-groups/${groupB.id}/members/${code}`, 'POST')).status, 403);
     const approval = await call('admin', `/api/admin/drivers/${code}/verify`, 'POST');
     assert.equal(approval.status, 200);
     assert.equal(approval.body.driver.verified_by, 'account-admin');

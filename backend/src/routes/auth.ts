@@ -19,7 +19,7 @@ authRouter.get('/me', requireAuth, async (req, res) => {
 // POST /api/auth/otp-request
 authRouter.post('/otp-request', otpRateLimiter, async (req: Request, res: Response) => {
   try {
-    const { mobileNumber, role = 'commuter' } = req.body;
+    const { mobileNumber, role = 'passenger' } = req.body;
     if (!mobileNumber) {
       return res.status(400).json({ error: 'Mobile number is required' });
     }
@@ -47,7 +47,7 @@ authRouter.post('/otp-request', otpRateLimiter, async (req: Request, res: Respon
 // POST /api/auth/otp-verify
 authRouter.post('/otp-verify', async (req: Request, res: Response) => {
   try {
-    const { mobileNumber, otp, role = 'commuter', pin } = req.body;
+    const { mobileNumber, otp, role = 'passenger', pin } = req.body;
 
     if (env.NODE_ENV !== 'test' || !env.DEMO_AUTH) {
       return res.status(501).json({

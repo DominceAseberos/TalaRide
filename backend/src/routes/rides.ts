@@ -165,7 +165,7 @@ ridesRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
 
     // Authenticated clients are always scoped to their own history. Query filters are
     // retained for admin/test compatibility only when there is no end-user identity.
-    if (req.user && !['driver', 'talaride_admin', 'lgu_admin'].includes(req.user.role)) {
+    if (req.user && !['driver', 'admin', 'operator'].includes(req.user.role)) {
       passengerId = req.user.id;
       driverCode = undefined;
     } else if (req.user?.role === 'driver') {
@@ -194,7 +194,7 @@ ridesRouter.get('/:id', optionalAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Ride not found' });
     }
 
-    if (req.user && !['talaride_admin', 'lgu_admin'].includes(req.user.role) && ride.passenger_id !== req.user.id && ride.driver_code !== req.user.driver_code) return res.status(403).json({ error: 'You cannot view this ride.' });
+    if (req.user && !['admin', 'operator'].includes(req.user.role) && ride.passenger_id !== req.user.id && ride.driver_code !== req.user.driver_code) return res.status(403).json({ error: 'You cannot view this ride.' });
     const driver = await repository.getDriver(ride.driver_code);
     const vehicle = await repository.getVehicle(ride.vehicle_code);
     const payment = await repository.getPaymentByRideId(ride.ride_id);

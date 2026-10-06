@@ -5,22 +5,29 @@ import { requireRole } from '../lib/auth.js';
 import { sse } from '../sse.js';
 import { generateVehicleChecksum } from '../lib/qr.js';
 import { Driver, Vehicle } from '../types.js';
+import { supabaseAdmin } from '../lib/supabase-admin.js';
+import { env } from '../env.js';
 
 export const adminRouter = Router();
+function withoutPinHash<T extends { pin_hash?: string }>(driver: T) {
+  const { pin_hash: _pinHash, ...safeDriver } = driver;
+  return safeDriver;
+}
 
-// Protect ALL admin routes with strict role check (talaride_admin or lgu_admin)
-adminRouter.use(requireRole('talaride_admin', 'lgu_admin'));
+// All admin actions require the canonical admin role.
+adminRouter.use(requireRole('admin'));
 
 // GET /api/admin/overview & /api/admin/analytics
 adminRouter.get('/overview', async (_req: Request, res: Response) => {
   try {
-    const drivers = await repository.getAllDrivers();
+    const drivers = (await repository.getAllDrivers()).map(({ pin_hash: _pinHash, ...driver }) => driver);
     const vehicles = await repository.getAllVehicles();
     const rides = await repository.getRides();
     const payments = await repository.getAllPayments();
     const lostItems = await repository.getLostItems();
     const paymentIssues = await repository.getPaymentIssues();
     const fareConfig = await repository.getFareConfig();
+    const groups = await repository.getTodaGroups();
 
     const activeDrivers = drivers.filter((d) => d.shift_status === 'active').length;
     const verifiedDrivers = drivers.filter((d) => d.verification_status === 'verified').length;
@@ -45,6 +52,7 @@ adminRouter.get('/overview', async (_req: Request, res: Response) => {
         active_drivers_on_shift: activeDrivers,
         verified_drivers: verifiedDrivers,
         total_registered_vehicles: vehicles.length,
+        total_toda_groups: groups.length,
         total_rides_completed: rides.length,
         digital_rides_count: digitalRides.length,
         cash_rides_count: cashRides.length,
@@ -73,7 +81,7 @@ adminRouter.get('/analytics', async (req: Request, res: Response) => {
 adminRouter.get('/drivers', async (_req: Request, res: Response) => {
   try {
     const drivers = await repository.getAllDrivers();
-    return res.json(drivers);
+    return res.json(drivers.map(withoutPinHash));
   } catch (err: any) {
     return res.status(500).json({ error: 'Server error', message: err.message });
   }
@@ -92,13 +100,90 @@ adminRouter.post('/drivers', async (_req, res) => {
 });
 
 // POST /api/admin/drivers/:id/verify
-adminRouter.post('/drivers/:id/verify', requireRole('talaride_admin'), async (req: Request, res: Response) => {
+adminRouter.post('/drivers/:id/verify', async (req: Request, res: Response) => {
   try {
     const driver = await repository.updateDriverStatus(String(req.params.id), 'verified', req.user!.id);
     if (!driver) return res.status(404).json({ error: 'Driver not found' });
-    return res.json({ success: true, driver });
+    return res.json({ success: true, driver: withoutPinHash(driver) });
   } catch (err: any) {
     return res.status(500).json({ error: 'Server error', message: err.message });
+  }
+});
+
+adminRouter.get('/toda-groups', async (_req: Request, res: Response) => {
+  const [groups, drivers] = await Promise.all([repository.getTodaGroups(), repository.getAllDrivers()]);
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json(groups.map(group => ({
+    ...group,
+    members: drivers.filter(driver => driver.toda_group_id === group.id).map(driver => ({
+      driver_code: driver.driver_code, full_name: driver.full_name,
+      verification_status: driver.verification_status, toda_operator: driver.toda_operator,
+      assigned_vehicle_code: driver.assigned_vehicle_code, shift_status: driver.shift_status,
+      active_shift_id: driver.active_shift_id, photo_url: driver.photo_url, created_at: driver.created_at,
+    })),
+  })));
+});
+
+adminRouter.post('/toda-groups', async (req: Request, res: Response) => {
+  const parsed = z.object({ name: z.string().trim().min(2).max(120) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Enter a group name between 2 and 120 characters.' });
+  try {
+    const group = await repository.createTodaGroup(parsed.data.name, req.user!.id);
+    return res.status(201).json({ group, members: [] });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('already exists')) return res.status(409).json({ message: error.message });
+    return res.status(500).json({ message: 'The TODA group could not be saved.' });
+  }
+});
+
+adminRouter.post('/toda-groups/:groupId/members/:driverCode', async (req: Request, res: Response) => {
+  const group = await repository.getTodaGroup(String(req.params.groupId));
+  if (!group) return res.status(404).json({ message: 'TODA group not found.' });
+  const driverCode = String(req.params.driverCode).trim().toUpperCase();
+  if (!/^DR-\d{6}$/.test(driverCode)) return res.status(400).json({ message: 'Enter a valid driver code.' });
+  try {
+    const driver = await repository.assignDriverToToda(driverCode, group, req.user!.id);
+    if (!driver) return res.status(404).json({ message: 'Driver not found. Drivers must register in the mobile app first.' });
+    return res.json({ group, driver: withoutPinHash(driver) });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('already exists')) return res.status(409).json({ message: error.message });
+    return res.status(500).json({ message: 'The driver could not be assigned to this group.' });
+  }
+});
+
+adminRouter.post('/toda-operators', async (req: Request, res: Response) => {
+  const parsed = z.object({
+    name: z.string().trim().min(2).max(80),
+    email: z.string().trim().email().max(254),
+    groupId: z.string().uuid().optional(),
+    groupName: z.string().trim().min(2).max(120).optional(),
+  }).refine(value => !!value.groupId || !!value.groupName, 'Select or create a TODA group.').safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Enter the operator name, email, and a TODA group.' });
+  let group = parsed.data.groupId ? await repository.getTodaGroup(parsed.data.groupId) : null;
+  if (parsed.data.groupId && !group) return res.status(404).json({ message: 'TODA group not found.' });
+  try {
+    if (!group && parsed.data.groupName) group = await repository.createTodaGroup(parsed.data.groupName, req.user!.id);
+    if (!group) return res.status(400).json({ message: 'Select or create a TODA group.' });
+    const origin = String(req.get('origin') || '').trim();
+    const allowedOrigins = env.WEB_ORIGIN.split(',').map(value => value.trim()).filter(Boolean);
+    const redirectTo = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    const invitation = await supabaseAdmin.auth.admin.inviteUserByEmail(parsed.data.email.toLowerCase(), {
+      data: { display_name: parsed.data.name, full_name: parsed.data.name },
+      ...(redirectTo ? { redirectTo } : {}),
+    });
+    const invited = invitation.data.user;
+    if (invitation.error || !invited) return res.status(409).json({ message: invitation.error?.message || 'The operator invitation could not be created.' });
+    const authUpdate = await supabaseAdmin.auth.admin.updateUserById(invited.id, {
+      app_metadata: { ...invited.app_metadata, role: 'operator', toda_group_id: group.id, toda_group_name: group.name },
+    });
+    const profileUpdate = await supabaseAdmin.from('profiles').update({ role: 'operator' }).eq('id', invited.id);
+    if (authUpdate.error || profileUpdate.error) {
+      await supabaseAdmin.auth.admin.deleteUser(invited.id);
+      return res.status(500).json({ message: 'Operator setup failed. No account was kept; check that the latest profile migration is applied.' });
+    }
+    return res.status(201).json({ success: true, invited: true, email: parsed.data.email.toLowerCase(), group });
+  } catch {
+    return res.status(500).json({ message: 'The operator account could not be created.' });
   }
 });
 
@@ -107,7 +192,7 @@ adminRouter.post('/drivers/:id/suspend', async (req: Request, res: Response) => 
   try {
     const driver = await repository.updateDriverStatus(String(req.params.id), 'suspended');
     if (!driver) return res.status(404).json({ error: 'Driver not found' });
-    return res.json({ success: true, driver });
+    return res.json({ success: true, driver: withoutPinHash(driver) });
   } catch (err: any) {
     return res.status(500).json({ error: 'Server error', message: err.message });
   }
@@ -189,7 +274,7 @@ adminRouter.post('/assign-vehicle', async (req: Request, res: Response) => {
     );
     return res.json({
       success: true,
-      driver: result.driver,
+      driver: withoutPinHash(result.driver),
       vehicle: result.vehicle
     });
   } catch (err: any) {

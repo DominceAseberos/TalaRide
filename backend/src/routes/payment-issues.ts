@@ -45,7 +45,7 @@ paymentIssuesRouter.post('/payment-issue', optionalAuth, async (req: Request, re
 
     const relatedPayment = payment_id ? await repository.getPayment(payment_id) : null;
     const relatedRide = (ride_id || relatedPayment?.ride_id) ? await repository.getRide(ride_id || relatedPayment!.ride_id) : null;
-    if (req.user && !['talaride_admin', 'lgu_admin'].includes(req.user.role) && (!relatedRide || (relatedRide.passenger_id !== req.user.id && relatedRide.driver_code !== req.user.driver_code))) return res.status(403).json({ error: 'You may report issues only for your own ride.' });
+    if (req.user && req.user.role !== 'admin' && (!relatedRide || (relatedRide.passenger_id !== req.user.id && relatedRide.driver_code !== req.user.driver_code))) return res.status(403).json({ error: 'You may report issues only for your own ride.' });
     const ticketId = `TKT-${randomUUID()}`;
     const ticket: PaymentIssueTicket = {
       ticket_id: ticketId,

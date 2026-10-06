@@ -6,9 +6,11 @@ import { useEffect, useState } from 'react';
 import { replace } from '@/components/ui';
 import { useMock } from '@/mocks/MockProvider';
 import { colors } from '@/constants/theme';
+import { useAuth } from '@/auth/AuthProvider';
 
 export default function SplashScreen() {
   const { ready, onboardingComplete, signedIn } = useMock();
+  const { profile } = useAuth();
   const [fade] = useState(() => new Animated.Value(0));
   const [rise] = useState(() => new Animated.Value(18));
   const [animationDone, setAnimationDone] = useState(false);
@@ -40,7 +42,11 @@ export default function SplashScreen() {
   const { width } = useWindowDimensions();
   const contentWidth = Math.min(width, 480);
   // Returning users, including after logout, go directly to the current account route.
-  if (ready && onboardingComplete) return <Redirect href={signedIn ? '/home' : '/sign-in'} />;
+  if (ready && onboardingComplete && signedIn && profile?.role === 'driver') return <Redirect href="/driver-portal" />;
+  if (ready && onboardingComplete && signedIn && profile?.role === 'passenger') return <Redirect href="/home" />;
+  if (ready && onboardingComplete && signedIn && (profile?.role === 'admin' || profile?.role === 'operator')) return <Redirect href="/staff-account" />;
+  if (ready && onboardingComplete && signedIn && !profile) return <Redirect href="/role-access" />;
+  if (ready && onboardingComplete && !signedIn) return <Redirect href="/sign-in" />;
   return (
     <Screen scroll={false} style={{ padding: 0 }}>
       <Animated.View

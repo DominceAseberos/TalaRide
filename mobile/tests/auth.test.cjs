@@ -441,7 +441,7 @@ test('local provider scopes all operations to Auth user, hides account-switch re
 });
 
 test('protected route declarations hide private screens during initialization, onboarding and sign-out', async () => {
-  let state = { ready: false, onboardingComplete: false, signedIn: false };
+  let state = { ready: false, onboardingComplete: false, signedIn: false, profile: null };
   function Stack({ children }) {
     return React.createElement('stack', null, children);
   }
@@ -458,7 +458,7 @@ test('protected route declarations hide private screens during initialization, o
     '@expo-google-fonts/roboto/700Bold': {},
     '@/scan/draft': { prepareScanCache: async () => {} },
     '@/api/sync': { triggerSync: async () => ({ sent: 0, pending: 0 }) },
-    '@/auth/AuthProvider': { AuthProvider: wrapper },
+     '@/auth/AuthProvider': { AuthProvider: wrapper, useAuth: () => ({ profile: state.profile }) },
     '@/notifications/NotificationProvider': { NotificationProvider: wrapper },
     '@/components/ui': { Brand: 'Brand', Copy: 'Copy' },
     '@/constants/theme': { colors: { white: '#FFFFFF', green: '#356653' } },
@@ -476,7 +476,7 @@ test('protected route declarations hide private screens during initialization, o
   });
   assert.equal(routes().length, 0);
   assert.equal(tree.root.findAllByType('Brand').length, 1);
-  state = { ready: true, onboardingComplete: false, signedIn: false };
+  state = { ready: true, onboardingComplete: false, signedIn: false, profile: null };
   await act(async () => {
     tree.update(element());
   });
@@ -488,7 +488,7 @@ test('protected route declarations hide private screens during initialization, o
     'payment-status',
     'onboarding',
   ]);
-  state = { ready: true, onboardingComplete: true, signedIn: false };
+  state = { ready: true, onboardingComplete: true, signedIn: false, profile: null };
   await act(async () => {
     tree.update(element());
   });
@@ -500,7 +500,7 @@ test('protected route declarations hide private screens during initialization, o
     'payment-status',
     'sign-in',
   ]);
-  state = { ready: true, onboardingComplete: true, signedIn: true };
+  state = { ready: true, onboardingComplete: true, signedIn: true, profile: { role: 'passenger' } };
   await act(async () => {
     tree.update(element());
   });
@@ -509,7 +509,26 @@ test('protected route declarations hide private screens during initialization, o
   assert.ok(routes().includes('profile'));
   assert.ok(!routes().includes('sign-in'));
   assert.ok(!routes().includes('onboarding'));
-  state = { ready: true, onboardingComplete: true, signedIn: false };
+  assert.ok(!routes().includes('driver-portal'));
+  state = { ready: true, onboardingComplete: true, signedIn: true, profile: { role: 'driver' } };
+  await act(async () => {
+    tree.update(element());
+  });
+  assert.ok(routes().includes('driver-portal'));
+  assert.ok(!routes().includes('home'));
+  assert.ok(!routes().includes('staff-account'));
+  state = { ready: true, onboardingComplete: true, signedIn: true, profile: { role: 'operator' } };
+  await act(async () => {
+    tree.update(element());
+  });
+  assert.deepEqual(routes(), ['index', 'auth-callback', 'staff-account']);
+  state = { ready: true, onboardingComplete: true, signedIn: true, profile: null };
+  await act(async () => {
+    tree.update(element());
+  });
+  assert.ok(routes().includes('role-access'));
+  assert.ok(!routes().includes('home'));
+  state = { ready: true, onboardingComplete: true, signedIn: false, profile: null };
   await act(async () => {
     tree.update(element());
   });
@@ -552,6 +571,12 @@ test('sign-in UI submits real actions, blocks repeated taps and shows unavailabl
         signOut: async () => {},
         error: null,
       }),
+    },
+    '@/auth/profiles': {
+      loadProfile: async () => ({ role: calls.at(-1)?.[4] || 'passenger' }),
+    },
+    '@/auth/client': {
+      requireSupabase: () => ({ auth: { getUser: async () => ({ data: { user: { id: 'test-user' } }, error: null }) } }),
     },
     '@/auth/actions': {
       performEmailAction: async (...args) => {
@@ -924,6 +949,7 @@ test('returning users skip the splash animation and signed-out users go straight
         },
       },
       '@/mocks/MockProvider': { useMock: () => state },
+      '@/auth/AuthProvider': { useAuth: () => ({ profile: { role: 'passenger' } }) },
       '@/constants/theme': { colors: {} },
     },
     {
@@ -1065,26 +1091,34 @@ test('driver waits for admin approval then dashboard and saved membership update
   });
 });
 
-test('TODA member form saves through the API and displays returned records without approval controls', async () => {
+test('TODA operator dashboard shows assigned members and lost-item notices read-only', async () => {
   const group = { id: 'group-a', name: 'Group A' };
-  let members = [];
-  let calls = 0;
-  let fail = false;
+  const members = [{ driver_id: 'DR-123456', name: 'Registered driver', verification_status: 'pending' }];
+  const lostItems = [{ report_id: 'lost-1', vehicle_code: 'TR-100', driver_code: 'DR-123456', item_category: 'bag', description: 'Blue backpack left on seat', status: 'open', created_at: '2026-10-06T00:00:00.000Z' }];
+  let memberReads = 0;
+  let lostItemReads = 0;
+  const OpsLayout = ({ children, sections, onSelect }) => React.createElement(
+    'ops-layout',
+    null,
+    ...sections.map((section) => React.createElement('button', {
+      key: section.id,
+      onClick: () => onSelect(section.id),
+    }, section.label)),
+    children,
+  );
+  const icon = () => null;
   const { TodaDashboard } = load(
     '../frontend/src/components/toda/TodaDashboard.tsx',
     {
+      react: React,
+      'lucide-react': { Bell: icon, CircleAlert: icon, Users: icon },
       '../../services/api': {
         api: {
-          getTodaMembers: async () => ({ group, members }),
-          addTodaMember: async (code) => {
-            calls++;
-            if (fail) throw new Error('Driver belongs to another group');
-            members = [
-              { driver_id: code, name: 'Registered driver', verification_status: 'pending' },
-            ];
-          },
+          getTodaMembers: async () => { memberReads++; return { group, members }; },
+          getTodaLostItems: async () => { lostItemReads++; return lostItems; },
         },
       },
+      '../ops/OpsLayout': { OpsLayout },
     },
     { window: { setInterval: () => 1, clearInterval() {} } },
   );
@@ -1092,29 +1126,23 @@ test('TODA member form saves through the API and displays returned records witho
   await act(async () => {
     tree = create(React.createElement(TodaDashboard, { operatorName: 'Operator', onSignOut() {} }));
   });
+  const rendered = JSON.stringify(tree.toJSON());
+  assert.equal(memberReads, 1);
+  assert.equal(lostItemReads, 1);
+  assert.ok(rendered.includes('Group A'));
+  assert.ok(rendered.includes('Group members'));
   await act(async () => {
-    tree.root.findByType('input').props.onChange({ target: { value: 'dr-123456' } });
+    tree.root.findAllByType('button').find((button) => button.children.includes('Members')).props.onClick();
   });
+  const roster = JSON.stringify(tree.toJSON());
+  assert.ok(roster.includes('DR-123456'));
+  assert.ok(roster.includes('Pending admin review'));
   await act(async () => {
-    await tree.root.findByType('form').props.onSubmit({ preventDefault() {} });
+    tree.root.findAllByType('button').find((button) => button.children.includes('Lost item notices')).props.onClick();
   });
-  assert.equal(calls, 1);
-  assert.ok(JSON.stringify(tree.toJSON()).includes('DR-123456'));
-  assert.ok(JSON.stringify(tree.toJSON()).includes('Awaiting admin approval'));
-  assert.ok(
-    !tree.root
-      .findAllByType('button')
-      .some((item) => /approve|verify/i.test(JSON.stringify(item.props.children))),
-  );
-  fail = true;
-  await act(async () => {
-    tree.root.findByType('input').props.onChange({ target: { value: 'DR-234567' } });
-  });
-  await act(async () => {
-    await tree.root.findByType('form').props.onSubmit({ preventDefault() {} });
-  });
-  assert.ok(JSON.stringify(tree.toJSON()).includes('Driver belongs to another group'));
-  assert.ok(!JSON.stringify(tree.toJSON()).includes('Membership saved'));
+  const notices = JSON.stringify(tree.toJSON());
+  assert.ok(notices.includes('Blue backpack left on seat'));
+  assert.ok(!tree.root.findAllByType('form').length, 'operators cannot add or assign drivers');
   await act(async () => {
     tree.unmount();
   });

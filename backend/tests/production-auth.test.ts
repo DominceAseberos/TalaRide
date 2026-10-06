@@ -32,6 +32,8 @@ test('signup metadata cannot grant dashboard access; only server-managed role ca
     const req = { headers: { authorization: 'Bearer verified-by-test-auth-service' }, query: {} } as any;
     assert.equal((await authenticateRequest(req))?.role, 'passenger');
     user.app_metadata.role = 'talaride_admin';
-    assert.equal((await authenticateRequest(req))?.role, 'talaride_admin');
+    assert.equal((await authenticateRequest(req))?.role, 'passenger');
+    user.app_metadata.role = 'admin';
+    assert.equal((await authenticateRequest(req))?.role, 'admin');
   } finally { env.DEMO_AUTH = previous; }
 });

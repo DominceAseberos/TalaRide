@@ -4,6 +4,12 @@ import { supabaseAdmin } from './supabase-admin.js';
 import { repository } from './repository.js';
 import { AppRole, Profile, Driver } from '../types.js';
 
+function canonicalRole(value: unknown): AppRole | null {
+  return value === 'admin' || value === 'operator' || value === 'passenger' || value === 'driver'
+    ? value
+    : null;
+}
+
 export interface AuthenticatedUser {
   id: string;
   role: AppRole;
@@ -43,7 +49,7 @@ export async function authenticateRequest(req: Request): Promise<AuthenticatedUs
       const p = await repository.getProfile('USR-ADM-001');
       return {
         id: p?.id || 'USR-ADM-001',
-        role: 'talaride_admin',
+        role: 'admin',
         full_name: p?.full_name || 'Admin TalaRide',
         mobile_number: p?.mobile_number || '09990001122'
       };
@@ -79,12 +85,19 @@ export async function authenticateRequest(req: Request): Promise<AuthenticatedUs
     const userId = data.user.id;
     let profile = await repository.getProfile(userId);
     let driver: Driver | null = await repository.getDriverByUserId(userId);
+    const { data: storedProfile } = await supabaseAdmin.from('profiles').select('role').eq('id', userId).maybeSingle();
+    const managedRole = canonicalRole(data.user.app_metadata?.role);
+    const storedRole = canonicalRole(storedProfile?.role);
+    const role: AppRole = managedRole === 'admin' || managedRole === 'operator'
+      ? managedRole
+      : storedRole === 'admin' || storedRole === 'operator'
+        ? storedRole
+        : driver ? 'driver' : storedRole === 'driver' || managedRole === 'driver'
+          ? 'driver' : storedRole || managedRole || canonicalRole(profile?.role) || 'passenger';
 
     if (!profile) {
       // If user profile is not found, check driver table
       driver = await repository.getDriverByUserId(userId);
-      const trustedRole = data.user.app_metadata?.role;
-      const role: AppRole = driver ? 'driver' : (['operator', 'lgu_admin', 'talaride_admin'].includes(trustedRole) ? trustedRole : 'passenger');
       profile = {
         id: userId,
         mobile_number: data.user.phone || data.user.email || '',
@@ -94,16 +107,14 @@ export async function authenticateRequest(req: Request): Promise<AuthenticatedUs
         created_at: data.user.created_at
       };
       await repository.createProfile(profile);
-    } else if (profile.role === 'driver') {
+    } else if (role === 'driver') {
       driver = await repository.getDriverByUserId(userId);
     }
 
     if (profile.status !== 'active') return null;
-    // Elevated roles must be asserted by server-managed Auth metadata, never signup metadata.
-    if (['operator', 'lgu_admin', 'talaride_admin'].includes(profile.role) && data.user.app_metadata?.role !== profile.role) return null;
     return {
       id: profile.id,
-      role: ['talaride_admin', 'lgu_admin', 'operator'].includes(data.user.app_metadata?.role) ? data.user.app_metadata.role : driver ? 'driver' : 'passenger',
+      role,
       full_name: profile.full_name,
       mobile_number: profile.mobile_number,
       driver_code: driver?.driver_code || null,
@@ -192,5 +203,5 @@ export async function productionAuth(req: Request, res: Response, next: NextFunc
   return requireAuth(req, res, next);
 }
 export function canManageDriver(req: Request, code: string) {
-  return env.NODE_ENV === 'test' || req.user?.driver_code === code || ['talaride_admin', 'lgu_admin'].includes(req.user?.role || '');
+  return env.NODE_ENV === 'test' || req.user?.driver_code === code || req.user?.role === 'admin';
 }

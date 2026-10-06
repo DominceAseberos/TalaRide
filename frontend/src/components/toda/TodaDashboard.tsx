@@ -1,58 +1,55 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { Bell, CircleAlert, Users } from 'lucide-react';
 import { api } from '../../services/api';
+import { OpsLayout, type OpsSection } from '../ops/OpsLayout';
 import type { Driver } from '../../types';
 
+type LostNotice = { report_id: string; vehicle_code: string; driver_code: string; item_category: string; description: string; status: string; driver_response?: string | null; created_at: string };
+const card = 'rounded border border-slate-200 bg-white';
 export function TodaDashboard({ operatorName, onSignOut }: { operatorName: string; onSignOut: () => void }) {
   const [group, setGroup] = useState<{ id: string; name: string } | null>(null);
   const [members, setMembers] = useState<Driver[]>([]);
-  const [code, setCode] = useState('');
+  const [lostItems, setLostItems] = useState<LostNotice[]>([]);
+  const [tab, setTab] = useState<OpsSection>('overview');
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [busy, setBusy] = useState(false);
-  const mounted = useRef(false);
   const refresh = useCallback(async () => {
-    const result = await api.getTodaMembers();
-    if (mounted.current) { setGroup(result.group); setMembers(result.members); }
+    const [memberData, reportData] = await Promise.all([api.getTodaMembers(), api.getTodaLostItems()]);
+    setGroup(memberData.group);
+    setMembers(memberData.members);
+    setLostItems(reportData as LostNotice[]);
+    setError('');
   }, []);
   useEffect(() => {
-    mounted.current = true;
-    const update = () => void refresh().catch(e => { if (mounted.current) setError(e.message); });
+    let active = true;
+    const update = () => void refresh().catch(failure => { if (active) setError(failure instanceof Error ? failure.message : 'Could not load this group.'); });
     update();
     const timer = window.setInterval(update, 15000);
-    return () => { mounted.current = false; window.clearInterval(timer); };
+    return () => { active = false; window.clearInterval(timer); };
   }, [refresh]);
-  async function addMember(event: React.FormEvent) {
-    event.preventDefault();
-    if (busy) return;
-    setBusy(true); setError(''); setNotice('');
-    try {
-      await api.addTodaMember(code.trim().toUpperCase());
-      setCode('');
-      setNotice('Membership saved. The group name will appear in the driver’s app.');
-      await refresh();
-    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not save membership.'); }
-    finally { setBusy(false); }
-  }
-  return <main className="min-h-screen bg-canvas text-ink">
-    <header className="border-b border-line bg-white px-6 py-5"><div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-      <div><p className="font-semibold">TalaRide</p><p className="text-sm text-muted">{operatorName} · TODA operator</p></div>
-      <button onClick={onSignOut} className="rounded-lg border border-line px-4 py-2 text-sm">Sign out</button>
-    </div></header>
-    <div className="mx-auto max-w-5xl space-y-6 p-6 sm:p-8">
-      <div><h1 className="text-2xl font-semibold">{group?.name || 'Your TODA group'}</h1><p className="mt-2 text-sm text-muted">Manage your driver members. Driver verification is handled by the TalaRide administrator.</p></div>
-      {error && <p role="alert" className="rounded-xl border border-line bg-danger-soft p-4 text-danger">{error}</p>}
-      {notice && <p role="status" className="rounded-xl bg-accent-soft p-4 text-accent">{notice}</p>}
-      <div className="grid grid-cols-2 gap-4"><div className="rounded-xl border border-line bg-white p-5"><p className="text-sm text-muted">Members</p><p className="mt-2 text-2xl font-semibold">{members.length}</p></div><div className="rounded-xl border border-line bg-white p-5"><p className="text-sm text-muted">Verified drivers</p><p className="mt-2 text-2xl font-semibold">{members.filter(d => d.verification_status === 'verified').length}</p></div></div>
-      <section className="rounded-xl border border-line bg-white p-5 sm:p-6">
-        <h2 className="font-semibold">Add a driver to your group</h2><p className="mt-2 text-sm text-muted">Ask the driver for the code shown in their mobile app. Membership does not approve driver verification.</p>
-        <form onSubmit={event => void addMember(event)} className="mt-4 flex flex-wrap gap-3">
-          <label className="flex-1 text-sm">Driver code<input required pattern="[Dd][Rr]-[0-9]{6}" value={code} onChange={event => setCode(event.target.value)} placeholder="DR-123456" className="mt-2 block w-full rounded-lg border border-line bg-white px-4 py-3 uppercase" /></label>
-          <button disabled={busy || !group} className="self-end rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Saving…' : 'Add member'}</button>
-        </form>
-      </section>
-      <section className="overflow-hidden rounded-xl border border-line bg-white"><h2 className="border-b border-line p-5 font-semibold">Driver members</h2>
-        {!group ? <p className="p-5 text-muted">{error ? 'Member records are unavailable.' : 'Loading members…'}</p> : !members.length ? <p className="p-5 text-muted">No members yet. Add a registered driver using their driver code.</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-subtle text-muted"><tr><th className="p-4">Driver</th><th className="p-4">Code</th><th className="p-4">Verification</th><th className="p-4">Vehicle</th></tr></thead><tbody>{members.map(driver => <tr key={driver.driver_id} className="border-t border-line"><td className="p-4 font-medium">{driver.name}</td><td className="p-4 font-mono">{driver.driver_id}</td><td className="p-4">{driver.verification_status === 'pending' ? 'Awaiting admin approval' : driver.verification_status === 'verified' ? 'Verified' : 'Suspended'}</td><td className="p-4">{driver.assigned_vehicle_id || 'Not assigned'}</td></tr>)}</tbody></table></div>}
-      </section>
-    </div>
-  </main>;
+  const openItems = lostItems.filter(item => !['closed', 'found'].includes(item.status));
+  const sections = [
+    { id: 'overview' as const, label: 'Overview' },
+    { id: 'members' as const, label: 'Members', count: members.length },
+    { id: 'lostItems' as const, label: 'Lost item notices', count: openItems.length },
+  ];
+  return <OpsLayout title="TODA operations" person={operatorName} role="operator" group={group?.name} active={tab} sections={sections} onSelect={setTab} onSignOut={onSignOut} onRefresh={() => void refresh()}>
+    {error && <p role="alert" className="mb-5 flex items-center gap-2 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><CircleAlert className="h-4 w-4" />{error}</p>}
+    <div className="mb-5"><h1 className="text-xl font-semibold">{group?.name || 'Your TODA group'}</h1><p className="mt-1 text-sm text-slate-500">{tab === 'overview' ? 'Group activity and member status' : tab === 'members' ? 'Read-only driver roster' : 'New and unresolved lost-item reports'}</p></div>
+    {tab === 'overview' && <div className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[['Group members', members.length], ['Verified drivers', members.filter(driver => driver.verification_status === 'verified').length], ['Pending verification', members.filter(driver => driver.verification_status === 'pending').length], ['Open lost-item notices', openItems.length]].map(([label, value]) => <div key={label} className={`${card} border-l-4 border-l-[#367fa9] p-5`}><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-3xl font-semibold text-slate-800">{value}</p></div>)}
+      </div>
+      <section className={`${card} overflow-hidden`}><div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div className="flex items-center gap-2"><Bell className="h-4 w-4 text-amber-600" /><h2 className="font-semibold">Lost item notifications</h2></div><button onClick={() => setTab('lostItems')} className="text-sm font-medium text-[#286b8e] hover:underline">View all</button></div>{openItems.length ? <LostTable items={openItems.slice(0, 5)} /> : <p className="p-8 text-center text-sm text-slate-500">No open lost-item reports for this group.</p>}</section>
+    </div>}
+    {tab === 'members' && <section className={`${card} overflow-hidden`}><div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div className="flex items-center gap-2"><Users className="h-4 w-4 text-[#367fa9]" /><h2 className="font-semibold">Driver members</h2></div><span className="text-xs text-slate-500">Read only · {members.length} members</span></div>{members.length ? <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="bg-[#f4f6f9] text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Driver</th><th className="px-4 py-3">Driver code</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Vehicle</th></tr></thead><tbody>{members.map(driver => <tr key={driver.driver_id} className="border-t border-slate-200"><td className="px-4 py-3 font-medium">{driver.name}</td><td className="px-4 py-3 font-mono text-xs">{driver.driver_id}</td><td className="px-4 py-3"><Status value={driver.verification_status} /></td><td className="px-4 py-3 text-slate-600">{driver.assigned_vehicle_id || 'Not assigned'}</td></tr>)}</tbody></table></div> : <p className="p-8 text-center text-sm text-slate-500">No members have been assigned by the TalaRide administrator.</p>}</section>}
+    {tab === 'lostItems' && <section className={`${card} overflow-hidden`}><div className="flex items-center gap-2 border-b border-slate-200 px-5 py-4"><Bell className="h-4 w-4 text-amber-600" /><h2 className="font-semibold">Lost item notices</h2></div>{lostItems.length ? <LostTable items={lostItems} /> : <p className="p-8 text-center text-sm text-slate-500">No lost-item reports have been filed by this group’s passengers.</p>}</section>}
+  </OpsLayout>;
+}
+function Status({ value }: { value: string }) {
+  const text = value === 'verified' ? 'Verified' : value === 'pending' ? 'Pending admin review' : 'Suspended';
+  const style = value === 'verified' ? 'bg-green-50 text-green-800' : value === 'pending' ? 'bg-amber-50 text-amber-800' : 'bg-red-50 text-red-700';
+  return <span className={`rounded px-2 py-1 text-xs ${style}`}>{text}</span>;
+}
+function LostTable({ items }: { items: LostNotice[] }) {
+  return <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead className="bg-[#f4f6f9] text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Reported</th><th className="px-4 py-3">Item</th><th className="px-4 py-3">Details</th><th className="px-4 py-3">Driver / vehicle</th><th className="px-4 py-3">Status</th></tr></thead><tbody>{items.map(item => <tr key={item.report_id} className="border-t border-slate-200"><td className="whitespace-nowrap px-4 py-3 text-slate-600">{new Date(item.created_at).toLocaleString()}</td><td className="px-4 py-3 font-medium capitalize">{item.item_category.replace(/_/g, ' ')}</td><td className="max-w-sm px-4 py-3 text-slate-600">{item.description}</td><td className="px-4 py-3 text-slate-600">{item.driver_code}<br />{item.vehicle_code}</td><td className="px-4 py-3"><span className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">{(item.driver_response || item.status).replace(/_/g, ' ')}</span></td></tr>)}</tbody></table></div>;
 }

@@ -196,10 +196,17 @@ export const api = {
     const data = await apiJson<{ group: { id: string; name: string }; members: any[] }>('/toda/members');
     return { group: data.group, members: data.members.map(normalizeDriver) };
   },
-  addTodaMember: (driverCode: string) => apiJson<{ driver: unknown }>('/toda/members', { method: 'POST', body: JSON.stringify({ driver_code: driverCode }) }),
+  getTodaLostItems: async (): Promise<any[]> => (await apiJson<{ items: any[] }>('/toda/lost-items')).items,
+  getAdminTodaGroups: async (): Promise<{ id: string; name: string; members: Driver[] }[]> => {
+    const groups = await apiJson<any[]>('/admin/toda-groups');
+    return groups.map(group => ({ ...group, members: (group.members || []).map(normalizeDriver) }));
+  },
+  createTodaGroup: (name: string) => apiJson<{ group: { id: string; name: string }; members: Driver[] }>('/admin/toda-groups', { method: 'POST', body: JSON.stringify({ name }) }),
+  assignDriverToTodaGroup: (groupId: string, driverCode: string) => apiJson<any>(`/admin/toda-groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(driverCode)}`, { method: 'POST' }),
+  inviteTodaOperator: (data: { name: string; email: string; groupId?: string; groupName?: string }) => apiJson<any>('/admin/toda-operators', { method: 'POST', body: JSON.stringify(data) }),
   enrollDriver: (data: { full_name: string; mobile_number: string; toda_operator: string; license_number: string }) => apiJson<any>('/drivers/enroll', { method: 'POST', body: JSON.stringify(data) }),
   getDriverNotifications: (code: string) => apiJson<any>(`/drivers/${encodeURIComponent(code)}/notifications`),
-  requestOtp: async (mobileNumber: string, role = 'commuter') =>
+  requestOtp: async (mobileNumber: string, role = 'passenger') =>
     apiJson<any>('/auth/otp-request', {
       method: 'POST',
       body: JSON.stringify({ mobileNumber, role })
@@ -208,7 +215,7 @@ export const api = {
   verifyOtp: async (
     mobileNumber: string,
     otp: string,
-    role = 'commuter',
+    role = 'passenger',
     name?: string,
     pin?: string
   ) => {

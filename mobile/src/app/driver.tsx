@@ -143,12 +143,6 @@ function DriverAccountScreen() {
   return (
     <Screen>
       <Header title="Driver portal" />
-      <Button
-        label="Switch to commuter"
-        variant="outline"
-        onPress={() => replace('/home')}
-        style={{ marginBottom: 16 }}
-      />
       {!account ? (
         <Card>
           <Copy>{error || 'Loading your driver account...'}</Copy>

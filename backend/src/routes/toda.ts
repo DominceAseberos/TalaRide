@@ -14,22 +14,24 @@ todaRouter.use((req, res, next) => {
 todaRouter.get('/members', async (req, res, next) => {
   try {
     const group = req.user!.toda_group!;
-    const members = (await repository.getAllDrivers()).filter(driver => driver.toda_group_id === group.id);
+    const members = (await repository.getAllDrivers()).filter(driver => driver.toda_group_id === group.id).map(driver => ({
+      driver_code: driver.driver_code, full_name: driver.full_name,
+      verification_status: driver.verification_status, toda_operator: driver.toda_operator,
+      assigned_vehicle_code: driver.assigned_vehicle_code, shift_status: driver.shift_status,
+      active_shift_id: driver.active_shift_id, photo_url: driver.photo_url, created_at: driver.created_at,
+    }));
     res.json({ group, members });
   } catch (error) { next(error); }
 });
-
-const AddMember = z.object({ driver_code: z.string().trim().toUpperCase().regex(/^DR-\d{6}$/) }).strict();
-todaRouter.post('/members', async (req, res, next) => {
-  const parsed = AddMember.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Enter the registered driver code, for example DR-123456.' });
+todaRouter.get('/lost-items', async (req, res, next) => {
   try {
     const group = req.user!.toda_group!;
-    const driver = await repository.addDriverToToda(parsed.data.driver_code, group, req.user!.id);
-    if (!driver) return res.status(404).json({ message: 'Driver not found. Ask the driver to register in the mobile app first.' });
-    res.json({ group, driver });
-  } catch (error) {
-    if (error instanceof Error && error.message.startsWith('Driver already belongs')) return res.status(409).json({ message: error.message });
-    next(error);
-  }
+    const driverCodes = new Set((await repository.getAllDrivers()).filter(driver => driver.toda_group_id === group.id).map(driver => driver.driver_code));
+    const items = (await repository.getLostItems()).filter(item => driverCodes.has(item.driver_code)).map(item => ({
+      report_id: item.report_id, ride_id: item.ride_id, vehicle_code: item.vehicle_code,
+      driver_code: item.driver_code, item_category: item.item_category, description: item.description,
+      status: item.status, driver_response: item.driver_response, created_at: item.created_at,
+    }));
+    res.json({ group, items });
+  } catch (error) { next(error); }
 });

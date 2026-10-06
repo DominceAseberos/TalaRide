@@ -1,16 +1,30 @@
 import { requireSupabase } from './client';
-export type UserProfile = { id: string; display_name: string; avatar_url?: string | null };
+export type AppRole = 'admin' | 'operator' | 'passenger' | 'driver';
+export type UserProfile = { id: string; display_name: string; avatar_url?: string | null; role: AppRole };
+function canonicalRole(value: unknown): AppRole | null {
+  if (value === 'admin' || value === 'talaride_admin' || value === 'lgu_admin') return 'admin';
+  if (value === 'operator' || value === 'passenger' || value === 'driver') return value;
+  if (value === 'toda_operator') return 'operator';
+  if (value === 'commuter') return 'passenger';
+  return null;
+}
 export async function loadProfile(id: string): Promise<UserProfile> {
-  const { data, error } = await requireSupabase()
+  const client = requireSupabase();
+  const [{ data, error }, { data: authData }] = await Promise.all([client
     .from('profiles')
-    .select('id, display_name, avatar_url')
+    .select('id, display_name, avatar_url, role')
     .eq('id', id)
-    .single();
+    .single(), client.auth.getUser()]);
   if (error)
     throw new Error(
       'Your cloud profile could not be loaded. Check your connection and the profile migration.',
     );
-  return data as UserProfile;
+  const savedRole = canonicalRole(data.role) || 'passenger';
+  const authRole = authData.user?.id === id ? canonicalRole(authData.user.app_metadata?.role) : null;
+  const role = authRole === 'admin' || authRole === 'operator' || authRole === 'driver'
+    ? authRole
+    : savedRole;
+  return { ...data, role } as UserProfile;
 }
 export async function saveProfile(id: string, name: string, avatarUrl?: string | null) {
   name = name.trim();
@@ -26,7 +40,7 @@ export async function saveProfile(id: string, name: string, avatarUrl?: string |
     .from('profiles')
     .update(updates)
     .eq('id', id)
-    .select('id, display_name, avatar_url')
+    .select('id, display_name, avatar_url, role')
     .single();
   if (error)
     throw new Error('Your profile could not be saved. Check your connection and try again.');

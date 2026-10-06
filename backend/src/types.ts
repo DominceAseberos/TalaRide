@@ -1,4 +1,4 @@
-export type AppRole = 'passenger' | 'driver' | 'operator' | 'lgu_admin' | 'talaride_admin';
+export type AppRole = 'admin' | 'operator' | 'passenger' | 'driver';
 export type DriverVerificationStatus = 'verified' | 'pending' | 'suspended';
 export type VehicleStatus = 'active' | 'maintenance' | 'inactive';
 export type ShiftStatus = 'active' | 'ended';
@@ -23,6 +23,13 @@ export interface Profile {
   status: 'active' | 'suspended' | 'pending';
   created_at: string;
   updated_at?: string;
+}
+
+export interface TodaGroup {
+  id: string;
+  name: string;
+  created_at: string;
+  created_by: string;
 }
 
 export interface Driver {

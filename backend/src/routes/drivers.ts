@@ -24,7 +24,7 @@ driversRouter.use(async (req, res, next) => {
   if (env.NODE_ENV === 'test') return next();
   if (!req.user) return res.status(401).json({ error: 'Sign in to view driver records.' });
   const code = req.path.split('/')[1];
-  if (/^DR-/.test(code) && req.user.driver_code !== code && !['talaride_admin', 'lgu_admin'].includes(req.user.role)) return res.status(403).json({ error: 'This driver record belongs to another account.' });
+  if (/^DR-/.test(code) && req.user.driver_code !== code && req.user.role !== 'admin') return res.status(403).json({ error: 'This driver record belongs to another account.' });
   next();
 });
 
@@ -136,7 +136,7 @@ driversRouter.patch('/:id/profile', optionalAuth, async (req: Request, res: Resp
   if (!req.user) return res.status(401).json({ error: 'Authentication required' });
   const canEdit =
     req.user.driver_code === String(req.params.id) ||
-    ['talaride_admin', 'operator', 'lgu_admin'].includes(req.user.role);
+    ['admin', 'operator'].includes(req.user.role);
   if (!canEdit) return res.status(403).json({ error: 'You cannot edit this driver profile' });
   const parsed = DriverPhotoSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'A valid profile image URL is required.' });

@@ -18,11 +18,13 @@ import {
   FareConfiguration,
   PaymentIssueTicket,
   NotificationRecord,
-  PaymentStatus
+  PaymentStatus,
+  TodaGroup
 } from '../types.js';
 
 interface StorageSchema {
   profiles: Profile[];
+  todaGroups: TodaGroup[];
   drivers: Driver[];
   vehicles: Vehicle[];
   shifts: DriverShift[];
@@ -91,11 +93,12 @@ export class TalaRideRepository {
           id: 'USR-ADM-001',
           mobile_number: '09990001122',
           full_name: 'Admin TalaRide',
-          role: 'talaride_admin',
+          role: 'admin',
           status: 'active',
           created_at: '2026-08-01T00:00:00.000Z'
         }
       ],
+      todaGroups: [],
       drivers: [
         {
           driver_code: 'DR-000481',
@@ -222,7 +225,7 @@ export class TalaRideRepository {
 
   private emptyState(): StorageSchema {
     return {
-      profiles: [], drivers: [], vehicles: [], shifts: [], rides: [], payments: [],
+      profiles: [], todaGroups: [], drivers: [], vehicles: [], shifts: [], rides: [], payments: [],
       paymentEvents: [], lostItems: [], rewards: [], paymentIssues: [], notifications: [],
       fareConfig: { id: 'current', standard_fares_centavos: [1500, 2000, 2500, 3000, 4000],
         min_custom_fare_centavos: 1500, max_custom_fare_centavos: 50000,
@@ -311,6 +314,26 @@ export class TalaRideRepository {
     return profile;
   }
 
+  async getTodaGroups(): Promise<TodaGroup[]> {
+    return [...(this.memoryState.todaGroups || [])].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async getTodaGroup(id: string): Promise<TodaGroup | null> {
+    return (this.memoryState.todaGroups || []).find(group => group.id === id) || null;
+  }
+
+  async createTodaGroup(name: string, createdBy: string): Promise<TodaGroup> {
+    const cleanName = name.trim();
+    if ((this.memoryState.todaGroups || []).some(group => group.name.toLowerCase() === cleanName.toLowerCase())) {
+      throw new Error('A TODA group with this name already exists.');
+    }
+    const group: TodaGroup = { id: randomUUID(), name: cleanName, created_at: new Date().toISOString(), created_by: createdBy };
+    this.memoryState.todaGroups ||= [];
+    this.memoryState.todaGroups.push(group);
+    this.persistToDisk(this.memoryState);
+    return group;
+  }
+
   // --- Drivers ---
   async getDriver(driverCode: string): Promise<Driver | null> {
     const driver = this.memoryState.drivers.find((d) => d.driver_code === driverCode);
@@ -347,6 +370,18 @@ export class TalaRideRepository {
     driver.toda_group_id = group.id;
     driver.toda_operator = group.name;
     driver.membership_added_by = operatorId;
+    driver.membership_added_at = new Date().toISOString();
+    driver.updated_at = driver.membership_added_at;
+    this.persistToDisk(this.memoryState);
+    return driver;
+  }
+
+  async assignDriverToToda(driverCode: string, group: { id: string; name: string }, adminId: string): Promise<Driver | null> {
+    const driver = this.memoryState.drivers.find(d => d.driver_code === driverCode);
+    if (!driver) return null;
+    driver.toda_group_id = group.id;
+    driver.toda_operator = group.name;
+    driver.membership_added_by = adminId;
     driver.membership_added_at = new Date().toISOString();
     driver.updated_at = driver.membership_added_at;
     this.persistToDisk(this.memoryState);

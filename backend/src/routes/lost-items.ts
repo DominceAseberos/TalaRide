@@ -49,7 +49,7 @@ lostItemsRouter.post('/lost-item-report', optionalAuth, async (req: Request, res
       return res.status(404).json({ error: 'Ride record not found' });
     }
 
-    if (req.user && !['talaride_admin', 'lgu_admin'].includes(req.user.role) && ride.passenger_id !== req.user.id) return res.status(403).json({ error: 'You can only report items from your own ride.' });
+    if (req.user && req.user.role !== 'admin' && ride.passenger_id !== req.user.id) return res.status(403).json({ error: 'You can only report items from your own ride.' });
     const reportId = `LIR-${randomUUID()}`;
     const newReport: LostItemReport = {
       report_id: reportId,
@@ -110,7 +110,7 @@ lostItemsRouter.post('/lost-item-respond', optionalAuth, async (req: Request, re
 
     const { report_id, response, note } = parsed.data;
 
-    if (req.user && !['talaride_admin', 'lgu_admin'].includes(req.user.role)) {
+    if (req.user && req.user.role !== 'admin') {
       if (!req.user.driver_code) return res.status(403).json({ error: 'Driver account required.' });
       const ownReports = await repository.getLostItems({ driver_code: req.user.driver_code });
       if (!ownReports.some(report => report.report_id === report_id)) return res.status(403).json({ error: 'Report belongs to another driver.' });
@@ -135,7 +135,7 @@ lostItemsRouter.post('/lost-item-respond', optionalAuth, async (req: Request, re
 lostItemsRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
   try {
     const driverCode = req.user?.role === 'driver' ? req.user.driver_code || '__none__' : (req.query.driver_code || req.query.driverId) as string | undefined;
-    const passengerId = req.user && !['driver', 'talaride_admin', 'lgu_admin'].includes(req.user.role) ? req.user.id : (req.query.passenger_id || req.query.passengerId) as string | undefined;
+    const passengerId = req.user && !['driver', 'admin', 'operator'].includes(req.user.role) ? req.user.id : (req.query.passenger_id || req.query.passengerId) as string | undefined;
 
     const reports = await repository.getLostItems({
       driver_code: driverCode,

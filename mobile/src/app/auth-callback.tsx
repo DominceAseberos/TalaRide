@@ -6,6 +6,7 @@ import { Button, Copy, Title, replace } from '@/components/ui';
 import { requireSupabase } from '@/auth/client';
 import { parseAuthCallback } from '@/auth/config';
 import { useAuth } from '@/auth/AuthProvider';
+import { loadProfile } from '@/auth/profiles';
 
 export default function AuthCallback() {
   const link = Linking.useURL();
@@ -33,7 +34,8 @@ export default function AuthCallback() {
         if (result.error)
           throw new Error('This authentication link is invalid or expired. Request a new link.');
         if (Platform.OS === 'web') window.history.replaceState({}, '', '/auth-callback');
-        replace(callback.recovery ? '/sign-in' : result.data.session?.user.user_metadata?.requested_role === 'driver' ? '/driver-portal' : '/home');
+        const callbackRole = result.data.session ? await loadProfile(result.data.session.user.id) : null;
+        replace(callback.recovery ? '/sign-in' : callbackRole?.role === 'driver' ? '/driver-portal' : callbackRole?.role === 'admin' || callbackRole?.role === 'operator' ? '/staff-account' : '/home');
       } catch (failure) {
         if (Platform.OS === 'web') window.history.replaceState({}, '', '/auth-callback');
         setRecovery(false);

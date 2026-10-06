@@ -6,12 +6,14 @@ import { Notice } from '@/components/Notice';
 import { ConfirmEmail } from '@/components/ConfirmEmail';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/auth/AuthProvider';
+import { loadProfile } from '@/auth/profiles';
+import { requireSupabase } from '@/auth/client';
 import { performEmailAction } from '@/auth/actions';
 
 export default function SignInScreen() {
   const { recovery, setRecovery, signOut, error: sessionError } = useAuth();
   const [mode, setMode] = useState<'signin' | 'register' | 'recover'>('signin');
-  const [accountType, setAccountType] = useState<'commuter' | 'driver'>('commuter');
+  const [accountType, setAccountType] = useState<'passenger' | 'driver'>('passenger');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
@@ -21,6 +23,12 @@ export default function SignInScreen() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [confirmation, setConfirmation] = useState(false);
+  async function destinationForSignedInAccount() {
+    const { data, error: userError } = await requireSupabase().auth.getUser();
+    if (userError || !data.user) return '/home';
+    const currentProfile = await loadProfile(data.user.id);
+    return currentProfile.role === 'driver' ? '/driver-portal' : currentProfile.role === 'admin' || currentProfile.role === 'operator' ? '/staff-account' : '/home';
+  }
   async function submit() {
     if (locked.current) return;
     setError('');
@@ -28,14 +36,13 @@ export default function SignInScreen() {
     setBusy(true);
     try {
       const result = await performEmailAction(recovery ? 'reset' : mode, email, password, name, accountType);
-      const destination = accountType === 'driver' ? '/driver-portal' : '/home';
       if (recovery) {
         setPassword('');
         setRecovery(false);
-        replace('/home');
+        replace(await destinationForSignedInAccount());
       } else if (mode === 'register') {
         setPassword('');
-        if (result === 'authenticated') replace(destination);
+        if (result === 'authenticated') replace(await destinationForSignedInAccount());
         else {
           setMode('signin');
           setConfirmation(true);
@@ -47,7 +54,7 @@ export default function SignInScreen() {
         );
       } else {
         setPassword('');
-        replace(destination);
+        replace(await destinationForSignedInAccount());
       }
     } catch (failure) {
       if (failure instanceof Error && failure.message.toLowerCase().includes('email not confirmed')) setConfirmation(true);
@@ -107,13 +114,13 @@ export default function SignInScreen() {
               : (accountType === 'driver' ? 'Sign in to manage your driver profile, QR, shifts, and notifications.' : 'Sign in to scan rides, pay fares, and view your ride history.')}
       </Copy>
       {!recovery && mode !== 'recover' && <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
-        {(['commuter', 'driver'] as const).map(type => <Pressable key={type}
-          accessibilityRole="button" accessibilityLabel={type === 'driver' ? 'Driver account' : 'Commuter account'}
+        {(['passenger', 'driver'] as const).map(type => <Pressable key={type}
+          accessibilityRole="button" accessibilityLabel={type === 'driver' ? 'Driver account' : 'Passenger account'}
           accessibilityState={{ selected: accountType === type }} disabled={busy}
           onPress={() => setAccountType(type)}
           style={{ flex: 1, alignItems: 'center', borderWidth: 1, borderColor: accountType === type ? colors.green : colors.border, backgroundColor: accountType === type ? colors.paleGreen : colors.white, borderRadius: 12, padding: 14 }}>
           <Icon name={type === 'driver' ? 'car-outline' : 'person-outline'} size={24} color={colors.darkGreen} />
-          <Copy bold style={{ marginTop: 5 }}>{type === 'driver' ? 'Driver' : 'Commuter'}</Copy>
+          <Copy bold style={{ marginTop: 5 }}>{type === 'driver' ? 'Driver' : 'Passenger'}</Copy>
         </Pressable>)}
       </View>}
       <View style={{ gap: 10 }}>

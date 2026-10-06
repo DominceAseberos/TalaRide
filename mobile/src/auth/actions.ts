@@ -13,7 +13,7 @@ export async function performEmailAction(
   email: string,
   password: string,
   name = '',
-  accountType: 'commuter' | 'driver' = 'commuter',
+  accountType: 'passenger' | 'driver' = 'passenger',
 ) {
   const client = requireSupabase();
   email = email.trim();

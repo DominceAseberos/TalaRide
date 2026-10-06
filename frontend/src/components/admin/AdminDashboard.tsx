@@ -4,12 +4,13 @@ import {
   HelpCircle,
   Search,
   Printer,
-  Plus,
-  RefreshCw
+  Plus
 } from 'lucide-react';
 import { VehicleSticker } from '../common/VehicleSticker';
 import { Driver, Vehicle, Payment, LostItemReport, PaymentIssueTicket, FareConfiguration } from '../../types';
 import { api } from '../../services/api';
+import { OpsLayout, type OpsSection } from '../ops/OpsLayout';
+import { TodaManagement } from './TodaManagement';
 
 interface Props {
   operatorName?: string;
@@ -19,7 +20,7 @@ interface Props {
 }
 
 export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Admin', todaName = 'TalaRide administration', onSignOut, canVerify = true }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'drivers' | 'vehicles' | 'transactions' | 'lostItems' | 'issues' | 'fares'>('overview');
+  const [activeTab, setActiveTab] = useState<OpsSection>('overview');
   const [overview, setOverview] = useState<any>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -31,12 +32,6 @@ export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Admin
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [verifyingDriver, setVerifyingDriver] = useState<string | null>(null);
-
-  // New Driver Form state
-  const [showAddDriver, setShowAddDriver] = useState(false);
-  const [newDriverName, setNewDriverName] = useState('');
-  const [newDriverMobile, setNewDriverMobile] = useState('');
-  const [newDriverToda, setNewDriverToda] = useState('Tagum Poblacion TODA');
 
   // New Vehicle Form state
   const [showAddVehicle, setShowAddVehicle] = useState(false);
@@ -131,23 +126,6 @@ export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Admin
     await loadAllData();
   };
 
-  const handleAddDriver = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await fetch('/api/admin/drivers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: newDriverName,
-        mobile_number: newDriverMobile,
-        toda_operator: newDriverToda
-      })
-    });
-    setShowAddDriver(false);
-    setNewDriverName('');
-    setNewDriverMobile('');
-    await loadAllData();
-  };
-
   const handleAddVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
     await api.registerVehicle({
@@ -178,92 +156,19 @@ export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Admin
   );
 
   return (
-    <div className="min-h-screen bg-canvas text-ink flex flex-col ">
-      {/* Admin Top Navigation */}
-      <div className="bg-white border-b border-line px-6 py-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-accent flex items-center justify-center font-semibold text-white text-lg">
-            T
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-semibold text-ink text-lg tracking-tight">TalaRide Ops Portal</h1>
-                <span className="text-[10px] uppercase font-bold bg-accent-soft text-accent border border-line px-2 py-0.5 rounded">
-                {todaName}
-              </span>
-            </div>
-            <p className="text-xs text-muted">{operatorName} · TODA operations dashboard</p>
-          </div>
-        </div>
-
-        {/* Tab links */}
-        <div className="flex max-w-full flex-wrap items-center gap-1.5 bg-white p-1 rounded-xl border border-line text-xs font-semibold">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'overview' ? 'bg-accent-soft text-accent' : 'text-muted hover:text-ink'}`}
-          >
-            Overview
-          </button>
-          <button
-            onClick={() => setActiveTab('drivers')}
-            className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'drivers' ? 'bg-accent-soft text-accent' : 'text-muted hover:text-ink'}`}
-          >
-            Drivers ({drivers.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('vehicles')}
-            className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'vehicles' ? 'bg-accent-soft text-accent' : 'text-muted hover:text-ink'}`}
-          >
-            Vehicles ({vehicles.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('transactions')}
-            className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'transactions' ? 'bg-accent-soft text-accent' : 'text-muted hover:text-ink'}`}
-          >
-            Transactions
-          </button>
-          <button
-            onClick={() => setActiveTab('lostItems')}
-            className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'lostItems' ? 'bg-accent-soft text-accent' : 'text-muted hover:text-ink'}`}
-          >
-            Lost Items ({lostItems.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('issues')}
-            className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'issues' ? 'bg-accent-soft text-accent' : 'text-muted hover:text-ink'}`}
-          >
-            Issues ({paymentIssues.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('fares')}
-            className={`px-3 py-1.5 rounded-lg transition ${activeTab === 'fares' ? 'bg-accent-soft text-accent' : 'text-muted hover:text-ink'}`}
-          >
-            Fare Config
-          </button>
-        </div>
-
-        <button
-          onClick={loadAllData}
-          disabled={loading}
-          className="p-2 bg-subtle hover:bg-line text-ink rounded-xl transition"
-          title="Refresh Data"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
-        {onSignOut && (
-          <button
-            onClick={onSignOut}
-            className="rounded-xl border border-line px-3 py-2 text-xs font-bold text-ink transition hover:border-line hover:text-ink"
-          >
-            Sign out
-          </button>
-        )}
-      </div>
+    <OpsLayout title="TalaRide administration" person={operatorName} role="admin" group={todaName} active={activeTab}
+      onSelect={setActiveTab} onSignOut={onSignOut} onRefresh={loadAllData} loading={loading}
+      sections={[
+        { id: 'overview', label: 'Overview' }, { id: 'drivers', label: 'Driver verification', count: drivers.filter(driver => driver.verification_status === 'pending').length },
+        { id: 'groups', label: 'TODA groups' }, { id: 'vehicles', label: 'Vehicles', count: vehicles.length },
+        { id: 'transactions', label: 'Transactions' }, { id: 'lostItems', label: 'Lost items', count: lostItems.filter(item => item.status !== 'closed' && item.status !== 'found').length },
+        { id: 'issues', label: 'Payment issues', count: paymentIssues.filter(issue => issue.status === 'pending').length }, { id: 'fares', label: 'Fare settings' },
+      ]}>
 
       {loadError && <p role="alert" className="m-4 rounded-xl bg-danger-soft p-4 text-danger">{loadError}</p>}
       {canVerify && drivers.some(driver => driver.verification_status === 'pending') && <button onClick={() => setActiveTab('drivers')} className="mx-4 mt-4 rounded-xl border border-line bg-white p-4 text-left text-sm font-semibold text-accent">{drivers.filter(driver => driver.verification_status === 'pending').length} driver verification request(s) awaiting your review →</button>}
       {/* Main Content Area */}
-      <div className="p-4 sm:p-6 max-w-7xl mx-auto w-full space-y-6 flex-1">
+      <div className="space-y-6">
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
@@ -300,6 +205,19 @@ export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Admin
                 <div className="text-3xl font-semibold text-warning font-mono">{overview?.metrics?.average_confirmation_speed_seconds ?? "—"}</div>
                 <div className="text-xs text-muted">From scan to driver chime</div>
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                ['Registered drivers', drivers.length, 'Driver accounts in TalaRide'],
+                ['TODA groups', overview?.metrics?.total_toda_groups ?? 0, 'Groups managed by this portal'],
+                ['Verified drivers', overview?.metrics?.verified_drivers ?? 0, 'Approved by an administrator'],
+                ['Open lost-item reports', lostItems.filter(item => !['closed', 'found'].includes(item.status)).length, 'Awaiting follow-up'],
+              ].map(([label, value, detail]) => <div key={label} className="rounded border border-slate-200 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-800">{value}</p>
+                <p className="mt-1 text-xs text-slate-500">{detail}</p>
+              </div>)}
             </div>
 
             {/* Quick Status Summaries */}
@@ -737,6 +655,7 @@ export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Admin
             </div>
           </div>
         )}
+        {activeTab === 'groups' && <TodaManagement />}
       </div>
 
       {/* Printable Vehicle Sticker Modal */}
@@ -776,65 +695,6 @@ export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Admin
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Register Driver Modal */}
-      {showAddDriver && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/20  p-4">
-          <form onSubmit={handleAddDriver} className="bg-white border border-line rounded-2xl max-w-md w-full p-6 space-y-4 text-ink shadow-none">
-            <h3 className="text-lg font-bold text-ink">Register New Tricycle Driver</h3>
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block text-muted mb-1">Driver Full Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Danilo Mendoza"
-                  value={newDriverName}
-                  onChange={(e) => setNewDriverName(e.target.value)}
-                  className="w-full p-3 bg-subtle border border-line rounded-xl text-ink font-medium"
-                />
-              </div>
-              <div>
-                <label className="block text-muted mb-1">Mobile Number</label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="09170001122"
-                  value={newDriverMobile}
-                  onChange={(e) => setNewDriverMobile(e.target.value)}
-                  className="w-full p-3 bg-subtle border border-line rounded-xl text-ink font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-muted mb-1">TODA Association</label>
-                <input
-                  type="text"
-                  required
-                  value={newDriverToda}
-                  onChange={(e) => setNewDriverToda(e.target.value)}
-                  className="w-full p-3 bg-subtle border border-line rounded-xl text-ink font-medium"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowAddDriver(false)}
-                className="flex-1 py-3 bg-subtle rounded-xl text-xs font-semibold text-muted"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="flex-1 py-3 bg-accent hover:bg-accent-hover rounded-xl text-xs font-bold text-white"
-              >
-                Register
-              </button>
-            </div>
-          </form>
         </div>
       )}
 
@@ -896,6 +756,6 @@ export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Admin
           </form>
         </div>
       )}
-    </div>
+    </OpsLayout>
   );
 };

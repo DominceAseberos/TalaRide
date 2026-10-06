@@ -12,7 +12,7 @@ rewardsRouter.get('/rewards-me', optionalAuth, async (req: Request, res: Respons
   try {
     const userId = req.user?.id || (req.query.user_id as string) || (req.query.userId as string) || '';
     if (!userId) return res.status(401).json({ error: 'Sign in to see rewards.' });
-    if (req.user && req.user.id !== userId && !['talaride_admin', 'lgu_admin'].includes(req.user.role)) return res.status(403).json({ error: 'Rewards belong to another account.' });
+    if (req.user && req.user.id !== userId && req.user.role !== 'admin') return res.status(403).json({ error: 'Rewards belong to another account.' });
     const data = await repository.getRewardsForUser(userId);
 
     return res.json({
@@ -42,7 +42,7 @@ rewardsRouter.get('/:userId', async (req: Request, res: Response) => {
   try {
     const userId = String(req.params.userId);
     if (!userId) return res.status(401).json({ error: 'Sign in to see rewards.' });
-    if (req.user && req.user.id !== userId && !['talaride_admin', 'lgu_admin'].includes(req.user.role)) return res.status(403).json({ error: 'Rewards belong to another account.' });
+    if (req.user && req.user.id !== userId && req.user.role !== 'admin') return res.status(403).json({ error: 'Rewards belong to another account.' });
     const data = await repository.getRewardsForUser(userId);
 
     return res.json({
