@@ -262,20 +262,26 @@ export class TalaRideRepository {
 
   async checkReadiness(): Promise<{ ready: boolean; details: any }> {
     let databaseReady = env.NODE_ENV !== 'production';
+    let commitFunctionReady = env.NODE_ENV !== 'production';
     if (env.NODE_ENV === 'production') {
       const { error } = await supabaseAdmin.from('talaride_backend_state').select('id').limit(1);
       databaseReady = !error;
+      const commit = await supabaseAdmin.rpc('talaride_commit_state', { expected_revision: -1, next_state: {} });
+      commitFunctionReady = !commit.error && commit.data === false;
     }
-    const liveConfiguration = env.NODE_ENV !== 'production' || (
-      !env.DEMO_AUTH && env.PAYMENT_MODE === 'live' &&
-      env.PAYMENT_PROVIDER_KEY.startsWith('sk_live_') &&
-      env.QR_INTENT_SECRET.length >= 32 && !env.QR_INTENT_SECRET.includes('talaride_qr_secret') &&
-      !!env.PAYMENT_WEBHOOK_SECRET && !env.PAYMENT_WEBHOOK_SECRET.startsWith('mock_')
-    );
-    return { ready: databaseReady && liveConfiguration, details: {
+    const configuration = {
+      demoAuthDisabled: !env.DEMO_AUTH,
+      livePaymentsEnabled: env.PAYMENT_MODE === 'live',
+      liveProviderKeyConfigured: env.PAYMENT_PROVIDER_KEY.startsWith('sk_live_'),
+      publicAuthKeyConfigured: !!env.SUPABASE_PUBLISHABLE_KEY,
+      qrSigningConfigured: env.QR_INTENT_SECRET.length >= 32 && !env.QR_INTENT_SECRET.includes('talaride_qr_secret'),
+      webhookConfigured: !!env.PAYMENT_WEBHOOK_SECRET && !env.PAYMENT_WEBHOOK_SECRET.startsWith('mock_'),
+    };
+    const liveConfiguration = env.NODE_ENV !== 'production' || Object.values(configuration).every(Boolean);
+    return { ready: databaseReady && commitFunctionReady && liveConfiguration, details: {
       durablePersistenceReady: databaseReady, environment: env.NODE_ENV,
       persistence: env.NODE_ENV === 'production' ? 'supabase' : 'test-local',
-      paymentMode: env.PAYMENT_MODE, liveConfiguration,
+      paymentMode: env.PAYMENT_MODE, liveConfiguration, commitFunctionReady, configuration,
     } };
   }
 

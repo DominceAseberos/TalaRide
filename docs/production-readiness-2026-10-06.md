@@ -1,6 +1,6 @@
 # Production preparation — 6 October 2026
 
-Status: source changes prepared; **not deployed or released**. Do not describe this snapshot as fully production-ready.
+Status: the user manually applied the backend storage SQL and returned all four verification checks as true. Deployment of the prepared account/QR update is authorized and in progress. The broader product is not yet fully production-ready; remaining integration is listed below.
 
 ## Implemented in this snapshot
 
@@ -26,4 +26,4 @@ Status: source changes prepared; **not deployed or released**. Do not describe t
 
 Final `pnpm check` passed: repository type checking, frontend/mobile lint, 39 backend tests, 52 mobile tests, and configured frontend/backend/shared builds. The mobile production environment verification also passed. This does not build an Android APK. Backend tests cover demo-token rejection, signup privilege escalation, authenticated manual lookup, session ownership/reservation/expiry, and payment workflows. Mobile tests include PostgreSQL validation of the new storage migration's client-access restrictions and stale-write rejection. Final verification results should be recorded alongside the resulting commit.
 
-Keep these changes off auto-deploying `main` until the required schema, environment configuration, outstanding integration and real-account checks are complete.
+Production startup now validates database table access, the commit RPC and required configuration before opening its port. A failed startup must be corrected through the existing Render service environment; do not weaken database grants or re-enable demo access. Remaining product integration is not represented as complete by deploying this account/QR update.

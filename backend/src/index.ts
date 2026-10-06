@@ -174,9 +174,18 @@ const isTestEnv =
   process.argv.some((arg) => arg.includes('test'));
 
 if (!isTestEnv) {
-  app.listen(PORT, () => {
-    console.log(`🚀 TalaRide Canonical Backend running on http://localhost:${PORT}`);
-    console.log(`📡 Secure Authenticated SSE stream at http://localhost:${PORT}/api/events`);
-    console.log(`🔒 Payment Mode: ${env.PAYMENT_MODE.toUpperCase()}`);
+  void repository.checkReadiness().then(({ ready, details }) => {
+    if (env.NODE_ENV === 'production' && !ready) {
+      console.error('Production startup blocked by missing configuration:', JSON.stringify(details));
+      process.exitCode = 1;
+      return;
+    }
+    app.listen(PORT, () => {
+      console.log(`TalaRide backend listening on port ${PORT}`);
+      console.log(`Payment mode: ${env.PAYMENT_MODE.toUpperCase()}`);
+    });
+  }).catch(() => {
+    console.error('Production startup could not verify database readiness.');
+    process.exitCode = 1;
   });
 }
