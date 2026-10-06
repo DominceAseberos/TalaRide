@@ -176,7 +176,7 @@ Deno.serve(async (request) => {
       const { data, error } = await admin
         .from('relay_notifications')
         .select(
-          'id, request_id, match_id, kind, is_read, created_at, lost_item_requests!inner(item_description, additional_details, status, expires_at), relay_matches(response)',
+          'id, request_id, match_id, kind, is_read, created_at, lost_item_requests!inner(item_description, additional_details, image_url, status, expires_at), relay_matches(response)',
         )
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
@@ -198,6 +198,7 @@ Deno.serve(async (request) => {
               item.kind === 'relay_prompt' ? requestRow?.item_description : undefined,
             additional_details:
               item.kind === 'relay_prompt' ? requestRow?.additional_details : undefined,
+            image_url: item.kind === 'relay_prompt' ? requestRow?.image_url : undefined,
             request_status: requestRow?.status,
             expires_at: requestRow?.expires_at,
             match_response: matchRow?.response ?? null,
@@ -222,7 +223,7 @@ Deno.serve(async (request) => {
       const { data, error } = await admin
         .from('lost_item_requests')
         .select(
-          'id, local_ride_id, item_description, additional_details, status, created_at, expires_at',
+          'id, local_ride_id, item_description, additional_details, image_url, status, created_at, expires_at',
         )
         .eq('owner_id', user.id)
         .order('created_at', { ascending: false })
@@ -234,6 +235,9 @@ Deno.serve(async (request) => {
       const item = text(body.description, 150, true);
       const details = text(body.details ?? '', 500);
       const localRideId = text(body.rideId, 100, true);
+      const imageUrl = body.imageUrl == null ? null : text(body.imageUrl, 1200);
+      if (imageUrl && !imageUrl.startsWith(`${url}/storage/v1/object/public/lost-item-images/`))
+        return reply(400, { error: 'Invalid lost-item image.' });
       const vehicleDigest = await digest(vehicle(body.vehicle), matchSecret);
       const { data, error } = await admin
         .from('lost_item_requests')
@@ -243,9 +247,10 @@ Deno.serve(async (request) => {
           vehicle_digest: vehicleDigest,
           item_description: item,
           additional_details: details,
+          image_url: imageUrl,
         })
         .select(
-          'id, local_ride_id, item_description, additional_details, status, created_at, expires_at',
+          'id, local_ride_id, item_description, additional_details, image_url, status, created_at, expires_at',
         )
         .single();
       if (error?.code === '23505')
@@ -257,7 +262,7 @@ Deno.serve(async (request) => {
       const vehicleDigest = await digest(vehicle(body.vehicle), matchSecret);
       const { data: requests, error } = await admin
         .from('lost_item_requests')
-        .select('id, owner_id, item_description, additional_details, created_at, expires_at')
+        .select('id, owner_id, item_description, additional_details, image_url, created_at, expires_at')
         .eq('vehicle_digest', vehicleDigest)
         .eq('status', 'active')
         .lt('created_at', now.toISOString())
@@ -282,6 +287,7 @@ Deno.serve(async (request) => {
             requestId: item.id,
             description: item.item_description,
             details: item.additional_details,
+            image_url: item.image_url,
             createdAt: item.created_at,
             expiresAt: item.expires_at,
           });

@@ -1,21 +1,48 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Screen } from '@/components/Screen';
 import { Button, Copy, Field, Header, Icon, Title, replace, s } from '@/components/ui';
 import { MissingRide } from '@/components/MissingRide';
 import { useMock } from '@/mocks/MockProvider';
 import { colors } from '@/constants/theme';
+import { useAuth } from '@/auth/AuthProvider';
+import { uploadLostItemImage } from '@/auth/profiles';
 
 export default function ReportLostItemScreen() {
   const { id = '1234' } = useLocalSearchParams<{ id?: string }>();
   const { rides, createRequest } = useMock();
+  const { session } = useAuth();
   const ride = rides.find((item) => item.id === id);
   const [description, setDescription] = useState('');
   const [details, setDetails] = useState('');
+  const [imageUri, setImageUri] = useState('');
+  const [imageMime, setImageMime] = useState('image/jpeg');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const submitted = useRef(false);
+  async function chooseImage() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setError('Allow photo access to attach a lost-item image.');
+      return;
+    }
+    const picked = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.75,
+    });
+    const asset = picked.canceled ? undefined : picked.assets[0];
+    if (!asset?.uri) return;
+    if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+      setError('Choose an image smaller than 5 MB.');
+      return;
+    }
+    setImageUri(asset.uri);
+    setImageMime(asset.mimeType ?? 'image/jpeg');
+    setError('');
+  }
   if (!ride) return <MissingRide />;
   async function submit() {
     if (!description.trim()) {
@@ -27,7 +54,10 @@ export default function ReportLostItemScreen() {
     setSaving(true);
     setError('');
     try {
-      await createRequest(ride!, description.trim(), details.trim());
+      const imageUrl = imageUri
+        ? await uploadLostItemImage(session?.user.id ?? '', imageUri, imageMime)
+        : undefined;
+      await createRequest(ride!, description.trim(), details.trim(), imageUrl);
       replace('/activity');
     } catch (cause) {
       submitted.current = false;
@@ -67,6 +97,40 @@ export default function ReportLostItemScreen() {
             maxLength={500}
             multiline
           />
+        </View>
+        <View>
+          <Copy style={{ marginBottom: 6 }}>Photo of the item (optional)</Copy>
+          {imageUri ? (
+            <View style={{ gap: 8 }}>
+              <Image
+                source={{ uri: imageUri }}
+                accessibilityLabel="Selected lost-item photo"
+                style={{ width: '100%', height: 180, borderRadius: 12, backgroundColor: colors.field }}
+                resizeMode="cover"
+              />
+              <View style={[s.row, { justifyContent: 'space-between' }]}>
+                <Button label="Change Photo" variant="outline" onPress={() => void chooseImage()} />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove lost-item photo"
+                  onPress={() => setImageUri('')}
+                  style={{ padding: 12 }}
+                >
+                  <Copy style={{ color: colors.red }}>Remove</Copy>
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <Button
+              label="Add Photo"
+              variant="outline"
+              icon="image-outline"
+              onPress={() => void chooseImage()}
+            />
+          )}
+          <Copy style={{ color: colors.muted, fontSize: 12, marginTop: 6 }}>
+            A clear photo can help identify the item. Keep it under 5 MB.
+          </Copy>
         </View>
       </View>
       {!!error && (

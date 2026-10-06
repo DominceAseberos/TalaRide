@@ -44,7 +44,7 @@ type MockState = {
   clearRideHistory: () => Promise<number>;
   deleteAccount: () => Promise<void>;
   searchRides: (search: string, identifier: IdentifierType | 'All') => Promise<Ride[]>;
-  createRequest: (ride: Ride, description: string, details: string) => Promise<void>;
+  createRequest: (ride: Ride, description: string, details: string, imageUrl?: string) => Promise<void>;
   respondToPrompt: (matchId: string, response: 'offered' | 'dismissed') => Promise<void>;
   resolveRequest: (requestId: string) => Promise<void>;
   refreshRequests: () => Promise<void>;
@@ -203,7 +203,7 @@ export function MockProvider({ children }: PropsWithChildren) {
         const items = await listRides(localAccountId, search, identifier);
         return account.current === localAccountId ? items : [];
       },
-      async createRequest(ride, description, details) {
+      async createRequest(ride, description, details, imageUrl) {
         if (
           !localAccountId ||
           account.current !== localAccountId ||
@@ -211,7 +211,7 @@ export function MockProvider({ children }: PropsWithChildren) {
           !rides.some((item) => item.id === ride.id)
         )
           throw new Error('Ride storage is still initializing.');
-        const created = await createLostRequest(ride.id, ride.number, description, details);
+        const created = await createLostRequest(ride.id, ride.number, description, details, imageUrl);
         if (account.current === localAccountId)
           setRequests((items) => [created, ...items.filter((item) => item.id !== created.id)]);
       },

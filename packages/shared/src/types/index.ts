@@ -35,6 +35,7 @@ export interface LostRequest {
   rideId: string;
   description: string;
   details: string;
+  imageUrl?: string;
   date: string;
   expiresAt: string;
   status: 'Active' | 'Helper responding' | 'Resolved' | 'Expired';
@@ -46,6 +47,7 @@ export interface RelayPrompt {
   rideId: string;
   description: string;
   details: string;
+  imageUrl?: string;
   createdAt: string;
   expiresAt: string;
 }
@@ -61,6 +63,7 @@ export interface Notification {
   matchId?: string;
   description?: string;
   details?: string;
+  imageUrl?: string;
   matchResponse?: RelayResponse | null;
   requestStatus?: RelayRequestStatus;
   expiresAt?: string;

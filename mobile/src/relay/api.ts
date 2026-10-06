@@ -67,6 +67,7 @@ function request(row: Record<string, unknown>): LostRequest {
     rideId: String(row.local_ride_id),
     description: String(row.item_description),
     details: String(row.additional_details ?? ''),
+    imageUrl: row.image_url ? String(row.image_url) : undefined,
     date: String(row.created_at),
     expiresAt: String(row.expires_at),
     status: status(row.status),
@@ -79,6 +80,7 @@ function prompt(row: Record<string, unknown>, rideId: string): RelayPrompt {
     rideId,
     description: String(row.description),
     details: String(row.details ?? ''),
+    imageUrl: row.image_url ? String(row.image_url) : undefined,
     createdAt: String(row.createdAt),
     expiresAt: String(row.expiresAt),
   };
@@ -89,8 +91,9 @@ export async function createLostRequest(
   vehicle: string,
   description: string,
   details: string,
+  imageUrl?: string,
 ) {
-  const data = await invoke({ action: 'create', rideId, vehicle, description, details });
+  const data = await invoke({ action: 'create', rideId, vehicle, description, details, imageUrl });
   if (!data.request) throw new Error('The relay returned an invalid response.');
   return request(data.request);
 }
@@ -129,6 +132,7 @@ function notification(row: Record<string, unknown>): Notification {
     matchId: row.match_id ? String(row.match_id) : undefined,
     description: row.item_description ? String(row.item_description) : undefined,
     details: row.additional_details ? String(row.additional_details) : undefined,
+    imageUrl: row.image_url ? String(row.image_url) : undefined,
     matchResponse:
       row.match_response === 'offered' || row.match_response === 'dismissed'
         ? row.match_response

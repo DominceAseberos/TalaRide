@@ -54,3 +54,24 @@ export async function uploadProfileImage(
   const { data } = requireSupabase().storage.from('avatars').getPublicUrl(path);
   return `${data.publicUrl}?v=${Date.now()}`;
 }
+
+export async function uploadLostItemImage(
+  id: string,
+  uri: string,
+  mimeType = 'image/jpeg',
+): Promise<string> {
+  if (!supabase) return uri;
+  const response = await fetch(uri);
+  if (!response.ok) throw new Error('The selected lost-item image could not be read.');
+  const bytes = await response.arrayBuffer();
+  const extension = mimeType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+  const path = `${id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
+  const { error } = await requireSupabase().storage.from('lost-item-images').upload(path, bytes, {
+    contentType: mimeType,
+    cacheControl: '604800',
+    upsert: false,
+  });
+  if (error) throw new Error('The lost-item image could not be uploaded. Try again.');
+  const { data } = requireSupabase().storage.from('lost-item-images').getPublicUrl(path);
+  return `${data.publicUrl}?v=${Date.now()}`;
+}

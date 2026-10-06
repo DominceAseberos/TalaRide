@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { BottomNav } from '@/components/BottomNav';
 import { ActivityCard } from '@/components/ActivityCard';
@@ -55,6 +55,7 @@ export default function ActivityScreen() {
     matchResponse?: RelayResponse | null;
     requestStatus?: RelayRequestStatus;
     expiresAt?: string;
+    imageUrl?: string;
   } | null>(null);
   const selected = selectedState?.accountId === accountId ? selectedState : null;
   const [error, setError] = useState('');
@@ -120,6 +121,7 @@ export default function ActivityScreen() {
                   message: `${request.description}${request.details ? `\n${request.details}` : ''}\nExpires ${formatDate(request.expiresAt)}`,
                   rideId: request.rideId,
                   requestId: request.id,
+                  imageUrl: request.imageUrl,
                 })
               }
             >
@@ -155,6 +157,7 @@ export default function ActivityScreen() {
                   matchResponse: notification.matchResponse,
                   requestStatus: notification.requestStatus,
                   expiresAt: notification.expiresAt,
+                  imageUrl: notification.imageUrl ?? request?.imageUrl ?? prompt?.imageUrl,
                 });
               }}
             >
@@ -182,6 +185,14 @@ export default function ActivityScreen() {
             setError('');
           }}
         >
+          {!!selected.imageUrl && (
+            <Image
+              source={{ uri: selected.imageUrl }}
+              accessibilityLabel="Lost-item photo"
+              style={{ width: '100%', height: 180, borderRadius: 12, marginBottom: 12 }}
+              resizeMode="cover"
+            />
+          )}
           {!!error && (
             <Copy accessibilityRole="alert" style={{ color: colors.red }}>
               {error}
