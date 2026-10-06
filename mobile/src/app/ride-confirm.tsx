@@ -6,22 +6,14 @@ import { Button, Card, Copy, Detail, Header, Title, replace } from '@/components
 import { colors } from '@/constants/theme';
 import {
   formatCentavos,
-  isDynamicQrExpired,
-  parseDynamicQr,
   parsePesoToCentavos,
-  type DynamicQr,
 } from '@talaride/shared';
-import { getPaymentMode } from '@/api/client';
 import {
-  claimPayment,
-  confirmServerPayment,
   createPaymentIntent,
-  fetchPaymentStatus,
   type PaymentMethod,
 } from '@/api/payments';
 import { fetchFares } from '@/api/fares';
 import { fetchPublicVehicle, type PublicVehicle } from '@/api/vehicles';
-import { confirmMockIntent, verifyMockPayload } from '@/payments/mock';
 import { enqueueOutbox } from '@/offline/queue';
 import { triggerSync } from '@/api/sync';
 import { useMock } from '@/mocks/MockProvider';
@@ -42,9 +34,7 @@ export default function RideConfirmScreen() {
     c?: string;
   }>();
   const { saveRide } = useMock();
-  const mode = getPaymentMode();
 
-  const [dynamic, setDynamic] = useState<DynamicQr | null>(null);
   const [vehicle, setVehicle] = useState<PublicVehicle | null>(null);
   const [fares, setFares] = useState<{ id: string; label: string; amountCentavos: number }[]>(
     [],
@@ -53,43 +43,19 @@ export default function RideConfirmScreen() {
   const [customMode, setCustomMode] = useState(false);
   const [customFare, setCustomFare] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
-  const [verifying, setVerifying] = useState(Boolean(!payload && vehicle_code && c));
+  const [verifying, setVerifying] = useState(Boolean(!payload && vehicle_code));
   const [error, setError] = useState('');
-  const [done, setDone] = useState('');
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!payload) return;
-    (async () => {
-      try {
-        const raw = typeof payload === 'string' ? JSON.parse(payload) : (payload as unknown);
-        const text = typeof raw === 'string' ? raw : JSON.stringify(raw);
-        const parsed = parseDynamicQr(text.startsWith('{') ? text : JSON.stringify(raw));
-        if (parsed.v !== 1 || !parsed.payment_id || !parsed.sig) {
-          throw new Error('Unsupported payment QR. Scan the permanent vehicle sticker instead.');
-        }
-        if (isDynamicQrExpired(parsed)) {
-          setError('This old payment QR expired. Scan the permanent vehicle sticker instead.');
-          return;
-        }
-        if (mode === 'mock-local') await verifyMockPayload(JSON.stringify(parsed));
-        setDynamic(parsed);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Invalid QR.');
-      }
-    })();
-  }, [payload, mode]);
 
   useEffect(() => {
     if (payload) return;
     const code = String(vehicle_code ?? '').trim().toUpperCase();
     if (!code) return;
 
-    if (!c) return;
 
     let live = true;
 
-    fetchPublicVehicle(code, String(c))
+    fetchPublicVehicle(code, String(c || ''))
       .then((verifiedVehicle) => {
         if (!live) return;
         setVehicle(verifiedVehicle);
@@ -126,17 +92,14 @@ export default function RideConfirmScreen() {
     }
   }, [customFare, customMode, presetFare]);
 
-  const staticError =
-    !payload && vehicle_code && !c
-      ? 'For digital payment, scan the verified TalaRide vehicle QR sticker.'
-      : error;
+  const staticError = payload ? 'Old payment QR codes are no longer supported. Scan the registered vehicle sticker.' : error;
 
   const canProceed =
     !!vehicle?.driver_code &&
     vehicle.verification_status === 'verified' &&
     vehicle.status === 'Active' &&
     vehicle.shift_status === 'Active' &&
-    amountCentavos >= MIN_FARE_CENTAVOS &&
+    amountCentavos >= MIN_FARE_CENTAVOS && amountCentavos <= 50000 &&
     !!paymentMethod &&
     !busy;
 
@@ -178,52 +141,13 @@ export default function RideConfirmScreen() {
     }
   }
 
-  async function saveConfirmedRide() {
-    if (!dynamic) return;
-    const rideId = await saveRide(dynamic.vehicle_code, 'Body #');
-    const op = 'pay-' + dynamic.payment_id;
-    await enqueueOutbox(op, 'payment_confirm', {
-      client_operation_id: op,
-      payment_id: dynamic.payment_id,
-      ride_id: dynamic.ride_id,
-      local_ride_id: rideId,
-      amount_centavos: dynamic.amount_centavos,
-    });
-    await triggerSync().catch(() => {});
-    setDone('✓ RIDE PAID ' + formatCentavos(dynamic.amount_centavos) + ' — saved.');
-  }
-
-  async function confirmLegacyDigital() {
-    if (!dynamic || busy) return;
-    setBusy(true);
-    setError('');
-    try {
-      if (mode === 'live') {
-        await claimPayment(JSON.stringify(dynamic));
-        const status = await fetchPaymentStatus(dynamic.payment_id);
-        if (!status.checkout_url) {
-          throw new Error('Payment authorization is unavailable. Scan the permanent vehicle QR.');
-        }
-        replace('/payment-status?payment_id=' + encodeURIComponent(dynamic.payment_id));
-        await Linking.openURL(status.checkout_url);
-        return;
-      }
-      if (mode === 'mock-local') await confirmMockIntent(dynamic.payment_id);
-      else await confirmServerPayment(dynamic.payment_id);
-      await saveConfirmedRide();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Payment failed. Pay cash instead.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function saveCheckin() {
     if (busy) return;
     setBusy(true);
     try {
-      const code = String(vehicle_code ?? dynamic?.vehicle_code ?? '').toUpperCase();
-      const rideId = await saveRide(code || 'TR-01842', 'Body #');
+      const code = String(vehicle_code ?? '').toUpperCase();
+      if (!/^TR-\d{5}$/.test(code)) throw new Error('Enter a valid registered vehicle code.');
+      const rideId = await saveRide(code, 'Body #');
       const op = 'checkin-' + rideId;
       await enqueueOutbox(op, 'checkin', {
         client_operation_id: op,
@@ -237,38 +161,6 @@ export default function RideConfirmScreen() {
     } finally {
       setBusy(false);
     }
-  }
-
-  if (dynamic) {
-    return (
-      <Screen>
-        <Header title="Legacy payment QR" />
-        <Title style={{ fontSize: 22 }}>Fare {formatCentavos(dynamic.amount_centavos)}</Title>
-        <Copy style={{ marginTop: 6, color: colors.muted }}>
-          Older expiring payment QR. New rides should use the permanent vehicle sticker.
-        </Copy>
-        <Card style={{ marginTop: 12 }}>
-          <Detail icon="bus-outline" label="Vehicle" value={dynamic.vehicle_code} />
-          <Detail icon="calendar-outline" label="Expires" value={dynamic.expires_at} />
-          <Detail icon="document-text-outline" label="Payment ID" value={dynamic.payment_id} />
-        </Card>
-        {!!error && <Copy style={{ color: colors.red, marginTop: 8 }}>{error}</Copy>}
-        {!!done && <Copy style={{ color: colors.green, marginTop: 8 }}>{done}</Copy>}
-        <View style={{ gap: 10, marginTop: 16 }}>
-          <Button
-            label={busy ? 'Opening…' : 'Continue payment'}
-            disabled={busy}
-            onPress={confirmLegacyDigital}
-          />
-          <Button
-            label="Save ride without payment"
-            variant="outline"
-            disabled={busy}
-            onPress={saveCheckin}
-          />
-        </View>
-      </Screen>
-    );
   }
 
   return (

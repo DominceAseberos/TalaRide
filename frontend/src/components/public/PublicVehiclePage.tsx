@@ -140,7 +140,7 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
     return Number.isFinite(parsed) ? parsed : 0;
   }, [customFare, customMode, presetFare]);
 
-  const hasValidFare = finalFare >= MIN_FARE && finalFare <= 100000;
+  const hasValidFare = finalFare >= MIN_FARE && finalFare <= 500;
   const canPay =
     !!data?.driver_code &&
     data.verification_status === 'verified' &&

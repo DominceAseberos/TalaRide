@@ -44,7 +44,7 @@ test('protected requests attach auth token; failures never silent success', asyn
       },
     },
   });
-  assert.equal(client.getPaymentMode(), 'mock-server');
+  assert.equal(client.getPaymentMode(), 'live');
   // fetch stub throws -> apiRequest must throw, never resolve success.
   await assert.rejects(() => client.apiRequest('/rides?limit=1'), /Network|timed out/);
   assert.ok(seen);

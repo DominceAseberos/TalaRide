@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiRequest } from './client';
+import { apiRequest, ApiError } from './client';
 
 export interface PublicVehicle {
   vehicle_code: string;
@@ -19,11 +19,12 @@ export async function fetchPublicVehicle(vehicleCode: string, checksum: string) 
   const cacheKey = `talaride.public-vehicle-v2:${code}:${checksum.trim()}`;
   try {
     const value = await apiRequest<PublicVehicle>(
-      '/vehicles/' + encodeURIComponent(code) + '/public?c=' + encodeURIComponent(checksum.trim()),
+      checksum.trim() ? '/vehicles/' + encodeURIComponent(code) + '/public?c=' + encodeURIComponent(checksum.trim()) : '/vehicles/' + encodeURIComponent(code) + '/lookup',
     );
     await AsyncStorage.setItem(cacheKey, JSON.stringify(value));
     return value;
   } catch (error) {
+    if (error instanceof ApiError) throw error;
     const cached = await AsyncStorage.getItem(cacheKey).catch(() => null);
     if (cached) return JSON.parse(cached) as PublicVehicle;
     throw error;

@@ -17,7 +17,7 @@ const MockConfirmSchema = z.object({
 mockConfirmRouter.post('/', optionalAuth, async (req: Request, res: Response) => {
   try {
     // 1. Strict guard: Mock confirmation prohibited in live production mode
-    if (env.PAYMENT_MODE === 'live') {
+    if (env.NODE_ENV !== 'test' || env.PAYMENT_MODE !== 'mock') {
       return res.status(403).json({
         error: 'Forbidden',
         message: 'Mock payment confirmation is disabled in production live mode. Provider webhook required.'

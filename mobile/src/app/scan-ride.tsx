@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Button, Copy, Header, Title, go } from '@/components/ui';
-import { parseDynamicQr, parseVehicleQr } from '@talaride/shared';
+import { parseVehicleQr } from '@talaride/shared';
 import { decodeQrImageUri } from '@/scan/decodeImage';
 import { colors } from '@/constants/theme';
 
@@ -25,26 +25,20 @@ export default function ScanRideScreen() {
   );
 
   function routeScanned(data: string) {
-    // Permanent vehicle QR is the MVP path. Legacy dynamic payment QR remains supported.
+    // Only registered permanent vehicle stickers are accepted.
     try {
       const v = parseVehicleQr(data);
       go('/ride-confirm?vehicle_code=' + encodeURIComponent(v.vehicle_code) + '&c=' + v.c);
       return;
     } catch {}
-    try {
-      const dyn = parseDynamicQr(data);
-      go('/ride-confirm?payload=' + encodeURIComponent(JSON.stringify(dyn)));
-      return;
-    } catch {
-      setError('QR not recognized. Enter TR-00000 manually or ask driver for a new QR.');
-      setLocked(false);
-    }
+    setError('QR not recognized. Scan the registered vehicle sticker or enter its code.');
+    setLocked(false);
   }
 
   function submitManual() {
     const code = manual.trim().toUpperCase();
     if (!/^TR-\d{5}$/.test(code)) {
-      setError('Enter vehicle code like TR-01842.');
+      setError('Enter TR- followed by the five digits printed below the QR.');
       return;
     }
     go(`/ride-confirm?vehicle_code=${encodeURIComponent(code)}`);
@@ -111,7 +105,7 @@ export default function ScanRideScreen() {
           accessibilityLabel="Vehicle code manual"
           value={manual}
           onChangeText={(v) => setManual(v.toUpperCase())}
-          placeholder="TR-01842"
+          placeholder="TR-_____"
           autoCapitalize="characters"
           maxLength={8}
           style={{ flex: 1, borderWidth: 1, borderRadius: 10, padding: 12 }}

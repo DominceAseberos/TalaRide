@@ -37,7 +37,7 @@ export async function authenticateRequest(req: Request): Promise<AuthenticatedUs
   }
 
   // 1. Support demo/test tokens only if DEMO_AUTH is enabled
-  if (env.DEMO_AUTH) {
+  if (env.NODE_ENV === 'test' && env.DEMO_AUTH) {
     if (token === 'demo-admin-token' || token.startsWith('mock-admin')) {
       const p = await repository.getProfile('USR-ADM-001');
       return {
@@ -77,12 +77,13 @@ export async function authenticateRequest(req: Request): Promise<AuthenticatedUs
 
     const userId = data.user.id;
     let profile = await repository.getProfile(userId);
-    let driver: Driver | null = null;
+    let driver: Driver | null = await repository.getDriverByUserId(userId);
 
     if (!profile) {
       // If user profile is not found, check driver table
       driver = await repository.getDriverByUserId(userId);
-      const role: AppRole = driver ? 'driver' : ((data.user.user_metadata?.role as AppRole) || 'passenger');
+      const trustedRole = data.user.app_metadata?.role;
+      const role: AppRole = driver ? 'driver' : (['operator', 'lgu_admin', 'talaride_admin'].includes(trustedRole) ? trustedRole : 'passenger');
       profile = {
         id: userId,
         mobile_number: data.user.phone || data.user.email || '',
@@ -96,9 +97,12 @@ export async function authenticateRequest(req: Request): Promise<AuthenticatedUs
       driver = await repository.getDriverByUserId(userId);
     }
 
+    if (profile.status !== 'active') return null;
+    // Elevated roles must be asserted by server-managed Auth metadata, never signup metadata.
+    if (['operator', 'lgu_admin', 'talaride_admin'].includes(profile.role) && data.user.app_metadata?.role !== profile.role) return null;
     return {
       id: profile.id,
-      role: profile.role,
+      role: ['talaride_admin', 'lgu_admin', 'operator'].includes(data.user.app_metadata?.role) ? data.user.app_metadata.role : driver ? 'driver' : 'passenger',
       full_name: profile.full_name,
       mobile_number: profile.mobile_number,
       driver_code: driver?.driver_code || null
@@ -177,4 +181,12 @@ export function requireRole(...allowedRoles: AppRole[]) {
       });
     }
   };
+}
+
+export async function productionAuth(req: Request, res: Response, next: NextFunction) {
+  if (env.NODE_ENV === 'test') return next();
+  return requireAuth(req, res, next);
+}
+export function canManageDriver(req: Request, code: string) {
+  return env.NODE_ENV === 'test' || req.user?.driver_code === code || ['talaride_admin', 'lgu_admin'].includes(req.user?.role || '');
 }

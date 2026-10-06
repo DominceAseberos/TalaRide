@@ -2,9 +2,10 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { repository } from '../lib/repository.js';
 import { sse } from '../sse.js';
-import { optionalAuth } from '../lib/auth.js';
+import { optionalAuth, productionAuth, canManageDriver } from '../lib/auth.js';
 
 export const shiftsRouter = Router();
+shiftsRouter.use(productionAuth);
 
 export const ShiftStartSchema = z.object({
   driver_code: z.string().regex(/^DR-[0-9]{6}$/, 'driver_code must match DR-000000 format'),
@@ -30,6 +31,7 @@ shiftsRouter.post('/start', optionalAuth, async (req: Request, res: Response) =>
 
     const { driver_code, vehicle_code } = parsed.data;
 
+    if (!canManageDriver(req, driver_code)) return res.status(403).json({ error: 'Driver account does not match.' });
     // Check driver
     const driver = await repository.getDriver(driver_code);
     if (!driver) {
@@ -48,6 +50,7 @@ shiftsRouter.post('/start', optionalAuth, async (req: Request, res: Response) =>
       return res.status(409).json({ error: 'Vehicle not active' });
     }
 
+    if (req.user?.role === 'driver' && driver.assigned_vehicle_code !== vehicle_code) return res.status(403).json({ error: 'Vehicle is not assigned to this driver.' });
     // Starting the same driver/vehicle twice is idempotent for reconnecting clients.
     const existingShift = await repository.getActiveShiftForDriver(driver_code);
     if (existingShift) {
@@ -101,6 +104,7 @@ shiftsRouter.post('/end', optionalAuth, async (req: Request, res: Response) => {
     }
 
     const { driver_code } = parsed.data;
+    if (!canManageDriver(req, driver_code)) return res.status(403).json({ error: 'Driver account does not match.' });
 
     const shift = await repository.endShift(driver_code);
     if (!shift) {

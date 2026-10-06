@@ -7,6 +7,7 @@ const envSchema = z.object({
   PORT: z.string().default('4000').transform((v) => parseInt(v, 10)),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   SUPABASE_URL: z.string().default('https://your-project.supabase.co'),
+  SUPABASE_PUBLISHABLE_KEY: z.string().default(''),
   SUPABASE_SERVICE_ROLE_KEY: z.string().default('replace_me'),
   SUPABASE_JWT_SECRET: z.string().default('talaride_test_jwt_secret_2026'),
   QR_INTENT_SECRET: z.string().default('talaride_qr_secret_key_2026_super_secure'),

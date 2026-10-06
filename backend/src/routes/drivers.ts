@@ -1,11 +1,32 @@
 import { Router, Request, Response } from 'express';
 import { repository } from '../lib/repository.js';
-import { optionalAuth } from '../lib/auth.js';
+import { optionalAuth, requireAuth } from '../lib/auth.js';
 import { shiftsRouter } from './shifts.js';
 import { ridesRouter } from './rides.js';
 import { z } from 'zod';
 
 export const driversRouter = Router();
+driversRouter.post('/enroll', requireAuth, async (req, res) => {
+  try {
+    const parsed = z.object({ full_name: z.string().trim().min(2).max(100), mobile_number: z.string().trim().min(10).max(20), toda_operator: z.string().trim().min(2).max(100), license_number: z.string().trim().min(3).max(50) }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Complete your driver details.' });
+    const existing = await repository.getDriverByUserId(req.user!.id);
+    if (existing) return res.status(409).json({ error: 'Driver registration already exists.' });
+    const driver = await repository.registerDriver(req.user!.id, parsed.data);
+    return res.status(201).json({ driver });
+  } catch { return res.status(503).json({ error: 'Could not save driver registration. Please retry.' }); }
+});
+
+// Every driver's private records are scoped to their verified Auth identity.
+driversRouter.use(async (req, res, next) => {
+  await optionalAuth(req, res, () => {});
+  const { env } = await import('../env.js');
+  if (env.NODE_ENV === 'test') return next();
+  if (!req.user) return res.status(401).json({ error: 'Sign in to view driver records.' });
+  const code = req.path.split('/')[1];
+  if (/^DR-/.test(code) && req.user.driver_code !== code && !['talaride_admin', 'lgu_admin'].includes(req.user.role)) return res.status(403).json({ error: 'This driver record belongs to another account.' });
+  next();
+});
 
 const DriverPhotoSchema = z.object({
   photo_url: z.string().url().max(1000).nullable(),

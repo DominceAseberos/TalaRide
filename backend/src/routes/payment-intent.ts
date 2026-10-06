@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { repository } from '../lib/repository.js';
@@ -6,8 +7,9 @@ import { generatePaymentQR } from '../lib/qr.js';
 import { optionalAuth } from '../lib/auth.js';
 import { paymentIntentRateLimiter } from '../middleware/rate-limit.js';
 import { createPayMongoCheckout, createPayMongoDirectGcash } from '../lib/paymongo.js';
+import type { Ride, Payment } from '../types.js';
 import { env } from '../env.js';
-import { consumeWebSession, validateWebSession } from '../lib/web-session.js';
+import { consumeWebSession, reserveWebSession, releaseWebSession } from '../lib/web-session.js';
 
 export const paymentIntentRouter = Router();
 
@@ -22,7 +24,11 @@ export const PaymentIntentSchema = z.object({
 
 // POST /api/payment-intent
 paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req: Request, res: Response) => {
+  let reservedSession: string | undefined;
+  let completed = false;
+  const owner = req.get('x-ride-owner') || '';
   try {
+    if (env.NODE_ENV === 'production' && (env.PAYMENT_MODE !== 'live' || !env.PAYMENT_PROVIDER_KEY.startsWith('sk_live_'))) return res.status(503).json({ error: 'Live payments are not configured.' });
     // Normalize body if legacy camelCase properties are provided
     const rawBody = {
       driver_code: req.body.driver_code || req.body.driverId,
@@ -48,13 +54,15 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
 
     const { driver_code, vehicle_code, amount_centavos, payment_method, approximate_location, session_id } = parsed.data;
 
-    if (session_id && !validateWebSession(session_id, vehicle_code)) {
+    if (env.NODE_ENV !== 'test' && !req.user && !session_id) return res.status(401).json({ error: 'Scan the vehicle QR to start your payment session.' });
+    if (session_id && !reserveWebSession(session_id, vehicle_code, owner)) {
       return res.status(410).json({
         error: 'Session expired',
         message: 'This ride session has expired. Scan the vehicle QR code again to start a new payment.'
       });
     }
 
+    reservedSession = session_id;
     // 1. Validate Driver exists
     const driver = await repository.getDriver(driver_code);
     if (!driver) {
@@ -110,19 +118,13 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       });
     }
 
-    // 6. Validate minimum fare amount (minimum 1000 centavos = ₱10.00)
-    if (amount_centavos < 1000) {
-      return res.status(400).json({
-        error: 'Invalid amount',
-        message: 'Fare amount must be at least 1000 centavos (₱10.00)'
-      });
-    }
-
-    // 7. Atomic creation: Create Ride (status: pending)
-    const rideId = `RIDE-${Date.now().toString().slice(-6)}`;
-    const paymentId = `PAY-${Date.now().toString().slice(-6)}`;
-
     const fareConfig = await repository.getFareConfig();
+    if (amount_centavos < fareConfig.min_custom_fare_centavos || amount_centavos > fareConfig.max_custom_fare_centavos) {
+      return res.status(400).json({ error: 'Fare is outside the supported range.' });
+    }
+    const rideId = `RIDE-${randomUUID()}`;
+    const paymentId = `PAY-${randomUUID()}`;
+
     const feeBreakdown = calculateFeeBreakdown(
       amount_centavos,
       fareConfig.provider_fee_basis_points,
@@ -186,14 +188,12 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       }
     }
 
-    const ride = await repository.createRide({
+    const ride: Ride = {
       ride_id: rideId,
       driver_code,
       driver_name: driver.full_name,
       vehicle_code,
-      // Payment intents are created by the driver; passenger identity is attached only
-      // when the commuter confirms or the payment provider settles the transaction.
-      passenger_id: null,
+      passenger_id: req.user?.role === 'passenger' ? req.user.id : null,
       passenger_name: null,
       passenger_mobile: null,
       timestamp: new Date().toISOString(),
@@ -202,10 +202,10 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       fare_amount_centavos: amount_centavos,
       status: 'pending',
       created_at: new Date().toISOString()
-    });
+    };
 
     // 9. Create Payment (status: awaiting_confirmation)
-    const payment = await repository.createPayment({
+    const payment: Payment = {
       payment_id: paymentId,
       ride_id: rideId,
       driver_code,
@@ -224,18 +224,19 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       created_at: new Date().toISOString(),
       expires_at: expiresAt,
       confirmed_at: null
-    });
+    };
 
     // Record initiated event in audit trail
-    await repository.addPaymentEvent({
-      event_id: `EVT-${Date.now().toString().slice(-6)}`,
+    await repository.createRideAndPayment(ride, payment, {
+      event_id: `EVT-${randomUUID()}`,
       payment_id: paymentId,
       event_type: 'intent_created',
-      payload: { amount_centavos, ride_id: rideId, payment_method, session_id: session_id ?? null },
+      payload: { amount_centavos, ride_id: rideId, payment_method },
       created_at: new Date().toISOString()
     });
 
-    if (session_id) consumeWebSession(session_id, vehicle_code);
+    if (session_id) consumeWebSession(session_id, vehicle_code, owner);
+    completed = true;
 
     return res.status(201).json({
       success: true,
@@ -257,6 +258,8 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
     });
   } catch (err: any) {
     console.error('Error generating payment intent:', err);
-    return res.status(500).json({ error: 'Server error', message: err.message });
+    return res.status(503).json({ error: 'Payment could not be saved. Please contact support before retrying.' });
+  } finally {
+    if (reservedSession && !completed) releaseWebSession(reservedSession, owner);
   }
 });

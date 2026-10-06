@@ -52,7 +52,7 @@ adminRouter.get('/overview', async (_req: Request, res: Response) => {
         total_digital_volume_centavos: totalDigitalVolumeCentavos,
         total_fees_collected_centavos: totalFeesCollectedCentavos,
         payment_success_rate: paymentSuccessRate,
-        average_confirmation_speed_seconds: '3.4s'
+        average_confirmation_speed_seconds: null
       },
       fare_config: fareConfig,
       active_lost_items_count: lostItems.filter((l) => l.status !== 'closed' && l.status !== 'found').length,
@@ -87,42 +87,8 @@ const DriverCreateSchema = z.object({
 });
 
 // POST /api/admin/drivers
-adminRouter.post('/drivers', async (req: Request, res: Response) => {
-  try {
-    const rawBody = {
-      full_name: req.body.full_name || req.body.name,
-      mobile_number: req.body.mobile_number || req.body.mobileNumber,
-      toda_operator: req.body.toda_operator || req.body.toda,
-      license_number: req.body.license_number
-    };
-
-    const parsed = DriverCreateSchema.safeParse(rawBody);
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Malformed input', details: parsed.error.format() });
-    }
-
-    const driverCode = `DR-000${Math.floor(100 + Math.random() * 900)}`;
-    const userId = `USR-DRV-${Date.now().toString().slice(-4)}`;
-
-    const newDriver: Driver = {
-      driver_code: driverCode,
-      user_id: userId,
-      full_name: parsed.data.full_name,
-      mobile_number: parsed.data.mobile_number,
-      verification_status: 'verified',
-      toda_operator: parsed.data.toda_operator,
-      license_number: parsed.data.license_number || `N01-26-${Math.floor(100000 + Math.random() * 900000)}`,
-      assigned_vehicle_code: null,
-      shift_status: 'ended',
-      active_shift_id: null,
-      created_at: new Date().toISOString()
-    };
-
-    const driver = await repository.createDriver(newDriver);
-    return res.status(201).json({ success: true, driver });
-  } catch (err: any) {
-    return res.status(500).json({ error: 'Server error', message: err.message });
-  }
+adminRouter.post('/drivers', async (_req, res) => {
+  return res.status(409).json({ error: 'Ask the driver to register at /driver using their own account, then verify their submission here.' });
 });
 
 // POST /api/admin/drivers/:id/verify

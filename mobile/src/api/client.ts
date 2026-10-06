@@ -3,10 +3,7 @@ import { supabase } from '@/auth/client';
 export type PaymentMode = 'mock-local' | 'mock-server' | 'live';
 
 export function getPaymentMode(): PaymentMode {
-  const raw = (process.env.EXPO_PUBLIC_PAYMENT_MODE ?? 'mock-server').trim();
-  if (raw === 'live') return 'live';
-  if (raw === 'mock-server') return 'mock-server';
-  return 'mock-local';
+  return 'live';
 }
 
 const DEFAULT_WEB_API = 'https://talaride-backend.onrender.com/api';

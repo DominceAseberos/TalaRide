@@ -46,8 +46,8 @@ app.use(
       return callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-provider-signature', 'idempotency-key']
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-provider-signature', 'idempotency-key', 'x-ride-owner']
   })
 );
 
@@ -103,7 +103,7 @@ app.get('/api/ready', async (_req, res) => {
 
 // 1. Payment Lifecycle
 app.use('/api/payment-intent', paymentIntentRouter);
-app.use('/api/mock-confirm', mockConfirmRouter);
+if (env.NODE_ENV === 'test') app.use('/api/mock-confirm', mockConfirmRouter);
 app.use('/api/payment-webhook', paymentWebhookRouter);
 app.use('/api/payment-status', paymentStatusRouter);
 

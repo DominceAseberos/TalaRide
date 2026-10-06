@@ -1,13 +1,18 @@
 import { Router, Request, Response } from 'express';
 import { repository } from '../lib/repository.js';
-import { optionalAuth } from '../lib/auth.js';
+import { optionalAuth, productionAuth } from '../lib/auth.js';
+
+import { env } from '../env.js';
 
 export const rewardsRouter = Router();
+rewardsRouter.use(productionAuth);
 
 // GET /api/rewards-me
 rewardsRouter.get('/rewards-me', optionalAuth, async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id || (req.query.user_id as string) || (req.query.userId as string) || 'USR-COM-001';
+    const userId = req.user?.id || (req.query.user_id as string) || (req.query.userId as string) || '';
+    if (!userId) return res.status(401).json({ error: 'Sign in to see rewards.' });
+    if (req.user && req.user.id !== userId && !['talaride_admin', 'lgu_admin'].includes(req.user.role)) return res.status(403).json({ error: 'Rewards belong to another account.' });
     const data = await repository.getRewardsForUser(userId);
 
     return res.json({
@@ -17,7 +22,7 @@ rewardsRouter.get('/rewards-me', optionalAuth, async (req: Request, res: Respons
       progress_towards_milestone: data.progressTowardsMilestone,
       unlocked_rewards_count: data.unlockedRewardsCount,
       active_voucher:
-        data.unlockedRewardsCount > 0
+        env.NODE_ENV === 'test' && data.unlockedRewardsCount > 0
           ? {
               voucher_code: 'TALA-PROMO-10RIDE',
               description: '₱20 Fare Discount / Partner Merchant Voucher',
@@ -36,6 +41,8 @@ rewardsRouter.get('/rewards-me', optionalAuth, async (req: Request, res: Respons
 rewardsRouter.get('/:userId', async (req: Request, res: Response) => {
   try {
     const userId = String(req.params.userId);
+    if (!userId) return res.status(401).json({ error: 'Sign in to see rewards.' });
+    if (req.user && req.user.id !== userId && !['talaride_admin', 'lgu_admin'].includes(req.user.role)) return res.status(403).json({ error: 'Rewards belong to another account.' });
     const data = await repository.getRewardsForUser(userId);
 
     return res.json({
@@ -45,7 +52,7 @@ rewardsRouter.get('/:userId', async (req: Request, res: Response) => {
       progressTowardsMilestone: data.progressTowardsMilestone,
       unlockedRewardsCount: data.unlockedRewardsCount,
       activeVoucher:
-        data.unlockedRewardsCount > 0
+        env.NODE_ENV === 'test' && data.unlockedRewardsCount > 0
           ? {
               voucherCode: 'TALA-PROMO-10RIDE',
               description: '₱20 Fare Discount / Partner Merchant Offer',
@@ -63,6 +70,7 @@ rewardsRouter.get('/:userId', async (req: Request, res: Response) => {
 // POST /api/rewards/redeem
 rewardsRouter.post('/redeem', optionalAuth, async (req: Request, res: Response) => {
   try {
+    if (env.NODE_ENV !== 'test') return res.status(409).json({ error: 'Reward redemption is not available yet.' });
     const userId = req.body.user_id || req.body.userId || req.user?.id;
     if (!userId) {
       return res.status(400).json({ error: 'user_id is required' });
