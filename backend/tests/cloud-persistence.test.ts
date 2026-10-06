@@ -38,6 +38,41 @@ test('database outages do not acknowledge a local-only registration', async t =>
   await assert.rejects(repository.cloudCall('registerDriver', ['blocked', {}]), /Durable database unavailable/);
 });
 
+test('TODA group rename commits to durable state before it is acknowledged', async t => {
+  let state: any = {
+    todaGroups: [{
+      id: 'group-a', name: 'Untitled TODA', is_placeholder: true,
+      created_at: '2026-10-06T00:00:00.000Z', created_by: 'operator-a',
+    }],
+    drivers: [{ driver_code: 'DR-123456', toda_group_id: 'group-a', toda_operator: 'Untitled TODA' }],
+  };
+  let revision = 0;
+  t.mock.method(supabaseAdmin, 'from', () => ({
+    upsert: async () => ({ error: null }),
+    select: () => ({ eq: () => ({ single: async () => ({ data: { state: structuredClone(state), revision }, error: null }) }) }),
+  }) as any);
+  t.mock.method(supabaseAdmin, 'rpc', async (_name: string, args: any) => {
+    if (args.expected_revision !== revision) return { data: false, error: null };
+    state = structuredClone(args.next_state);
+    revision++;
+    return { data: true, error: null };
+  });
+
+  const previous = env.NODE_ENV;
+  env.NODE_ENV = 'production';
+  try {
+    const renamed: any = await repository.cloudCall('renameTodaGroup', ['group-a', 'Sunrise TODA']);
+    assert.equal(renamed.name, 'Sunrise TODA');
+    assert.equal(renamed.is_placeholder, false);
+    assert.equal(state.todaGroups[0].name, 'Sunrise TODA');
+    assert.equal(state.drivers[0].toda_operator, 'Sunrise TODA');
+
+    const restored: any = await repository.cloudCall('getTodaGroup', ['group-a']);
+    assert.equal(restored.name, 'Sunrise TODA');
+    assert.equal(restored.is_placeholder, false);
+  } finally { env.NODE_ENV = previous; }
+});
+
 test('cloud membership and admin approval survive reloads and preserve an independent group update', async t => {
   let state: any = { drivers: [{ driver_code: 'DR-123456', user_id: 'driver', verification_status: 'pending', toda_operator: 'Requested group' }] };
   let revision = 0;

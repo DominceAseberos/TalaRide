@@ -25,7 +25,14 @@ export function TodaManagement() {
     setGroups(rows);
     setSelected(current => rows.some(row => row.id === current) ? current : rows[0]?.id || '');
   }, []);
-  useEffect(() => { void refresh().catch(failure => setError(failure instanceof Error ? failure.message : 'Could not load TODA groups.')); }, [refresh]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void refresh().catch(failure =>
+        setError(failure instanceof Error ? failure.message : 'Could not load TODA groups.')
+      );
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [refresh]);
   async function submit(action: () => Promise<unknown>, success: string) {
     if (busy) return;
     setBusy(true); setError(''); setNotice('');
