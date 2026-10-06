@@ -685,7 +685,6 @@ test('native driver enrollment validates details and waits for server success wi
   await act(async () => {
     for (const [label, value] of [
       ['Mobile number', '09170000000'],
-      ['TODA group', 'Test TODA'],
       ['License number', 'TEST-ONLY'],
     ]) {
       tree.root
@@ -702,6 +701,7 @@ test('native driver enrollment validates details and waits for server success wi
   assert.equal(saved.length, 0);
   assert.equal(calls[0].path, '/drivers/enroll');
   assert.equal(calls[0].details.user_id, undefined);
+  assert.equal(calls[0].details.toda_operator, undefined);
   failure = false;
   await act(async () => {
     submit();
@@ -996,13 +996,15 @@ test('driver waits for admin approval then dashboard and saved membership update
   let foreground;
   const stored = new Map();
   let unavailable = false;
+  const vehicleRegistrations = [];
   const ui = Object.fromEntries(
-    ['Button', 'Card', 'Copy', 'Detail', 'Header', 'Icon', 'Title'].map((name) => [name, name]),
+    ['Button', 'Card', 'Copy', 'Detail', 'Field', 'Header', 'Icon', 'Title'].map((name) => [name, name]),
   );
   const screen = load(
     'src/app/driver.tsx',
     {
       'react-native': {
+        Image: 'Image',
         TextInput: 'TextInput',
         View: 'View',
         AppState: {
@@ -1034,12 +1036,26 @@ test('driver waits for admin approval then dashboard and saved membership update
         fetchDriverNotifications: async () => {
           throw new Error('Notifications unavailable');
         },
+        fetchDriverSummary: async () => ({ rides: [], payments: [] }),
+        registerDriverVehicle: async (plateBodyNumber) => {
+          vehicleRegistrations.push(plateBodyNumber);
+          const vehicle = { vehicle_code: 'TR-77777', plate_body_number: plateBodyNumber, qr_checksum: 'created-checksum' };
+          account = { ...account, vehicle };
+          return { driver: account.driver, vehicle, created: true };
+        },
+        updateDriverPhoto: async () => ({}),
+      },
+      '@/api/fares': { fetchFares: async () => [] },
+      '@/auth/profiles': { uploadProfileImage: async (_id, uri) => uri },
+      'expo-image-picker': {
+        requestMediaLibraryPermissionsAsync: async () => ({ granted: false }),
+        launchImageLibraryAsync: async () => ({ canceled: true, assets: [] }),
       },
       '@/mocks/MockProvider': { useMock: () => ({ saveRide() {} }) },
       '@/offline/queue': { enqueueOutbox() {} },
       '@/api/sync': { triggerSync: async () => {} },
       '@/auth/AuthProvider': {
-        useAuth: () => ({ session: session('driver'), displayName: 'Registered driver' }),
+        useAuth: () => ({ session: session('driver'), displayName: 'Registered driver', profile: null, updateProfile: async () => {}, signOut: async () => {} }),
       },
       '@/constants/theme': { colors: {} },
     },
@@ -1103,9 +1119,23 @@ test('driver waits for admin approval then dashboard and saved membership update
   });
   rendered = JSON.stringify(tree.toJSON());
   assert.ok(rendered.includes('Registered driver'));
-  assert.ok(rendered.includes('Not yet added to a TODA group'));
+  assert.ok(!rendered.includes('TODA group'));
   assert.equal(tree.root.findAllByType('QrImage').length, 1);
   assert.ok(!rendered.includes('Verification pending'), 'verified driver stays on dashboard without a group');
+  account = { ...account, vehicle: null };
+  await act(async () => {
+    foreground('active');
+  });
+  rendered = JSON.stringify(tree.toJSON());
+  assert.ok(rendered.includes('Set up your tricycle'));
+  await act(async () => {
+    tree.root.findByType('Field').props.onChangeText('TAG-777');
+  });
+  await act(async () => {
+    tree.root.findAllByType('Button').find((item) => item.props.label === 'Register tricycle and create QR').props.onPress();
+  });
+  assert.deepEqual(vehicleRegistrations, ['TAG-777']);
+  assert.equal(tree.root.findAllByType('QrImage').length, 1);
   await act(async () => {
     tree.unmount();
   });

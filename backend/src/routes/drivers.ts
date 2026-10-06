@@ -8,7 +8,7 @@ import { z } from 'zod';
 export const driversRouter = Router();
 driversRouter.post('/enroll', requireAuth, async (req, res) => {
   try {
-    const parsed = z.object({ full_name: z.string().trim().min(2).max(100), mobile_number: z.string().trim().min(10).max(20), toda_operator: z.string().trim().min(2).max(100), license_number: z.string().trim().min(3).max(50) }).safeParse(req.body);
+    const parsed = z.object({ full_name: z.string().trim().min(2).max(100), mobile_number: z.string().trim().min(10).max(20), toda_operator: z.string().trim().max(100).optional().default(''), license_number: z.string().trim().min(3).max(50) }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Complete your driver details.' });
     const existing = await repository.getDriverByUserId(req.user!.id);
     if (existing) return res.status(409).json({ error: 'Driver registration already exists.' });
@@ -30,6 +30,26 @@ driversRouter.use(async (req, res, next) => {
 
 const DriverPhotoSchema = z.object({
   photo_url: z.string().url().max(1000).nullable(),
+});
+
+const DriverVehicleSchema = z.object({
+  plate_body_number: z.string().trim().min(2).max(50),
+});
+
+// Verified drivers can register their own tricycle before joining a TODA group.
+driversRouter.post('/me/vehicle', optionalAuth, async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+  const parsed = DriverVehicleSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Enter a valid tricycle plate or body number.' });
+  try {
+    const result = await repository.registerVehicleForDriver(req.user.id, parsed.data.plate_body_number);
+    return res.status(result.created ? 201 : 200).json(result);
+  } catch (failure) {
+    const message = failure instanceof Error ? failure.message : 'Could not register tricycle.';
+    if (message.includes('not found')) return res.status(404).json({ error: message });
+    if (message.includes('verify')) return res.status(403).json({ error: message });
+    return res.status(409).json({ error: message });
+  }
 });
 
 // GET /api/drivers/:id

@@ -32,7 +32,7 @@ function AppStack() {
       >
         <Brand />
         <ActivityIndicator color={colors.green} accessibilityLabel="Restoring your session" />
-        <Copy>Loading TalaRide�</Copy>
+        <Copy>Loading TalaRide…</Copy>
       </View>
     );
   return (

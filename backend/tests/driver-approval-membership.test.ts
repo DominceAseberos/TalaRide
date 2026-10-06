@@ -13,11 +13,12 @@ test('only admin approval unlocks a driver; operator membership is scoped, durab
   const groupA = await repository.createTodaGroup('Group A', 'account-admin');
   const groupB = await repository.createTodaGroup('Group B', 'account-admin');
   t.mock.method(supabaseAdmin.auth, 'getUser', async (token: string) => {
-    const role = token === 'admin' ? 'admin' : token === 'driver' ? undefined : token === 'lgu' ? 'lgu_admin' : 'operator';
+    const role = token === 'admin' ? 'admin' : token.startsWith('driver') ? undefined : token === 'lgu' ? 'lgu_admin' : 'operator';
     return { data: { user: { id: `account-${token}`, email: `${token}@example.invalid`, created_at: new Date().toISOString(),
       app_metadata: { role, ...(token.startsWith('operator') ? { toda_group_id: token === 'operator-b' ? groupB.id : groupA.id, toda_group_name: token === 'operator-b' ? groupB.name : groupA.name } : {}) },
       user_metadata: { full_name: token, toda_group_id: 'forged-group', toda_group_name: 'Forged group' } } }, error: null } as any;
   });
+  t.mock.method(supabaseAdmin, 'from', () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { role: 'passenger' }, error: null }) }) }) }) as any);
   const call = (token: string, path: string, method = 'GET', body?: unknown) => request(path, { method, body, headers: { Authorization: `Bearer ${token}` } });
   try {
     const registration = await call('driver', '/api/drivers/enroll', 'POST', { full_name: 'Registered driver', mobile_number: '09123456789', toda_operator: 'Requested group', license_number: 'LICENSE-123' });
@@ -60,5 +61,23 @@ test('only admin approval unlocks a driver; operator membership is scoped, durab
     assert.equal(operatorView.body.group.name, 'Group A Renamed');
     assert.equal(operatorView.body.members[0].verification_status, 'verified');
     assert.equal((await call('operator-a', '/api/toda/members', 'POST', { driver_code: 'DR-999999' })).status, 404);
+
+    const independentRegistration = await call('driver-independent', '/api/drivers/enroll', 'POST', { full_name: 'Independent driver', mobile_number: '09987654321', license_number: 'LICENSE-456' });
+    assert.equal(independentRegistration.status, 201);
+    const independentCode = independentRegistration.body.driver.driver_code;
+    assert.equal(independentRegistration.body.driver.toda_operator, '');
+    assert.equal((await call('driver-independent', '/api/drivers/me/vehicle', 'POST', { plate_body_number: 'TAG-456' })).status, 403);
+    assert.equal((await call('admin', `/api/admin/drivers/${independentCode}/verify`, 'POST')).status, 200);
+    const registeredVehicle = await call('driver-independent', '/api/drivers/me/vehicle', 'POST', { plate_body_number: 'TAG-456' });
+    assert.equal(registeredVehicle.status, 201);
+    assert.match(registeredVehicle.body.vehicle.vehicle_code, /^TR-[0-9]{5}$/);
+    assert.equal(registeredVehicle.body.vehicle.toda, '');
+    assert.equal(registeredVehicle.body.vehicle.assigned_driver_code, independentCode);
+    const independentAccount = await call('driver-independent', '/api/auth/me');
+    assert.equal(independentAccount.body.driver.toda_group_id, undefined);
+    assert.equal(independentAccount.body.vehicle.plate_body_number, 'TAG-456');
+    const repeatedRegistration = await call('driver-independent', '/api/drivers/me/vehicle', 'POST', { plate_body_number: 'IGNORED' });
+    assert.equal(repeatedRegistration.status, 200);
+    assert.equal(repeatedRegistration.body.vehicle.vehicle_code, registeredVehicle.body.vehicle.vehicle_code);
   } finally { env.DEMO_AUTH = previous; }
 });

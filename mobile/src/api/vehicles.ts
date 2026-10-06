@@ -5,7 +5,7 @@ export interface PublicVehicle {
   payment_environment?: 'test' | 'live';
   vehicle_code: string;
   plate_body_number: string;
-  toda: string;
+  toda?: string;
   status: string;
   shift_status: string;
   driver_code: string | null;

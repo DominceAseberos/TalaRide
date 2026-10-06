@@ -417,6 +417,11 @@ export class TalaRideRepository {
       if (driver.toda_group_id !== groupId) continue;
       driver.toda_operator = cleanName;
       driver.updated_at = now;
+      const vehicle = driver.assigned_vehicle_code ? this.memoryState.vehicles.find(item => item.vehicle_code === driver.assigned_vehicle_code) : undefined;
+      if (vehicle) {
+        vehicle.toda = cleanName;
+        vehicle.updated_at = now;
+      }
     }
 
     this.persistToDisk(this.memoryState);
@@ -461,6 +466,11 @@ export class TalaRideRepository {
     driver.membership_added_by = operatorId;
     driver.membership_added_at = new Date().toISOString();
     driver.updated_at = driver.membership_added_at;
+    const vehicle = driver.assigned_vehicle_code ? this.memoryState.vehicles.find(item => item.vehicle_code === driver.assigned_vehicle_code) : undefined;
+    if (vehicle) {
+      vehicle.toda = group.name;
+      vehicle.updated_at = driver.membership_added_at;
+    }
     this.persistToDisk(this.memoryState);
     return driver;
   }
@@ -473,6 +483,11 @@ export class TalaRideRepository {
     driver.membership_added_by = adminId;
     driver.membership_added_at = new Date().toISOString();
     driver.updated_at = driver.membership_added_at;
+    const vehicle = driver.assigned_vehicle_code ? this.memoryState.vehicles.find(item => item.vehicle_code === driver.assigned_vehicle_code) : undefined;
+    if (vehicle) {
+      vehicle.toda = group.name;
+      vehicle.updated_at = driver.membership_added_at;
+    }
     this.persistToDisk(this.memoryState);
     return driver;
   }
@@ -517,6 +532,39 @@ export class TalaRideRepository {
     this.memoryState.vehicles.push(vehicle);
     this.persistToDisk(this.memoryState);
     return vehicle;
+  }
+
+  async registerVehicleForDriver(userId: string, plateBodyNumber: string): Promise<{ driver: Driver; vehicle: Vehicle; created: boolean }> {
+    const driver = this.memoryState.drivers.find(item => item.user_id === userId);
+    if (!driver) throw new Error('Driver registration not found.');
+    if (driver.verification_status !== 'verified') throw new Error('An administrator must verify the driver before registering a tricycle.');
+    if (driver.assigned_vehicle_code) {
+      const existing = this.memoryState.vehicles.find(item => item.vehicle_code === driver.assigned_vehicle_code);
+      if (existing) return { driver, vehicle: existing, created: false };
+    }
+
+    const normalizedPlate = plateBodyNumber.trim().toUpperCase();
+    const duplicate = this.memoryState.vehicles.find(item => item.plate_body_number.trim().toUpperCase() === normalizedPlate);
+    if (duplicate) throw new Error('This plate or body number is already registered.');
+
+    let vehicleCode: string;
+    do { vehicleCode = `TR-${String(randomInt(0, 100000)).padStart(5, '0')}`; } while (this.memoryState.vehicles.some(item => item.vehicle_code === vehicleCode));
+    const now = new Date().toISOString();
+    const vehicle: Vehicle = {
+      vehicle_code: vehicleCode,
+      plate_body_number: plateBodyNumber.trim(),
+      toda: driver.toda_group_id ? driver.toda_operator : '',
+      status: 'active',
+      assigned_driver_code: driver.driver_code,
+      assigned_driver_name: driver.full_name,
+      qr_checksum: generateVehicleChecksum(vehicleCode),
+      created_at: now,
+    };
+    this.memoryState.vehicles.push(vehicle);
+    driver.assigned_vehicle_code = vehicleCode;
+    driver.updated_at = now;
+    this.persistToDisk(this.memoryState);
+    return { driver, vehicle, created: true };
   }
 
   async assignVehicleToDriver(driverCode: string, vehicleCode: string): Promise<{ driver: Driver; vehicle: Vehicle }> {

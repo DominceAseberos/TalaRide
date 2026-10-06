@@ -7,6 +7,9 @@ import { apiRequest } from '@/api/client';
 export type RegisteredDriver = {
   driver_code: string;
   full_name: string;
+  mobile_number?: string;
+  license_number?: string;
+  photo_url?: string | null;
   verification_status: string;
   shift_status: string;
   toda_operator?: string;
@@ -24,7 +27,6 @@ export function DriverEnrollment({
 }) {
   const [fullName, setFullName] = useState(name);
   const [phone, setPhone] = useState('');
-  const [toda, setToda] = useState('');
   const [license, setLicense] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -35,16 +37,14 @@ export function DriverEnrollment({
     const details = {
       full_name: fullName.trim(),
       mobile_number: phone.trim(),
-      toda_operator: toda.trim(),
       license_number: license.trim(),
     };
     if (
       details.full_name.length < 2 ||
       details.mobile_number.length < 10 ||
-      details.toda_operator.length < 2 ||
       details.license_number.length < 3
     ) {
-      setError('Complete your full name, mobile number, TODA group, and license number.');
+      setError('Complete your full name, mobile number, and license number.');
       return;
     }
     locked.current = true;
@@ -95,15 +95,6 @@ export function DriverEnrollment({
           keyboardType="phone-pad"
         />
         <Field
-          label="TODA group"
-          placeholder="TODA group"
-          value={toda}
-          onChangeText={setToda}
-          maxLength={100}
-          editable={!busy}
-          autoCapitalize="words"
-        />
-        <Field
           label="License number"
           placeholder="License number"
           value={license}
@@ -124,8 +115,8 @@ export function DriverEnrollment({
           onPress={() => void submit()}
         />
         <Copy style={{ color: colors.muted, fontSize: 12 }}>
-          The TalaRide admin approves your registration. Your TODA operator adds you to their group
-          separately. Your QR appears after a registered vehicle is assigned.
+          The TalaRide admin approves your registration. After approval, you can register your
+          tricycle and create its QR immediately. A TODA group can be assigned later.
         </Copy>
       </View>
     </Card>

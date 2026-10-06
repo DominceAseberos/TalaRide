@@ -211,7 +211,7 @@ export default function RideConfirmScreen() {
               value={vehicle.plate_body_number}
             />
             <Detail icon="pricetag-outline" label="Vehicle code" value={vehicle.vehicle_code} />
-            <Detail icon="location-outline" label="TODA" value={vehicle.toda} />
+            {!!vehicle.toda && <Detail icon="location-outline" label="TODA" value={vehicle.toda} />}
             <Detail icon="radio-button-on-outline" label="Shift" value={vehicle.shift_status} />
           </Card>
 
