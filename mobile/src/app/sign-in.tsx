@@ -10,6 +10,7 @@ import { performEmailAction } from '@/auth/actions';
 export default function SignInScreen() {
   const { recovery, setRecovery, signOut, error: sessionError } = useAuth();
   const [mode, setMode] = useState<'signin' | 'register' | 'recover'>('signin');
+  const [accountType, setAccountType] = useState<'commuter' | 'driver'>('commuter');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
@@ -24,14 +25,15 @@ export default function SignInScreen() {
     locked.current = true;
     setBusy(true);
     try {
-      const result = await performEmailAction(recovery ? 'reset' : mode, email, password, name);
+      const result = await performEmailAction(recovery ? 'reset' : mode, email, password, name, accountType);
+      const destination = accountType === 'driver' ? '/driver-portal' : '/home';
       if (recovery) {
         setPassword('');
         setRecovery(false);
         replace('/home');
       } else if (mode === 'register') {
         setPassword('');
-        if (result === 'authenticated') replace('/home');
+        if (result === 'authenticated') replace(destination);
         else {
           setMode('signin');
           setNotice(
@@ -45,7 +47,7 @@ export default function SignInScreen() {
         );
       } else {
         setPassword('');
-        replace('/home');
+        replace(destination);
       }
     } catch (failure) {
       setError(formatAuthError(failure));
@@ -98,11 +100,21 @@ export default function SignInScreen() {
         {recovery
           ? 'Choose a new password for your account.'
           : mode === 'register'
-            ? 'Keep your private ride history on your device.'
+            ? (accountType === 'driver' ? 'Create your account, then submit your driver details in the app.' : 'Keep your private ride history on your device.')
             : mode === 'recover'
               ? 'We’ll email you a password recovery link.'
-              : 'Sign in to access your account.'}
+              : (accountType === 'driver' ? 'Sign in to manage your driver profile, QR, shifts, and notifications.' : 'Sign in to scan rides, pay fares, and view your ride history.')}
       </Copy>
+      {!recovery && mode !== 'recover' && <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
+        {(['commuter', 'driver'] as const).map(type => <Pressable key={type}
+          accessibilityRole="button" accessibilityLabel={type === 'driver' ? 'Driver account' : 'Commuter account'}
+          accessibilityState={{ selected: accountType === type }} disabled={busy}
+          onPress={() => setAccountType(type)}
+          style={{ flex: 1, alignItems: 'center', borderWidth: 1, borderColor: accountType === type ? colors.green : colors.border, backgroundColor: accountType === type ? colors.paleGreen : colors.white, borderRadius: 12, padding: 14 }}>
+          <Icon name={type === 'driver' ? 'car-outline' : 'person-outline'} size={24} color={colors.darkGreen} />
+          <Copy bold style={{ marginTop: 5 }}>{type === 'driver' ? 'Driver' : 'Commuter'}</Copy>
+        </Pressable>)}
+      </View>}
       <View style={{ gap: 10 }}>
         {mode === 'register' && !recovery && (
           <Field

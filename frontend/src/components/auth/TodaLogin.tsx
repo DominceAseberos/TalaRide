@@ -140,7 +140,6 @@ export const TodaLogin: React.FC<Props> = ({ onAuthenticated }) => {
             <button type="button" onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); }} className="mt-6 w-full text-center text-sm font-bold text-emerald-700 hover:underline">
               {mode === 'signin' ? 'Create a TODA account' : 'Already have an account? Sign in'}
             </button>
-            <a href="/driver" className="mt-4 block text-center text-sm font-semibold text-slate-600 hover:underline">Driver sign in or registration</a>
           </section>
         </div>
       </div>

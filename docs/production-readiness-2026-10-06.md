@@ -31,3 +31,7 @@ Production startup now validates database table access, the commit RPC and requi
 ## PayMongo test gateway follow-up
 
 The owner explicitly requested retaining the current PayMongo tester. PAYMENT_ENVIRONMENT=test accepts only sk_test_ keys; live accepts only sk_live_ keys. Production mock confirmation and demo accounts remain blocked. Payment records retain their environment, test receipts are labeled, and test payments do not mint rewards. Native webhooks now require the matching signed provider event, preserve UUID payment IDs and ignore non-paid events. Guest receipts read payment status without requiring access to private ride records. Mobile source carries the same test labels but still needs an APK build. Full pnpm check passed: 41 backend tests, 52 mobile tests, type checks, lint and configured builds. Future real-money launch also needs review of test-era dashboard/shift totals; test results must not be represented as real revenue.
+
+## Mobile-only driver and commuter portals
+
+Driver registration now runs inside the mobile app, using the authenticated enrollment API and remaining pending until TODA verification. Sign-in provides Driver / Commuter selection, with an in-app switch back to commuter. Web driver login/registration is removed and old /driver links redirect to the TODA portal. QR-originated guest fare/checkout pages remain available for commuters without the app. Preparing Android 1.2.5 (versionCode 7); publish only after e714 signer verification.

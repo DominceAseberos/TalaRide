@@ -179,6 +179,9 @@ test('email actions validate input, use real Auth methods, preserve password whi
   );
   assert.equal(calls[1].args[0].options.data.display_name, 'Passenger');
   assert.equal(calls[1].args[0].options.emailRedirectTo, 'talaride://auth-callback');
+  await performEmailAction('register', 'driver@example.test', 'password123', 'Driver', 'driver');
+  assert.equal(calls.at(-1).args[0].options.data.requested_role, 'driver');
+  assert.equal(calls.at(-1).args[0].options.data.role, undefined);
   registeredSession = session('a');
   assert.equal(
     await performEmailAction('register', 'a@example.test', 'password123', 'Passenger'),
@@ -575,8 +578,50 @@ test('sign-in UI submits real actions, blocks repeated taps and shows unavailabl
   assert.match(tree.root.findByType('notice').props.message, /not configured/);
   assert.equal(calls.length, 1);
   await act(async () => {
+    tree.root.findAllByType('pressable').find(item => item.props.accessibilityLabel === 'Driver account').props.onPress();
+  });
+  await act(async () => {
+    button('Sign In').props.onPress();
+  });
+  assert.equal(calls.at(-1)[4], 'driver');
+  assert.equal(navigations.at(-1), '/driver-portal');
+  await act(async () => {
     tree.unmount();
   });
+});
+
+test('native driver enrollment validates details and waits for server success without granting verification', async () => {
+  const calls = [];
+  const saved = [];
+  let failure = true;
+  const ui = Object.fromEntries(['Button', 'Card', 'Copy', 'Field', 'Title'].map(name => [name, props => React.createElement(name, props, props.children)]));
+  const { DriverEnrollment } = load('src/components/DriverEnrollment.tsx', {
+    'react-native': { View: 'view' }, './ui': ui, '@/constants/theme': { colors: {} },
+    '@/api/client': { apiRequest: async (path, options) => {
+      calls.push({ path, details: JSON.parse(options.body) });
+      if (failure) throw new Error('Network unavailable');
+      return { driver: { driver_code: 'DR-100001', full_name: 'Real Driver', verification_status: 'pending', shift_status: 'ended' } };
+    } },
+  });
+  let tree;
+  await act(async () => { tree = create(React.createElement(DriverEnrollment, { name: 'Real Driver', online: true, onRegistered: driver => saved.push(driver) })); });
+  const submit = () => tree.root.findByType('Button').props.onPress();
+  await act(async () => { submit(); });
+  assert.equal(calls.length, 0);
+  await act(async () => {
+    for (const [label, value] of [['Mobile number', '09170000000'], ['TODA group', 'Test TODA'], ['License number', 'TEST-ONLY']]) {
+      tree.root.findAllByType('Field').find(field => field.props.label === label).props.onChangeText(value);
+    }
+  });
+  await act(async () => { submit(); submit(); });
+  assert.equal(calls.length, 1);
+  assert.equal(saved.length, 0);
+  assert.equal(calls[0].path, '/drivers/enroll');
+  assert.equal(calls[0].details.user_id, undefined);
+  failure = false;
+  await act(async () => { submit(); });
+  assert.equal(saved[0].verification_status, 'pending');
+  await act(async () => { tree.unmount(); });
 });
 
 test('installed Supabase SDK persists through the secure adapter, restores a session and removes it on offline sign-out', async () => {

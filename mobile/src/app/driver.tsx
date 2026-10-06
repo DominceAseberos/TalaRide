@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Linking, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Screen } from '@/components/Screen';
-import { Button, Card, Copy, Header, Title } from '@/components/ui';
+import { Button, Card, Copy, Header, Title, replace } from '@/components/ui';
+import { DriverEnrollment, type RegisteredDriver } from '@/components/DriverEnrollment';
 import { QrImage } from '@/components/QrImage';
 import { apiRequest, ApiError } from '@/api/client';
 import { startShift, endShift } from '@/api/shifts';
@@ -12,14 +13,14 @@ import { enqueueOutbox } from '@/offline/queue';
 import { triggerSync } from '@/api/sync';
 import { useAuth } from '@/auth/AuthProvider';
 
-type Account = { driver: { driver_code: string; full_name: string; verification_status: string; shift_status: string } | null; vehicle: { vehicle_code: string; qr_checksum: string } | null };
+type Account = { driver: RegisteredDriver | null; vehicle: { vehicle_code: string; qr_checksum: string } | null };
 export default function DriverScreen() {
   const { session } = useAuth();
   return <DriverAccountScreen key={session?.user.id || 'signed-out'} />;
 }
 
 function DriverAccountScreen() {
-  const { session } = useAuth();
+  const { session, displayName } = useAuth();
   const { saveRide } = useMock();
   const [cashFare, setCashFare] = useState('');
   const [cashMessage, setCashMessage] = useState('');
@@ -86,7 +87,12 @@ function DriverAccountScreen() {
     finally { setBusy(false); }
   }
   return <Screen><Header title="Driver portal" />
-    {!account ? <Card><Copy>{error || 'Loading your driver account...'}</Copy></Card> : !driver ? <Card><Title>Register as a driver</Title><Copy>Submit your real details for verification and vehicle assignment.</Copy><Button label="Create or connect driver account" onPress={() => void Linking.openURL('https://talaride-web-frontend.vercel.app/driver')} /></Card> : <>
+    <Button label="Switch to commuter" variant="outline" onPress={() => replace('/home')} style={{ marginBottom: 16 }} />
+    {!account ? <Card><Copy>{error || 'Loading your driver account...'}</Copy></Card> : !driver ? <DriverEnrollment name={displayName} online={online} onRegistered={(registered) => {
+      const saved = { ...account, driver: registered };
+      setAccount(saved);
+      if (userId) void AsyncStorage.setItem(`talaride.driver-account:${userId}`, JSON.stringify(saved)).catch(() => {});
+    }} /> : <>
       <Title>{driver.full_name}</Title><Copy>{driver.driver_code} · {driver.verification_status === 'verified' ? 'Verified driver' : 'Verification pending'}</Copy>
       <Card style={{ marginTop: 16 }}>
         {vehicle ? <QrImage code={vehicle.vehicle_code} value={`https://talaride-web-frontend.vercel.app/v/${vehicle.vehicle_code}?c=${encodeURIComponent(vehicle.qr_checksum)}`} /> : <Copy>Your vehicle QR appears after your TODA assigns a registered vehicle.</Copy>}

@@ -3,7 +3,6 @@ import { PublicVehiclePage } from './components/public/PublicVehiclePage';
 import { PaymentReturnPage } from './components/public/PaymentReturnPage';
 import { TodaLogin, type TodaSession } from './components/auth/TodaLogin';
 import { AdminDashboard } from './components/admin/AdminDashboard';
-import { RegisteredDriverPortal } from './components/driver/RegisteredDriverPortal';
 import { api } from './services/api';
 import { getAuthClient, signOut } from './services/auth';
 
@@ -35,7 +34,6 @@ export function App() {
   }, [path]);
   const page = path === '/success' || path === '/cancel' ? <PaymentReturnPage paymentId={query.get('payment_id') || ''} cancelled={path === '/cancel'} />
     : path.startsWith('/v/') ? <PublicVehiclePage vehicleCode={path.split('/')[2]} checksum={query.get('c') || ''} />
-    : path === '/driver' ? <RegisteredDriverPortal />
     : <>{error && <p role="alert">{error}</p>}{operator ? <AdminDashboard operatorName={operator.name} todaName={operator.group} onSignOut={() => void signOut().then(() => setOperator(null)).catch(e => setError(e.message))} /> : <TodaLogin onAuthenticated={setOperator} />}</>;
   return <>{testPayments && <div role="status" className="bg-amber-100 px-4 py-3 text-center text-sm font-semibold text-amber-950">PayMongo test mode — no real money is charged.</div>}{page}</>;
 }

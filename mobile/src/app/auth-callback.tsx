@@ -33,7 +33,7 @@ export default function AuthCallback() {
         if (result.error)
           throw new Error('This authentication link is invalid or expired. Request a new link.');
         if (Platform.OS === 'web') window.history.replaceState({}, '', '/auth-callback');
-        replace(callback.recovery ? '/sign-in' : '/home');
+        replace(callback.recovery ? '/sign-in' : result.data.session?.user.user_metadata?.requested_role === 'driver' ? '/driver-portal' : '/home');
       } catch (failure) {
         if (Platform.OS === 'web') window.history.replaceState({}, '', '/auth-callback');
         setRecovery(false);

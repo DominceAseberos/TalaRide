@@ -5,6 +5,7 @@ export async function performEmailAction(
   email: string,
   password: string,
   name = '',
+  accountType: 'commuter' | 'driver' = 'commuter',
 ) {
   const client = requireSupabase();
   email = email.trim();
@@ -28,7 +29,7 @@ export async function performEmailAction(
     const { data, error } = await client.auth.signUp({
       email,
       password,
-      options: { data: { display_name: name.trim() }, emailRedirectTo: authRedirectUrl() },
+      options: { data: { display_name: name.trim(), requested_role: accountType }, emailRedirectTo: authRedirectUrl() },
     });
     if (error) throw error;
     return data.session ? ('authenticated' as const) : ('confirmation-required' as const);
