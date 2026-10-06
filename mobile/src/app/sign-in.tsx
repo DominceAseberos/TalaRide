@@ -3,6 +3,7 @@ import { Pressable, View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { Brand, Button, Copy, Field, Icon, IconButton, Title, replace, s } from '@/components/ui';
 import { Notice } from '@/components/Notice';
+import { ConfirmEmail } from '@/components/ConfirmEmail';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/auth/AuthProvider';
 import { performEmailAction } from '@/auth/actions';
@@ -19,6 +20,7 @@ export default function SignInScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [confirmation, setConfirmation] = useState(false);
   async function submit() {
     if (locked.current) return;
     setError('');
@@ -36,9 +38,7 @@ export default function SignInScreen() {
         if (result === 'authenticated') replace(destination);
         else {
           setMode('signin');
-          setNotice(
-            'Check your email for a confirmation link. After confirming, return here to sign in.',
-          );
+          setConfirmation(true);
         }
       } else if (mode === 'recover') {
         setMode('signin');
@@ -50,6 +50,7 @@ export default function SignInScreen() {
         replace(destination);
       }
     } catch (failure) {
+      if (failure instanceof Error && failure.message.toLowerCase().includes('email not confirmed')) setConfirmation(true);
       setError(formatAuthError(failure));
     } finally {
       locked.current = false;
@@ -292,6 +293,8 @@ export default function SignInScreen() {
           </View>
         </>
       )}
+      {!recovery && mode === 'signin' && <Button label="Need to confirm your email?" variant="subtle" onPress={() => setConfirmation(true)} style={{ marginTop: 12 }} />}
+      {confirmation && <ConfirmEmail email={email.trim()} onClose={() => setConfirmation(false)} />}
       {!!notice && (
         <Notice title="Account information" message={notice} onClose={() => setNotice('')} />
       )}

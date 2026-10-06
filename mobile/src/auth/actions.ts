@@ -1,5 +1,13 @@
 import { authRedirectUrl, requireSupabase } from './client';
 export type EmailAction = 'signin' | 'register' | 'recover' | 'reset';
+export async function resendConfirmation(email: string) {
+  email = email.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Enter a valid email address.');
+  const { error } = await requireSupabase().auth.resend({
+    type: 'signup', email, options: { emailRedirectTo: authRedirectUrl() },
+  });
+  if (error) throw error;
+}
 export async function performEmailAction(
   action: EmailAction,
   email: string,

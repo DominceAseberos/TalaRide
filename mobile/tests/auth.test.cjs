@@ -522,6 +522,7 @@ test('sign-in UI submits real actions, blocks repeated taps and shows unavailabl
     '@/components/Notice': {
       Notice: (props) => React.createElement('notice', props, props.children),
     },
+    '@/components/ConfirmEmail': { ConfirmEmail: (props) => React.createElement('confirm-email', props) },
     '@/constants/theme': { colors: {} },
     '@/auth/AuthProvider': {
       useAuth: () => ({
@@ -693,4 +694,81 @@ test('installed Supabase SDK persists through the secure adapter, restores a ses
     first.auth.stopAutoRefresh();
     second?.auth.stopAutoRefresh();
   }
+});
+
+test('confirmation inbox links use known providers and never trust arbitrary email domains', () => {
+  for (const file of ['src/auth/emailInbox.ts', '../frontend/src/services/emailInbox.ts']) {
+    const { emailInbox } = load(file);
+    assert.equal(emailInbox(' User@GMAIL.COM ').url, 'https://mail.google.com/mail/u/0/#inbox');
+    assert.equal(emailInbox('user@outlook.com').name, 'Outlook');
+    assert.equal(emailInbox('user@gmail.com.attacker.test'), null);
+    assert.equal(emailInbox('user@custom.test'), null);
+    assert.equal(emailInbox(''), null);
+  }
+});
+
+test('resending confirmation validates email and preserves the native callback without bypassing verification', async () => {
+  let args;
+  let error = null;
+  const { resendConfirmation } = load('src/auth/actions.ts', { './client': {
+    authRedirectUrl: () => 'talaride://auth-callback',
+    requireSupabase: () => ({ auth: { resend: async value => { args = value; return { error }; } } }),
+  } });
+  await assert.rejects(resendConfirmation('bad'), /valid email/);
+  assert.equal(args, undefined);
+  await resendConfirmation(' passenger@gmail.com ');
+  assert.equal(args.type, 'signup');
+  assert.equal(args.email, 'passenger@gmail.com');
+  assert.equal(args.options.emailRedirectTo, 'talaride://auth-callback');
+  error = new Error('Email rate limit exceeded');
+  await assert.rejects(resendConfirmation('passenger@gmail.com'), /rate limit/);
+});
+
+test('native confirmation modal opens inbox, prevents duplicate sends and surfaces resend failures', async () => {
+  const pending = deferred();
+  const opened = [];
+  let calls = 0;
+  let failing = true;
+  const ui = Object.fromEntries(['Button', 'Copy', 'Field'].map(name => [name, props => React.createElement(name, props, props.children)]));
+  const { ConfirmEmail } = load('src/components/ConfirmEmail.tsx', {
+    'react-native': { Linking: { openURL: async url => { opened.push(url); } } },
+    '@/auth/actions': { resendConfirmation: async () => { calls++; if (failing) throw new Error('Offline'); return pending.promise; } },
+    '@/auth/emailInbox': load('src/auth/emailInbox.ts'),
+    './Notice': { Notice: props => React.createElement('notice', props, props.children) }, './ui': ui,
+  });
+  let tree;
+  await act(async () => { tree = create(React.createElement(ConfirmEmail, { email: 'passenger@gmail.com', onClose() {} })); });
+  const button = label => tree.root.findAllByType('Button').find(item => item.props.label === label);
+  await act(async () => { button('Open Gmail').props.onPress(); });
+  assert.equal(opened[0], 'https://mail.google.com/mail/u/0/#inbox');
+  await act(async () => { button('Resend confirmation email').props.onPress(); });
+  assert.ok(JSON.stringify(tree.toJSON()).includes('Offline'));
+  failing = false;
+  await act(async () => { const send = button('Resend confirmation email').props.onPress; send(); send(); });
+  assert.equal(calls, 2);
+  assert.equal(button('Sending…').props.disabled, true);
+  await act(async () => { pending.resolve(); });
+  assert.ok(JSON.stringify(tree.toJSON()).includes('newest link'));
+  await act(async () => { button('Resend confirmation email').props.onPress(); });
+  assert.equal(calls, 2);
+  await act(async () => { tree.unmount(); });
+});
+
+test('web confirmation resend uses the deployed origin and handles provider errors without claiming success', async () => {
+  const calls = [];
+  let failure = new Error('Email rate limit exceeded');
+  const { ConfirmEmail } = load('../frontend/src/components/auth/ConfirmEmail.tsx', {
+    '../../services/auth': { getAuthClient: async () => ({ auth: { resend: async args => { calls.push(args); return { error: failure }; } } }) },
+    '../../services/emailInbox': load('../frontend/src/services/emailInbox.ts'),
+  }, { window: { location: { origin: 'https://talaride-web-frontend.vercel.app' } } });
+  let tree;
+  await act(async () => { tree = create(React.createElement(ConfirmEmail, { email: 'operator@gmail.com', onClose() {} })); });
+  await act(async () => { await tree.root.findByType('form').props.onSubmit({ preventDefault() {} }); });
+  assert.equal(calls[0].options.emailRedirectTo, 'https://talaride-web-frontend.vercel.app');
+  assert.ok(JSON.stringify(tree.toJSON()).includes('rate limit'));
+  failure = null;
+  await act(async () => { await tree.root.findByType('form').props.onSubmit({ preventDefault() {} }); });
+  assert.ok(JSON.stringify(tree.toJSON()).includes('newest link'));
+  assert.equal(tree.root.findByType('a').props.rel, 'noopener noreferrer');
+  await act(async () => { tree.unmount(); });
 });

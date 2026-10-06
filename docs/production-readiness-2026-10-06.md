@@ -35,3 +35,10 @@ The owner explicitly requested retaining the current PayMongo tester. PAYMENT_EN
 ## Mobile-only driver and commuter portals
 
 Driver registration now runs inside the mobile app, using the authenticated enrollment API and remaining pending until TODA verification. Sign-in provides Driver / Commuter selection, with an in-app switch back to commuter. Web driver login/registration is removed and old /driver links redirect to the TODA portal. QR-originated guest fare/checkout pages remain available for commuters without the app. Preparing Android 1.2.5 (versionCode 7); publish only after e714 signer verification.
+
+## Email confirmation recovery (v1.2.5)
+- Web and mobile show a confirmation dialog after signup and for unconfirmed-email sign-in, with known-provider inbox links and real Supabase resend actions.
+- Expired web links show a useful message; users can request a new email from sign-in. Resends retain the correct web/native callback, with duplicate-send protection.
+- Supabase Authentication > URL Configuration must use Site URL `https://talaride-web-frontend.vercel.app` and allow `https://talaride-web-frontend.vercel.app`, `https://talaride-web-frontend.vercel.app/`, and `talaride://auth-callback`. The management connector returned 401, so this setting requires an owner update. Existing expired links cannot be reused; request a fresh email after saving.
+- Confirm-signup email templates should retain Supabase's `{{ .ConfirmationURL }}` link rather than a hardcoded localhost URL.
+- Validation: 57 mobile/auth tests passed, mobile typecheck and lint passed, frontend production build and lint passed. Real mailbox confirmation still requires the owner configuration and a fresh link.

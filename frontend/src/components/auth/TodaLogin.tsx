@@ -3,6 +3,7 @@ import { Building2, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 
 import { getAuthClient } from '../../services/auth';
 import { api } from '../../services/api';
+import { ConfirmEmail } from './ConfirmEmail';
 
 export interface TodaSession {
   name: string;
@@ -20,7 +21,14 @@ export const TodaLogin: React.FC<Props> = ({ onAuthenticated }) => {
   const [group, setGroup] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(() => {
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    if (!params.has('error') && !params.has('error_code')) return '';
+    return params.get('error_code') === 'otp_expired'
+      ? 'This confirmation link has expired or was already used. Try signing in, or request a new confirmation email below.'
+      : 'The email link could not be verified. Try signing in, or request a new confirmation email below.';
+  });
+  const [confirmation, setConfirmation] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
@@ -35,6 +43,10 @@ export const TodaLogin: React.FC<Props> = ({ onAuthenticated }) => {
   useEffect(() => {
     window.localStorage.removeItem('talaride.toda-account');
     window.sessionStorage.removeItem('talaride.toda-session');
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    if (params.has('error') || params.has('error_code')) {
+      window.history.replaceState({}, '', window.location.pathname + window.location.search);
+    }
   }, []);
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -45,19 +57,23 @@ export const TodaLogin: React.FC<Props> = ({ onAuthenticated }) => {
       const normalizedEmail = email.trim().toLowerCase();
       if (mode === 'signup') {
         if (name.trim().length < 2 || group.trim().length < 2) throw new Error('Enter your name and TODA group.');
-        const { error: failure } = await client.auth.signUp({
+        const { data, error: failure } = await client.auth.signUp({
           email: normalizedEmail, password,
           options: { emailRedirectTo: window.location.origin, data: { display_name: name.trim(), full_name: name.trim(), toda_group: group.trim(), requested_role: 'operator' } },
         });
         if (failure) throw failure;
         setPassword(''); setMode('signin');
-        setNotice('Check your email to confirm your account. TODA access will be available after approval.');
+        if (data.session) await openAccount();
+        else setConfirmation(true);
       } else {
         const { error: failure } = await client.auth.signInWithPassword({ email: normalizedEmail, password });
         if (failure) throw failure;
         await openAccount();
       }
-    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not connect to your account.'); }
+    } catch (failure) {
+      if (failure instanceof Error && failure.message.toLowerCase().includes('email not confirmed')) setConfirmation(true);
+      setError(failure instanceof Error ? failure.message : 'Could not connect to your account.');
+    }
     finally { setBusy(false); }
   };
 
@@ -137,12 +153,14 @@ export const TodaLogin: React.FC<Props> = ({ onAuthenticated }) => {
             </form>
 
             {notice && <p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
+            <button type="button" onClick={() => setConfirmation(true)} className="mt-4 w-full text-center text-sm font-bold text-emerald-700 hover:underline">Need to confirm your email?</button>
             <button type="button" onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); }} className="mt-6 w-full text-center text-sm font-bold text-emerald-700 hover:underline">
               {mode === 'signin' ? 'Create a TODA account' : 'Already have an account? Sign in'}
             </button>
           </section>
         </div>
       </div>
+      {confirmation && <ConfirmEmail email={email.trim()} onClose={() => setConfirmation(false)} />}
     </main>
   );
 };
