@@ -339,10 +339,29 @@ export class TalaRideRepository {
     return driver;
   }
 
-  async updateDriverStatus(driverCode: string, status: 'verified' | 'suspended'): Promise<Driver | null> {
+  async addDriverToToda(driverCode: string, group: { id: string; name: string }, operatorId: string): Promise<Driver | null> {
+    const driver = this.memoryState.drivers.find(d => d.driver_code === driverCode);
+    if (!driver) return null;
+    if (driver.toda_group_id && driver.toda_group_id !== group.id) throw new Error('Driver already belongs to another TODA group. Ask an admin to resolve the membership.');
+    if (driver.toda_group_id === group.id) return driver;
+    driver.toda_group_id = group.id;
+    driver.toda_operator = group.name;
+    driver.membership_added_by = operatorId;
+    driver.membership_added_at = new Date().toISOString();
+    driver.updated_at = driver.membership_added_at;
+    this.persistToDisk(this.memoryState);
+    return driver;
+  }
+
+  async updateDriverStatus(driverCode: string, status: 'verified' | 'suspended', adminId?: string): Promise<Driver | null> {
     const driver = this.memoryState.drivers.find((d) => d.driver_code === driverCode);
     if (!driver) return null;
     driver.verification_status = status;
+    driver.updated_at = new Date().toISOString();
+    if (status === 'verified' && adminId) {
+      driver.verified_by = adminId;
+      driver.verified_at = driver.updated_at;
+    }
     if (status === 'suspended') {
       driver.shift_status = 'ended';
       driver.active_shift_id = null;

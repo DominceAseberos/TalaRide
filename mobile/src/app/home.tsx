@@ -6,7 +6,6 @@ import { RideRow } from '@/components/RideRow';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/auth/AuthProvider';
 import { useMock } from '@/mocks/MockProvider';
-import { LinearGradient } from 'expo-linear-gradient';
 
 const REWARD_THRESHOLD = 10;
 
@@ -35,21 +34,24 @@ export default function HomeScreen() {
         accessibilityLabel="Scan ride"
         onPress={() => go('/scan-ride')}
       >
-        <LinearGradient
-          colors={[colors.green, colors.darkGreen]}
+        <View
           style={{
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.paleGreen,
             alignItems: 'center',
             justifyContent: 'center',
-            borderRadius: 12,
-            minHeight: 112,
-            gap: 9,
+            borderRadius: 18,
+            minHeight: 120,
+            gap: 8,
           }}
         >
-          <Icon name="scan-outline" size={44} color={colors.white} />
-          <Copy bold style={{ color: colors.white, fontSize: 18 }}>
-            SCAN RIDE
+          <Icon name="scan-outline" size={38} color={colors.green} />
+          <Copy bold style={{ color: colors.darkGreen, fontSize: 17 }}>
+            Scan a ride
           </Copy>
-        </LinearGradient>
+          <Copy style={{ color: colors.muted, fontSize: 12 }}>Verify the driver and fare before paying</Copy>
+        </View>
       </Pressable>
       <Pressable
         accessibilityRole="button"

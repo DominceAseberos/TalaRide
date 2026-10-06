@@ -21,9 +21,9 @@ const pages = [
   },
   {
     art: 'community' as IllustrationName,
-    eyebrow: 'USEFUL AFTER THE RIDE',
-    title: 'Keep every ride useful',
-    body: 'Your ride history can help with lost-item follow-up and future rewards while keeping data collection minimal.',
+    eyebrow: 'RIDE HISTORY & REWARDS',
+    title: 'Ride, earn, and keep track',
+    body: 'Earn TalaPoints on completed digital rides and track progress toward vouchers. Voucher claiming and redemption are coming soon. Your trip history also helps with lost-item follow-up.',
   },
 ] as const;
 

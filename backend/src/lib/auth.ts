@@ -10,6 +10,7 @@ export interface AuthenticatedUser {
   full_name: string;
   mobile_number: string;
   driver_code?: string | null;
+  toda_group?: { id: string; name: string } | null;
 }
 
 declare global {
@@ -105,7 +106,10 @@ export async function authenticateRequest(req: Request): Promise<AuthenticatedUs
       role: ['talaride_admin', 'lgu_admin', 'operator'].includes(data.user.app_metadata?.role) ? data.user.app_metadata.role : driver ? 'driver' : 'passenger',
       full_name: profile.full_name,
       mobile_number: profile.mobile_number,
-      driver_code: driver?.driver_code || null
+      driver_code: driver?.driver_code || null,
+      toda_group: typeof data.user.app_metadata?.toda_group_id === 'string' && typeof data.user.app_metadata?.toda_group_name === 'string'
+        && data.user.app_metadata.toda_group_id.trim() && data.user.app_metadata.toda_group_name.trim()
+        ? { id: data.user.app_metadata.toda_group_id.trim(), name: data.user.app_metadata.toda_group_name.trim() } : null
     };
   } catch (err) {
     console.error('Supabase token verification error:', err);

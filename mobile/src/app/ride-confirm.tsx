@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Image, Linking, Pressable, TextInput, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/components/Screen';
-import { Button, Card, Copy, Detail, Header, Title, replace } from '@/components/ui';
+import { Button, Card, Copy, Detail, Header, Icon, Title, replace } from '@/components/ui';
 import { colors } from '@/constants/theme';
 import {
   formatCentavos,
@@ -46,6 +46,7 @@ export default function RideConfirmScreen() {
   const [verifying, setVerifying] = useState(Boolean(!payload && vehicle_code));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [photoUnavailable, setPhotoUnavailable] = useState(false);
 
   useEffect(() => {
     if (payload) return;
@@ -59,6 +60,7 @@ export default function RideConfirmScreen() {
       .then((verifiedVehicle) => {
         if (!live) return;
         setVehicle(verifiedVehicle);
+        setPhotoUnavailable(false);
         setError('');
       })
       .catch((e) => {
@@ -181,25 +183,34 @@ export default function RideConfirmScreen() {
       {vehicle && (
         <>
           <Card style={{ marginTop: 14 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {vehicle.driver_photo_url ? (
-                <Image source={{ uri: vehicle.driver_photo_url }} style={{ width: 48, height: 48, borderRadius: 24 }} />
-              ) : null}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ width: 56, height: 56, borderRadius: 18, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paleGreen, borderWidth: 1, borderColor: colors.border }}>
+                {vehicle.driver_photo_url && !photoUnavailable ? (
+                  <Image
+                    source={{ uri: vehicle.driver_photo_url }}
+                    accessibilityLabel={'Photo of driver ' + vehicle.driver_name}
+                    onError={() => setPhotoUnavailable(true)}
+                    style={{ width: '100%', height: '100%' }}
+                  />
+                ) : <Icon name="person" size={32} color={colors.green} />}
+              </View>
               <View style={{ flex: 1 }}>
-                <Copy bold style={{ color: vehicle.verification_status === 'verified' ? colors.green : colors.yellow }}>
-                  {vehicle.verification_status === 'verified' ? '✓ Verified driver' : 'Verification pending'}
-                </Copy>
-                <Copy style={{ marginTop: 2, color: colors.muted, fontSize: 12 }}>
-                  {vehicle.status} vehicle · {vehicle.shift_status}
-                </Copy>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <Icon name={vehicle.verification_status === 'verified' ? 'checkmark-circle' : 'time-outline'} size={15} color={vehicle.verification_status === 'verified' ? colors.green : colors.yellow} />
+                  <Copy bold style={{ color: vehicle.verification_status === 'verified' ? colors.green : colors.yellow, fontSize: 12 }}>
+                    {vehicle.verification_status === 'verified' ? 'Verified driver' : 'Verification pending'}
+                  </Copy>
+                </View>
+                <Copy bold numberOfLines={1} style={{ marginTop: 3, fontSize: 17, lineHeight: 22 }}>{vehicle.driver_name}</Copy>
+                {!!vehicle.driver_code && <Copy style={{ marginTop: 1, color: colors.muted, fontSize: 12 }}>{vehicle.driver_code}</Copy>}
               </View>
             </View>
-            <Detail icon="person-outline" label="Driver" value={vehicle.driver_name} />
             <Detail
               icon="bus-outline"
-              label="Vehicle"
-              value={vehicle.vehicle_code + ' • Body ' + vehicle.plate_body_number}
+              label="Tricycle number"
+              value={vehicle.plate_body_number}
             />
+            <Detail icon="pricetag-outline" label="Vehicle code" value={vehicle.vehicle_code} />
             <Detail icon="location-outline" label="TODA" value={vehicle.toda} />
             <Detail icon="radio-button-on-outline" label="Shift" value={vehicle.shift_status} />
           </Card>

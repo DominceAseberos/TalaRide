@@ -11,14 +11,26 @@ import { AuthProvider } from '@/auth/AuthProvider';
 import { ActivityIndicator, AppState, View } from 'react-native';
 import { NotificationProvider } from '@/notifications/NotificationProvider';
 import { triggerSync } from '@/api/sync';
+import { Brand, Copy } from '@/components/ui';
+import { colors } from '@/constants/theme';
 
 function AppStack() {
   const { ready, onboardingComplete, signedIn } = useMock();
   // Protected routes are removed from the navigator, not just redirected after rendering.
   if (!ready)
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator accessibilityLabel="Restoring your session" />
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.white,
+          gap: 20,
+        }}
+      >
+        <Brand />
+        <ActivityIndicator color={colors.green} accessibilityLabel="Restoring your session" />
+        <Copy>Loading TalaRide�</Copy>
       </View>
     );
   return (

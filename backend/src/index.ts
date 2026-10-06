@@ -16,6 +16,7 @@ import { lostItemsRouter } from './routes/lost-items.js';
 import { rewardsRouter } from './routes/rewards.js';
 import { paymentIssuesRouter } from './routes/payment-issues.js';
 import { adminRouter } from './routes/admin.js';
+import { todaRouter } from './routes/toda.js';
 import { publicVehiclesRouter } from './routes/public-vehicles.js';
 
 // Compatibility Routers
@@ -117,6 +118,7 @@ app.post('/api/shift-end', (req, res, next) => {
 
 // 3. Fares
 app.use('/api/fares', faresRouter);
+app.use('/api/toda', todaRouter);
 
 // 4. Rides, Cash Record & Safety Checkin
 app.post('/api/cash-record', (req, res, next) => {

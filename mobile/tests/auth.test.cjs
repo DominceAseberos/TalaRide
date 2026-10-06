@@ -460,6 +460,8 @@ test('protected route declarations hide private screens during initialization, o
     '@/api/sync': { triggerSync: async () => ({ sent: 0, pending: 0 }) },
     '@/auth/AuthProvider': { AuthProvider: wrapper },
     '@/notifications/NotificationProvider': { NotificationProvider: wrapper },
+    '@/components/ui': { Brand: 'Brand', Copy: 'Copy' },
+    '@/constants/theme': { colors: { white: '#FFFFFF', green: '#356653' } },
     'react-native': {
       View: 'view',
       ActivityIndicator: 'spinner',
@@ -473,16 +475,31 @@ test('protected route declarations hide private screens during initialization, o
     tree = create(element());
   });
   assert.equal(routes().length, 0);
+  assert.equal(tree.root.findAllByType('Brand').length, 1);
   state = { ready: true, onboardingComplete: false, signedIn: false };
   await act(async () => {
     tree.update(element());
   });
-  assert.deepEqual(routes(), ['index', 'auth-callback', 'v/[vehicle]', 'ride-confirm', 'payment-status', 'onboarding']);
+  assert.deepEqual(routes(), [
+    'index',
+    'auth-callback',
+    'v/[vehicle]',
+    'ride-confirm',
+    'payment-status',
+    'onboarding',
+  ]);
   state = { ready: true, onboardingComplete: true, signedIn: false };
   await act(async () => {
     tree.update(element());
   });
-  assert.deepEqual(routes(), ['index', 'auth-callback', 'v/[vehicle]', 'ride-confirm', 'payment-status', 'sign-in']);
+  assert.deepEqual(routes(), [
+    'index',
+    'auth-callback',
+    'v/[vehicle]',
+    'ride-confirm',
+    'payment-status',
+    'sign-in',
+  ]);
   state = { ready: true, onboardingComplete: true, signedIn: true };
   await act(async () => {
     tree.update(element());
@@ -522,7 +539,9 @@ test('sign-in UI submits real actions, blocks repeated taps and shows unavailabl
     '@/components/Notice': {
       Notice: (props) => React.createElement('notice', props, props.children),
     },
-    '@/components/ConfirmEmail': { ConfirmEmail: (props) => React.createElement('confirm-email', props) },
+    '@/components/ConfirmEmail': {
+      ConfirmEmail: (props) => React.createElement('confirm-email', props),
+    },
     '@/constants/theme': { colors: {} },
     '@/auth/AuthProvider': {
       useAuth: () => ({
@@ -579,7 +598,10 @@ test('sign-in UI submits real actions, blocks repeated taps and shows unavailabl
   assert.match(tree.root.findByType('notice').props.message, /not configured/);
   assert.equal(calls.length, 1);
   await act(async () => {
-    tree.root.findAllByType('pressable').find(item => item.props.accessibilityLabel === 'Driver account').props.onPress();
+    tree.root
+      .findAllByType('pressable')
+      .find((item) => item.props.accessibilityLabel === 'Driver account')
+      .props.onPress();
   });
   await act(async () => {
     button('Sign In').props.onPress();
@@ -595,34 +617,74 @@ test('native driver enrollment validates details and waits for server success wi
   const calls = [];
   const saved = [];
   let failure = true;
-  const ui = Object.fromEntries(['Button', 'Card', 'Copy', 'Field', 'Title'].map(name => [name, props => React.createElement(name, props, props.children)]));
+  const ui = Object.fromEntries(
+    ['Button', 'Card', 'Copy', 'Field', 'Title'].map((name) => [
+      name,
+      (props) => React.createElement(name, props, props.children),
+    ]),
+  );
   const { DriverEnrollment } = load('src/components/DriverEnrollment.tsx', {
-    'react-native': { View: 'view' }, './ui': ui, '@/constants/theme': { colors: {} },
-    '@/api/client': { apiRequest: async (path, options) => {
-      calls.push({ path, details: JSON.parse(options.body) });
-      if (failure) throw new Error('Network unavailable');
-      return { driver: { driver_code: 'DR-100001', full_name: 'Real Driver', verification_status: 'pending', shift_status: 'ended' } };
-    } },
+    'react-native': { View: 'view' },
+    './ui': ui,
+    '@/constants/theme': { colors: {} },
+    '@/api/client': {
+      apiRequest: async (path, options) => {
+        calls.push({ path, details: JSON.parse(options.body) });
+        if (failure) throw new Error('Network unavailable');
+        return {
+          driver: {
+            driver_code: 'DR-100001',
+            full_name: 'Real Driver',
+            verification_status: 'pending',
+            shift_status: 'ended',
+          },
+        };
+      },
+    },
   });
   let tree;
-  await act(async () => { tree = create(React.createElement(DriverEnrollment, { name: 'Real Driver', online: true, onRegistered: driver => saved.push(driver) })); });
+  await act(async () => {
+    tree = create(
+      React.createElement(DriverEnrollment, {
+        name: 'Real Driver',
+        online: true,
+        onRegistered: (driver) => saved.push(driver),
+      }),
+    );
+  });
   const submit = () => tree.root.findByType('Button').props.onPress();
-  await act(async () => { submit(); });
+  await act(async () => {
+    submit();
+  });
   assert.equal(calls.length, 0);
   await act(async () => {
-    for (const [label, value] of [['Mobile number', '09170000000'], ['TODA group', 'Test TODA'], ['License number', 'TEST-ONLY']]) {
-      tree.root.findAllByType('Field').find(field => field.props.label === label).props.onChangeText(value);
+    for (const [label, value] of [
+      ['Mobile number', '09170000000'],
+      ['TODA group', 'Test TODA'],
+      ['License number', 'TEST-ONLY'],
+    ]) {
+      tree.root
+        .findAllByType('Field')
+        .find((field) => field.props.label === label)
+        .props.onChangeText(value);
     }
   });
-  await act(async () => { submit(); submit(); });
+  await act(async () => {
+    submit();
+    submit();
+  });
   assert.equal(calls.length, 1);
   assert.equal(saved.length, 0);
   assert.equal(calls[0].path, '/drivers/enroll');
   assert.equal(calls[0].details.user_id, undefined);
   failure = false;
-  await act(async () => { submit(); });
+  await act(async () => {
+    submit();
+  });
   assert.equal(saved[0].verification_status, 'pending');
-  await act(async () => { tree.unmount(); });
+  await act(async () => {
+    tree.unmount();
+  });
 });
 
 test('installed Supabase SDK persists through the secure adapter, restores a session and removes it on offline sign-out', async () => {
@@ -710,10 +772,19 @@ test('confirmation inbox links use known providers and never trust arbitrary ema
 test('resending confirmation validates email and preserves the native callback without bypassing verification', async () => {
   let args;
   let error = null;
-  const { resendConfirmation } = load('src/auth/actions.ts', { './client': {
-    authRedirectUrl: () => 'talaride://auth-callback',
-    requireSupabase: () => ({ auth: { resend: async value => { args = value; return { error }; } } }),
-  } });
+  const { resendConfirmation } = load('src/auth/actions.ts', {
+    './client': {
+      authRedirectUrl: () => 'talaride://auth-callback',
+      requireSupabase: () => ({
+        auth: {
+          resend: async (value) => {
+            args = value;
+            return { error };
+          },
+        },
+      }),
+    },
+  });
   await assert.rejects(resendConfirmation('bad'), /valid email/);
   assert.equal(args, undefined);
   await resendConfirmation(' passenger@gmail.com ');
@@ -729,46 +800,322 @@ test('native confirmation modal opens inbox, prevents duplicate sends and surfac
   const opened = [];
   let calls = 0;
   let failing = true;
-  const ui = Object.fromEntries(['Button', 'Copy', 'Field'].map(name => [name, props => React.createElement(name, props, props.children)]));
+  const ui = Object.fromEntries(
+    ['Button', 'Copy', 'Field'].map((name) => [
+      name,
+      (props) => React.createElement(name, props, props.children),
+    ]),
+  );
   const { ConfirmEmail } = load('src/components/ConfirmEmail.tsx', {
-    'react-native': { Linking: { openURL: async url => { opened.push(url); } } },
-    '@/auth/actions': { resendConfirmation: async () => { calls++; if (failing) throw new Error('Offline'); return pending.promise; } },
+    'react-native': {
+      Linking: {
+        openURL: async (url) => {
+          opened.push(url);
+        },
+      },
+    },
+    '@/auth/actions': {
+      resendConfirmation: async () => {
+        calls++;
+        if (failing) throw new Error('Offline');
+        return pending.promise;
+      },
+    },
     '@/auth/emailInbox': load('src/auth/emailInbox.ts'),
-    './Notice': { Notice: props => React.createElement('notice', props, props.children) }, './ui': ui,
+    './Notice': { Notice: (props) => React.createElement('notice', props, props.children) },
+    './ui': ui,
   });
   let tree;
-  await act(async () => { tree = create(React.createElement(ConfirmEmail, { email: 'passenger@gmail.com', onClose() {} })); });
-  const button = label => tree.root.findAllByType('Button').find(item => item.props.label === label);
-  await act(async () => { button('Open Gmail').props.onPress(); });
+  await act(async () => {
+    tree = create(
+      React.createElement(ConfirmEmail, { email: 'passenger@gmail.com', onClose() {} }),
+    );
+  });
+  const button = (label) =>
+    tree.root.findAllByType('Button').find((item) => item.props.label === label);
+  await act(async () => {
+    button('Open Gmail').props.onPress();
+  });
   assert.equal(opened[0], 'https://mail.google.com/mail/u/0/#inbox');
-  await act(async () => { button('Resend confirmation email').props.onPress(); });
+  await act(async () => {
+    button('Resend confirmation email').props.onPress();
+  });
   assert.ok(JSON.stringify(tree.toJSON()).includes('Offline'));
   failing = false;
-  await act(async () => { const send = button('Resend confirmation email').props.onPress; send(); send(); });
+  await act(async () => {
+    const send = button('Resend confirmation email').props.onPress;
+    send();
+    send();
+  });
   assert.equal(calls, 2);
   assert.equal(button('Sending…').props.disabled, true);
-  await act(async () => { pending.resolve(); });
+  await act(async () => {
+    pending.resolve();
+  });
   assert.ok(JSON.stringify(tree.toJSON()).includes('newest link'));
-  await act(async () => { button('Resend confirmation email').props.onPress(); });
+  await act(async () => {
+    button('Resend confirmation email').props.onPress();
+  });
   assert.equal(calls, 2);
-  await act(async () => { tree.unmount(); });
+  await act(async () => {
+    tree.unmount();
+  });
 });
 
 test('web confirmation resend uses the deployed origin and handles provider errors without claiming success', async () => {
   const calls = [];
   let failure = new Error('Email rate limit exceeded');
-  const { ConfirmEmail } = load('../frontend/src/components/auth/ConfirmEmail.tsx', {
-    '../../services/auth': { getAuthClient: async () => ({ auth: { resend: async args => { calls.push(args); return { error: failure }; } } }) },
-    '../../services/emailInbox': load('../frontend/src/services/emailInbox.ts'),
-  }, { window: { location: { origin: 'https://talaride-web-frontend.vercel.app' } } });
+  const { ConfirmEmail } = load(
+    '../frontend/src/components/auth/ConfirmEmail.tsx',
+    {
+      '../../services/auth': {
+        getAuthClient: async () => ({
+          auth: {
+            resend: async (args) => {
+              calls.push(args);
+              return { error: failure };
+            },
+          },
+        }),
+      },
+      '../../services/emailInbox': load('../frontend/src/services/emailInbox.ts'),
+    },
+    { window: { location: { origin: 'https://talaride-web-frontend.vercel.app' } } },
+  );
   let tree;
-  await act(async () => { tree = create(React.createElement(ConfirmEmail, { email: 'operator@gmail.com', onClose() {} })); });
-  await act(async () => { await tree.root.findByType('form').props.onSubmit({ preventDefault() {} }); });
+  await act(async () => {
+    tree = create(React.createElement(ConfirmEmail, { email: 'operator@gmail.com', onClose() {} }));
+  });
+  await act(async () => {
+    await tree.root.findByType('form').props.onSubmit({ preventDefault() {} });
+  });
   assert.equal(calls[0].options.emailRedirectTo, 'https://talaride-web-frontend.vercel.app');
   assert.ok(JSON.stringify(tree.toJSON()).includes('rate limit'));
   failure = null;
-  await act(async () => { await tree.root.findByType('form').props.onSubmit({ preventDefault() {} }); });
+  await act(async () => {
+    await tree.root.findByType('form').props.onSubmit({ preventDefault() {} });
+  });
   assert.ok(JSON.stringify(tree.toJSON()).includes('newest link'));
   assert.equal(tree.root.findByType('a').props.rel, 'noopener noreferrer');
-  await act(async () => { tree.unmount(); });
+  await act(async () => {
+    tree.unmount();
+  });
+});
+
+test('returning users skip the splash animation and signed-out users go straight to sign-in', async () => {
+  let state = { ready: true, onboardingComplete: true, signedIn: false };
+  let scheduled = 0;
+  const screen = load(
+    'src/app/index.tsx',
+    {
+      'expo-router': { Redirect: 'Redirect' },
+      'react-native': {
+        Animated: { Value: class {} },
+        Easing: {},
+        Text: 'Text',
+        View: 'View',
+        useWindowDimensions: () => ({ width: 390 }),
+      },
+      '@/components/TalaIllustration': { TalaIllustration: 'TalaIllustration' },
+      '@/components/Screen': { Screen: 'Screen' },
+      '@/components/ui': {
+        replace() {
+          throw new Error('Unexpected animated redirect');
+        },
+      },
+      '@/mocks/MockProvider': { useMock: () => state },
+      '@/constants/theme': { colors: {} },
+    },
+    {
+      setTimeout() {
+        scheduled++;
+        return 1;
+      },
+      clearTimeout() {},
+    },
+  );
+  let tree;
+  await act(async () => {
+    tree = create(React.createElement(screen.default));
+  });
+  assert.equal(tree.root.findByType('Redirect').props.href, '/sign-in');
+  assert.equal(scheduled, 0);
+  assert.equal(tree.root.findAllByType('TalaIllustration').length, 0);
+  await act(async () => {
+    state = { ...state, signedIn: true };
+    tree.update(React.createElement(screen.default));
+  });
+  assert.equal(tree.root.findByType('Redirect').props.href, '/home');
+  await act(async () => {
+    state = { ...state, signedIn: false };
+    tree.update(React.createElement(screen.default));
+  });
+  assert.equal(tree.root.findByType('Redirect').props.href, '/sign-in');
+  assert.equal(scheduled, 0);
+  await act(async () => tree.unmount());
+});
+
+test('driver waits for admin approval then dashboard and saved membership update automatically', async () => {
+  let account = {
+    driver: {
+      driver_code: 'DR-123456',
+      full_name: 'Registered driver',
+      verification_status: 'pending',
+      shift_status: 'ended',
+    },
+    vehicle: { vehicle_code: 'TR-12345', qr_checksum: 'checksum' },
+  };
+  let tick;
+  let foreground;
+  const stored = new Map();
+  let unavailable = false;
+  const ui = Object.fromEntries(
+    ['Button', 'Card', 'Copy', 'Header', 'Title'].map((name) => [name, name]),
+  );
+  const screen = load(
+    'src/app/driver.tsx',
+    {
+      'react-native': {
+        TextInput: 'TextInput',
+        View: 'View',
+        AppState: {
+          addEventListener: (_event, fn) => {
+            foreground = fn;
+            return { remove() {} };
+          },
+        },
+      },
+      '@react-native-async-storage/async-storage': {
+        getItem: async (key) => stored.get(key),
+        setItem: async (key, value) => stored.set(key, value),
+        removeItem: async (key) => stored.delete(key),
+      },
+      '@/components/Screen': { Screen: 'Screen' },
+      '@/components/ui': { ...ui, replace() {} },
+      '@/components/DriverEnrollment': { DriverEnrollment: 'DriverEnrollment' },
+      '@/components/QrImage': { QrImage: 'QrImage' },
+      '@/api/client': {
+        ApiError: class extends Error {},
+        apiRequest: async () => {
+          if (unavailable) throw new Error('Offline');
+          return structuredClone(account);
+        },
+      },
+      '@/api/shifts': { startShift() {}, endShift() {} },
+      '@/api/drivers': {
+        fetchDriverNotifications: async () => {
+          throw new Error('Notifications unavailable');
+        },
+      },
+      '@/mocks/MockProvider': { useMock: () => ({ saveRide() {} }) },
+      '@/offline/queue': { enqueueOutbox() {} },
+      '@/api/sync': { triggerSync: async () => {} },
+      '@/auth/AuthProvider': {
+        useAuth: () => ({ session: session('driver'), displayName: 'Registered driver' }),
+      },
+      '@/constants/theme': { colors: {} },
+    },
+    {
+      structuredClone,
+      setInterval: (fn) => {
+        tick = fn;
+        return 1;
+      },
+      clearInterval() {},
+    },
+  );
+  let tree;
+  await act(async () => {
+    tree = create(React.createElement(screen.default));
+  });
+  assert.ok(JSON.stringify(tree.toJSON()).includes('Awaiting admin verification'));
+  assert.equal(tree.root.findAllByType('QrImage').length, 0);
+  account.driver = { ...account.driver, toda_group_id: 'group-a', toda_operator: 'Group A' };
+  await act(async () => {
+    tick();
+  });
+  assert.ok(JSON.stringify(tree.toJSON()).includes('Group A'));
+  assert.equal(
+    tree.root.findAllByType('QrImage').length,
+    0,
+    'membership never unlocks the dashboard',
+  );
+  account.driver = { ...account.driver, verification_status: 'verified' };
+  await act(async () => {
+    foreground('active');
+  });
+  assert.equal(tree.root.findAllByType('QrImage').length, 1);
+  assert.ok(JSON.stringify(tree.toJSON()).includes('Verified driver'));
+  assert.ok(!JSON.stringify(tree.toJSON()).includes('Awaiting admin verification'));
+  assert.equal(
+    JSON.parse(stored.get('talaride.driver-account:driver')).driver.toda_operator,
+    'Group A',
+  );
+  unavailable = true;
+  await act(async () => {
+    tick();
+  });
+  assert.ok(
+    JSON.stringify(tree.toJSON()).includes('Group A'),
+    'offline view retains saved membership',
+  );
+  assert.ok(JSON.stringify(tree.toJSON()).includes('Saved QR'));
+  await act(async () => {
+    tree.unmount();
+  });
+});
+
+test('TODA member form saves through the API and displays returned records without approval controls', async () => {
+  const group = { id: 'group-a', name: 'Group A' };
+  let members = [];
+  let calls = 0;
+  let fail = false;
+  const { TodaDashboard } = load(
+    '../frontend/src/components/toda/TodaDashboard.tsx',
+    {
+      '../../services/api': {
+        api: {
+          getTodaMembers: async () => ({ group, members }),
+          addTodaMember: async (code) => {
+            calls++;
+            if (fail) throw new Error('Driver belongs to another group');
+            members = [
+              { driver_id: code, name: 'Registered driver', verification_status: 'pending' },
+            ];
+          },
+        },
+      },
+    },
+    { window: { setInterval: () => 1, clearInterval() {} } },
+  );
+  let tree;
+  await act(async () => {
+    tree = create(React.createElement(TodaDashboard, { operatorName: 'Operator', onSignOut() {} }));
+  });
+  await act(async () => {
+    tree.root.findByType('input').props.onChange({ target: { value: 'dr-123456' } });
+  });
+  await act(async () => {
+    await tree.root.findByType('form').props.onSubmit({ preventDefault() {} });
+  });
+  assert.equal(calls, 1);
+  assert.ok(JSON.stringify(tree.toJSON()).includes('DR-123456'));
+  assert.ok(JSON.stringify(tree.toJSON()).includes('Awaiting admin approval'));
+  assert.ok(
+    !tree.root
+      .findAllByType('button')
+      .some((item) => /approve|verify/i.test(JSON.stringify(item.props.children))),
+  );
+  fail = true;
+  await act(async () => {
+    tree.root.findByType('input').props.onChange({ target: { value: 'DR-234567' } });
+  });
+  await act(async () => {
+    await tree.root.findByType('form').props.onSubmit({ preventDefault() {} });
+  });
+  assert.ok(JSON.stringify(tree.toJSON()).includes('Driver belongs to another group'));
+  assert.ok(!JSON.stringify(tree.toJSON()).includes('Membership saved'));
+  await act(async () => {
+    tree.unmount();
+  });
 });

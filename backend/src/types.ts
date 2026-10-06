@@ -32,6 +32,11 @@ export interface Driver {
   mobile_number: string;
   verification_status: DriverVerificationStatus;
   toda_operator: string;
+  toda_group_id?: string | null;
+  membership_added_by?: string;
+  membership_added_at?: string;
+  verified_by?: string;
+  verified_at?: string;
   license_number: string;
   pin_hash?: string;
   assigned_vehicle_code: string | null;

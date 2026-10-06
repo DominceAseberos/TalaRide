@@ -1,5 +1,4 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
 import type { ComponentProps, PropsWithChildren } from 'react';
 import {
   Pressable,
@@ -97,17 +96,8 @@ export function Button({
       ]}
     >
       {variant === 'primary' ? (
-        <LinearGradient
-          colors={[colors.darkGreen, colors.green]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{ borderRadius: 10 }}
-        >
-          {inner}
-        </LinearGradient>
-      ) : (
-        inner
-      )}
+        <View style={{ borderRadius: 10, backgroundColor: colors.green }}>{inner}</View>
+      ) : inner}
     </Pressable>
   );
 }
@@ -238,7 +228,7 @@ export const s = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
   },
-  outline: { borderWidth: 1, borderColor: colors.green },
+  outline: { borderWidth: 1, borderColor: colors.border },
   subtle: { backgroundColor: colors.paleGreen },
   iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   header: {

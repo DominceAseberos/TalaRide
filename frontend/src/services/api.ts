@@ -192,6 +192,11 @@ function normalizeFareConfig(raw: any): FareConfiguration {
 
 export const api = {
   getCurrentAccount: () => apiJson<any>('/auth/me'),
+  getTodaMembers: async (): Promise<{ group: { id: string; name: string }; members: Driver[] }> => {
+    const data = await apiJson<{ group: { id: string; name: string }; members: any[] }>('/toda/members');
+    return { group: data.group, members: data.members.map(normalizeDriver) };
+  },
+  addTodaMember: (driverCode: string) => apiJson<{ driver: unknown }>('/toda/members', { method: 'POST', body: JSON.stringify({ driver_code: driverCode }) }),
   enrollDriver: (data: { full_name: string; mobile_number: string; toda_operator: string; license_number: string }) => apiJson<any>('/drivers/enroll', { method: 'POST', body: JSON.stringify(data) }),
   getDriverNotifications: (code: string) => apiJson<any>(`/drivers/${encodeURIComponent(code)}/notifications`),
   requestOtp: async (mobileNumber: string, role = 'commuter') =>

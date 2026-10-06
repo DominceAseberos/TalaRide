@@ -9,6 +9,7 @@ export interface TodaSession {
   name: string;
   group: string;
   email: string;
+  role: 'operator' | 'talaride_admin' | 'lgu_admin';
 }
 
 interface Props {
@@ -34,11 +35,11 @@ export const TodaLogin: React.FC<Props> = ({ onAuthenticated }) => {
   const [notice, setNotice] = useState('');
   async function openAccount() {
     const result = await api.getCurrentAccount();
-    if (!['talaride_admin', 'lgu_admin'].includes(result.user.role)) {
+    if (!['operator', 'talaride_admin', 'lgu_admin'].includes(result.user.role)) {
       setNotice('Your account is signed in. TODA dashboard access requires approval from TalaRide.');
       return;
     }
-    onAuthenticated({ name: result.user.full_name, group: 'TODA operations', email });
+    onAuthenticated({ name: result.user.full_name, role: result.user.role, group: result.user.toda_group?.name || 'TalaRide administration', email });
   }
   useEffect(() => {
     window.localStorage.removeItem('talaride.toda-account');

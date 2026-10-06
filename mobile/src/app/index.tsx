@@ -1,3 +1,4 @@
+import { Redirect } from 'expo-router';
 import { Animated, Easing, Text, useWindowDimensions, View } from 'react-native';
 import { TalaIllustration } from '@/components/TalaIllustration';
 import { Screen } from '@/components/Screen';
@@ -12,6 +13,7 @@ export default function SplashScreen() {
   const [rise] = useState(() => new Animated.Value(18));
   const [animationDone, setAnimationDone] = useState(false);
   useEffect(() => {
+    if (onboardingComplete) return;
     Animated.parallel([
       Animated.timing(fade, {
         toValue: 1,
@@ -30,15 +32,15 @@ export default function SplashScreen() {
       setAnimationDone(true);
     }, 2400);
     return () => clearTimeout(timer);
-  }, [fade, rise]);
+  }, [fade, rise, onboardingComplete]);
 
   useEffect(() => {
-    if (animationDone && ready) {
-      replace(!onboardingComplete ? '/onboarding' : signedIn ? '/home' : '/sign-in');
-    }
+    if (animationDone && ready && !onboardingComplete) replace('/onboarding');
   }, [animationDone, ready, onboardingComplete, signedIn]);
   const { width } = useWindowDimensions();
   const contentWidth = Math.min(width, 480);
+  // Returning users, including after logout, go directly to the current account route.
+  if (ready && onboardingComplete) return <Redirect href={signedIn ? '/home' : '/sign-in'} />;
   return (
     <Screen scroll={false} style={{ padding: 0 }}>
       <Animated.View
@@ -54,7 +56,14 @@ export default function SplashScreen() {
       >
         <TalaIllustration name="mark" width={92} />
         <View style={{ alignItems: 'center', marginTop: 14 }}>
-          <Text style={{ fontSize: 42, fontWeight: '800', color: colors.darkGreen, letterSpacing: -1.5 }}>
+          <Text
+            style={{
+              fontSize: 42,
+              fontWeight: '800',
+              color: colors.darkGreen,
+              letterSpacing: -1.5,
+            }}
+          >
             TalaRide
           </Text>
           <Text style={{ fontSize: 16, fontStyle: 'italic', color: colors.green }}>

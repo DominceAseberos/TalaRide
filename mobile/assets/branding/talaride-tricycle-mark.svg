@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 84" role="img" aria-labelledby="title">
+  <title id="title">TalaRide Philippine tricycle</title>
+  <rect x="2" y="2" width="96" height="80" rx="22" fill="#f2f6f3"/>
+  <ellipse cx="50" cy="76" rx="39" ry="2" fill="#dce5df"/>
+  <path d="M5 75h87" stroke="#cfdad3" stroke-width="1.5" stroke-linecap="round"/>
+  <g fill="#fff" stroke="#2f5141" stroke-width="3.5">
+    <circle cx="20" cy="67" r="8"/><circle cx="55" cy="67" r="8"/><circle cx="87" cy="67" r="8"/>
+  </g>
+  <g fill="#6e8a7b"><circle cx="20" cy="67" r="2"/><circle cx="55" cy="67" r="2"/><circle cx="87" cy="67" r="2"/></g>
+  <path d="M8 43q1-10 10-12h42q10 0 16 9l6 20q1 4-5 4H16q-8-1-8-7z" fill="#42b83f"/>
+  <path d="M16 34q4-11 16-12h24q10 1 14 13z" fill="#2f5141"/>
+  <path d="M19 34q4-8 13-8h11v11H17zm27-8h10q7 1 11 11H46z" fill="#dceee0"/>
+  <path d="M12 42h58M14 56h61" stroke="#bce4b5" stroke-width="1.4"/>
+  <path d="M48 39h17v20H48q-2 0-2-2V42q0-3 2-3z" fill="#f5f6ec"/>
+  <path d="M47 41v17m16-18v18M50 53h10" fill="none" stroke="#2f5141" stroke-width="1.8"/>
+  <path d="m75 55 6-1 3 6h-6zM68 49q2-9 8-10l6 3 2 12-5 4h-9z" fill="#47715d"/>
+  <circle cx="74" cy="30" r="5.8" fill="#d8a982"/>
+  <path d="M68 29q1-8 8-8t6 8l-5-2-5 3z" fill="#2f5141"/>
+  <path d="m78 43 8-1 4 5m-9-3 7-1m-4 0 5-4 3 1-5 23m2-24 7-2" fill="none" stroke="#2f5141" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m81 44 7-1m-8 2 8-1" stroke="#d8a982" stroke-width="2.4" stroke-linecap="round"/>
+</svg>

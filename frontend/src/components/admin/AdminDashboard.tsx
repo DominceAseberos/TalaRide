@@ -15,9 +15,10 @@ interface Props {
   operatorName?: string;
   todaName?: string;
   onSignOut?: () => void;
+  canVerify?: boolean;
 }
 
-export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Operator', todaName = 'Tagum City TODA', onSignOut }) => {
+export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Admin', todaName = 'TalaRide administration', onSignOut, canVerify = true }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'drivers' | 'vehicles' | 'transactions' | 'lostItems' | 'issues' | 'fares'>('overview');
   const [overview, setOverview] = useState<any>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -29,6 +30,7 @@ export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Opera
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [verifyingDriver, setVerifyingDriver] = useState<string | null>(null);
 
   // New Driver Form state
   const [showAddDriver, setShowAddDriver] = useState(false);
@@ -108,9 +110,21 @@ export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Opera
   }, []);
 
   const handleVerifyDriver = async (driverId: string) => {
-    await api.verifyDriver(driverId);
-    await loadAllData();
+    if (verifyingDriver) return;
+    setVerifyingDriver(driverId); setLoadError('');
+    try { await api.verifyDriver(driverId); await loadAllData(); }
+    catch (error) { setLoadError(error instanceof Error ? error.message : 'Could not approve this driver.'); }
+    finally { setVerifyingDriver(null); }
   };
+
+  useEffect(() => {
+    let active = true;
+    const timer = window.setInterval(() => {
+      void api.getAdminDrivers().then(rows => { if (active) setDrivers(rows); })
+        .catch(error => { if (active) setLoadError(error.message); });
+    }, 15000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, []);
 
   const handleSuspendDriver = async (driverId: string) => {
     await api.suspendDriver(driverId);
@@ -247,6 +261,7 @@ export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Opera
       </div>
 
       {loadError && <p role="alert" className="m-4 rounded-xl bg-danger-soft p-4 text-danger">{loadError}</p>}
+      {canVerify && drivers.some(driver => driver.verification_status === 'pending') && <button onClick={() => setActiveTab('drivers')} className="mx-4 mt-4 rounded-xl border border-line bg-white p-4 text-left text-sm font-semibold text-accent">{drivers.filter(driver => driver.verification_status === 'pending').length} driver verification request(s) awaiting your review →</button>}
       {/* Main Content Area */}
       <div className="p-4 sm:p-6 max-w-7xl mx-auto w-full space-y-6 flex-1">
         {/* TAB 1: OVERVIEW */}
@@ -371,7 +386,7 @@ export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Opera
                   <tr>
                     <th className="p-4">Driver ID</th>
                     <th className="p-4">Name</th>
-                    <th className="p-4">Mobile</th>
+                    <th className="p-4">Mobile / License</th>
                     <th className="p-4">TODA / Operator</th>
                     <th className="p-4">Active Unit</th>
                     <th className="p-4">Shift Status</th>
@@ -384,7 +399,7 @@ export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Opera
                     <tr key={d.driver_id} className="hover:bg-subtle/60">
                       <td className="p-4 font-mono font-bold text-accent">{d.driver_id}</td>
                       <td className="p-4 font-semibold text-ink">{d.name}</td>
-                      <td className="p-4 font-mono text-muted">{d.mobile_number}</td>
+                      <td className="p-4 font-mono text-muted">{d.mobile_number}<div className="mt-1">{d.license_number || 'No license submitted'}</div></td>
                       <td className="p-4 text-ink">{d.toda_operator}</td>
                       <td className="p-4 font-mono font-bold text-ink">
                         {d.assigned_vehicle_id || '—'}
@@ -406,12 +421,13 @@ export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Opera
                         </span>
                       </td>
                       <td className="p-4 text-right space-x-2">
-                        {d.verification_status !== 'verified' && (
+                        {canVerify && d.verification_status !== 'verified' && (
                           <button
                             onClick={() => handleVerifyDriver(d.driver_id)}
+                            disabled={!!verifyingDriver}
                             className="px-2.5 py-1 bg-accent-soft text-accent hover:bg-accent-soft rounded text-[11px] font-semibold"
                           >
-                            Verify
+                            {verifyingDriver === d.driver_id ? 'Approving…' : 'Approve driver'}
                           </button>
                         )}
                         {d.verification_status !== 'suspended' && (

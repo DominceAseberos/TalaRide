@@ -60,29 +60,24 @@
       "fallbackToCacheTimeout": 0
     },
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/branding/talaride-tricycle-app-icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.beepanjero.talaride",
-      "associatedDomains": [
-        "applinks:talaride-web-frontend.vercel.app"
-      ]
+      "associatedDomains": ["applinks:talaride-web-frontend.vercel.app"]
     },
     "android": {
       "package": "com.beepanjero.talaride",
       "versionCode": 7,
       "adaptiveIcon": {
-        "backgroundColor": "#FFFEF9",
-        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#F2F6F3",
+        "foregroundImage": "./assets/branding/talaride-tricycle-adaptive-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "monochromeImage": "./assets/branding/talaride-tricycle-adaptive-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.REQUEST_INSTALL_PACKAGES"
-      ],
+      "permissions": ["android.permission.CAMERA", "android.permission.REQUEST_INSTALL_PACKAGES"],
       "intentFilters": [
         {
           "action": "VIEW",
@@ -94,15 +89,12 @@
               "pathPrefix": "/v/"
             }
           ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "category": ["BROWSABLE", "DEFAULT"]
         }
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png",
+      "favicon": "./assets/branding/talaride-tricycle-app-icon.png",
       "bundler": "metro"
     },
     "extra": {

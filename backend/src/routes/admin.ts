@@ -92,9 +92,9 @@ adminRouter.post('/drivers', async (_req, res) => {
 });
 
 // POST /api/admin/drivers/:id/verify
-adminRouter.post('/drivers/:id/verify', async (req: Request, res: Response) => {
+adminRouter.post('/drivers/:id/verify', requireRole('talaride_admin'), async (req: Request, res: Response) => {
   try {
-    const driver = await repository.updateDriverStatus(String(req.params.id), 'verified');
+    const driver = await repository.updateDriverStatus(String(req.params.id), 'verified', req.user!.id);
     if (!driver) return res.status(404).json({ error: 'Driver not found' });
     return res.json({ success: true, driver });
   } catch (err: any) {
