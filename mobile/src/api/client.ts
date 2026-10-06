@@ -9,7 +9,7 @@ export function getPaymentMode(): PaymentMode {
   return 'mock-local';
 }
 
-const DEFAULT_WEB_API = 'https://talaride-web.onrender.com/api';
+const DEFAULT_WEB_API = 'https://talaride-backend.onrender.com/api';
 
 export function getWebApiBase(): string {
   return (process.env.EXPO_PUBLIC_WEB_API ?? DEFAULT_WEB_API).trim().replace(/\/$/, '');
