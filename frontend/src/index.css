@@ -1,18 +1,35 @@
 @import "tailwindcss";
 
+@theme {
+  --color-canvas: #ffffff;
+  --color-subtle: #f7f8f8;
+  --color-ink: #25332e;
+  --color-muted: #65716b;
+  --color-line: #e2e7e4;
+  --color-accent: #356653;
+  --color-accent-hover: #2b5545;
+  --color-accent-soft: #f0f5f2;
+  --color-danger: #a04444;
+  --color-danger-soft: #fcf5f5;
+  --color-danger-line: #eddada;
+  --color-warning: #80612e;
+  --color-warning-soft: #faf8f2;
+}
+
 @layer base {
   :root {
     --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    --talaride-bg: #FFFEF9;
+    color-scheme: light;
+    --talaride-bg: #FFFFFF;
     --talaride-surface: #FFFFFF;
-    --talaride-ink: #101A20;
-    --talaride-muted: #53606D;
-    --talaride-green: #006B3D;
-    --talaride-green-dark: #003D2B;
-    --talaride-green-soft: #EEF7EB;
-    --talaride-border: #DFE6DF;
-    --talaride-danger: #C73E3A;
-    --talaride-warning: #C88913;
+    --talaride-ink: #25332e;
+    --talaride-muted: #65716b;
+    --talaride-green: #356653;
+    --talaride-green-dark: #2b5545;
+    --talaride-green-soft: #f0f5f2;
+    --talaride-border: #e2e7e4;
+    --talaride-danger: #a04444;
+    --talaride-warning: #80612e;
   }
 
   html, body, #root {
@@ -26,7 +43,6 @@
     background-color: var(--talaride-bg);
     color: var(--talaride-ink);
     -webkit-tap-highlight-color: transparent;
-    user-select: none;
   }
 
   button, input, select, textarea {
@@ -36,6 +52,16 @@
   button {
     touch-action: manipulation;
   }
+
+  :where(button, a, input, select, textarea):focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+  }
+
+  :where(button, a) { -webkit-tap-highlight-color: transparent; }
+  button:not(:disabled), a { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  input, select, textarea { color-scheme: light; }
 }
 
 /* Custom animations & pulsing status */

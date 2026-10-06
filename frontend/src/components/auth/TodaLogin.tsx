@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
+import { Building2, LockKeyhole, Mail } from 'lucide-react';
 
 import { getAuthClient } from '../../services/auth';
 import { api } from '../../services/api';
@@ -78,38 +78,19 @@ export const TodaLogin: React.FC<Props> = ({ onAuthenticated }) => {
   };
 
   return (
-    <main className="min-h-screen bg-[#F4F8F5] px-4 py-8 text-slate-900 sm:px-6">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl items-center justify-center">
-        <div className="grid w-full overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-xl shadow-emerald-950/10 md:grid-cols-[1.05fr_0.95fr]">
-          <section className="hidden bg-[#003D2B] p-10 text-white md:block">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500 text-2xl font-black">T</div>
-              <div>
-                <div className="text-2xl font-black">TalaRide</div>
-                <div className="text-xs text-emerald-100">TODA operations portal</div>
-              </div>
-            </div>
-            <div className="mt-20 max-w-md">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">
-                <ShieldCheck className="h-8 w-8 text-emerald-300" />
-              </div>
-              <h1 className="text-4xl font-black leading-tight">Run your TODA from one simple dashboard.</h1>
-              <p className="mt-4 text-sm leading-6 text-emerald-100">
-                Manage verified drivers, vehicles, locations, fare activity, lost-item reports, and payment issues in one place.
-              </p>
-            </div>
-          </section>
-
+    <main className="min-h-screen bg-canvas px-4 py-8 text-ink sm:px-6">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md items-center justify-center">
+        <div className="w-full rounded-2xl border border-line bg-white">
           <section className="p-6 sm:p-10">
-            <div className="mb-8 md:hidden">
-              <div className="text-2xl font-black text-[#003D2B]">TalaRide</div>
-              <div className="text-xs text-slate-500">TODA operations portal</div>
+            <div className="mb-8">
+              <div className="text-2xl font-semibold text-ink">TalaRide</div>
+              <div className="text-xs text-muted">TODA operations portal</div>
             </div>
             <div className="mb-7">
-              <h2 className="text-2xl font-black text-slate-900">
+              <h2 className="text-2xl font-semibold text-ink">
                 {mode === 'signin' ? 'Sign in to your TODA portal' : 'Create a TODA portal account'}
               </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">
+              <p className="mt-2 text-sm leading-6 text-muted">
                 {mode === 'signin'
                   ? 'Use your operator account to view today’s members, locations, reports, and activity.'
                   : 'Register your TODA group and request access. An approved account is required to view member records.'}
@@ -120,41 +101,41 @@ export const TodaLogin: React.FC<Props> = ({ onAuthenticated }) => {
               {mode === 'signup' && (
                 <>
                   <label className="block">
-                    <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Your name</span>
-                    <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-emerald-500">
-                      <Building2 className="h-4 w-4 text-slate-400" />
+                    <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted">Your name</span>
+                    <div className="flex items-center rounded-xl border border-line bg-subtle px-3 focus-within:border-line">
+                      <Building2 className="h-4 w-4 text-muted" />
                       <input value={name} onChange={(event) => setName(event.target.value)} className="w-full bg-transparent px-3 py-3 text-sm outline-none" placeholder="TODA coordinator name" />
                     </div>
                   </label>
                   <label className="block">
-                    <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">TODA group</span>
-                    <input value={group} onChange={(event) => setGroup(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none focus:border-emerald-500" placeholder="e.g. Tagum Poblacion TODA" />
+                    <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted">TODA group</span>
+                    <input value={group} onChange={(event) => setGroup(event.target.value)} className="w-full rounded-xl border border-line bg-subtle px-3 py-3 text-sm outline-none focus:border-line" placeholder="e.g. Tagum Poblacion TODA" />
                   </label>
                 </>
               )}
               <label className="block">
-                <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Email</span>
-                <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-emerald-500">
-                  <Mail className="h-4 w-4 text-slate-400" />
+                <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted">Email</span>
+                <div className="flex items-center rounded-xl border border-line bg-subtle px-3 focus-within:border-line">
+                  <Mail className="h-4 w-4 text-muted" />
                   <input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full bg-transparent px-3 py-3 text-sm outline-none" placeholder="operator@example.com" autoComplete="email" />
                 </div>
               </label>
               <label className="block">
-                <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Password</span>
-                <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-emerald-500">
-                  <LockKeyhole className="h-4 w-4 text-slate-400" />
+                <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted">Password</span>
+                <div className="flex items-center rounded-xl border border-line bg-subtle px-3 focus-within:border-line">
+                  <LockKeyhole className="h-4 w-4 text-muted" />
                   <input required minLength={8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="w-full bg-transparent px-3 py-3 text-sm outline-none" placeholder="At least 8 characters" autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} />
                 </div>
               </label>
-              {error && <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{error}</p>}
-              <button disabled={busy} type="submit" className="min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700">
+              {error && <p className="rounded-xl border border-danger-line bg-danger-soft px-3 py-2 text-xs font-semibold text-danger">{error}</p>}
+              <button disabled={busy} type="submit" className="min-h-12 w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white shadow-none  transition hover:bg-accent-hover">
                 {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in to dashboard' : 'Create TODA account'}
               </button>
             </form>
 
-            {notice && <p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
-            <button type="button" onClick={() => setConfirmation(true)} className="mt-4 w-full text-center text-sm font-bold text-emerald-700 hover:underline">Need to confirm your email?</button>
-            <button type="button" onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); }} className="mt-6 w-full text-center text-sm font-bold text-emerald-700 hover:underline">
+            {notice && <p role="status" className="mt-4 rounded-xl bg-accent-soft p-3 text-sm text-accent">{notice}</p>}
+            <button type="button" onClick={() => setConfirmation(true)} className="mt-4 w-full text-center text-sm font-bold text-accent hover:underline">Need to confirm your email?</button>
+            <button type="button" onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); }} className="mt-6 w-full text-center text-sm font-bold text-accent hover:underline">
               {mode === 'signin' ? 'Create a TODA account' : 'Already have an account? Sign in'}
             </button>
           </section>

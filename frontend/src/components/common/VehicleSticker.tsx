@@ -34,12 +34,12 @@ export function VehicleSticker({ code, url }: { code: string; url: string }) {
   }
   if (!/^TR-\d{5}$/.test(code) || !url) return <p>Assign a registered vehicle to display its QR code.</p>;
   return <div className="space-y-4 text-center">
-    <div ref={container} className="rounded-2xl bg-white p-5 text-slate-900">
+    <div ref={container} className="rounded-2xl bg-white p-5 text-ink">
       <QRCodeSVG value={url} size={240} marginSize={4} level="M" className="mx-auto max-w-full h-auto" />
-      <div className="mt-3 font-mono text-3xl font-black">{code}</div>
+      <div className="mt-3 font-mono text-3xl font-semibold">{code}</div>
       <p className="mt-2 text-xs">Scan QR or enter this vehicle code</p>
     </div>
-    <button onClick={() => void download()} className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white">Download QR image</button>
+    <button onClick={() => void download()} className="w-full rounded-xl bg-accent px-4 py-3 font-bold text-white">Download QR image</button>
     {error && <p role="alert">{error}</p>}
   </div>;
 }

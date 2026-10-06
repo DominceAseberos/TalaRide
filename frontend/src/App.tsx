@@ -35,6 +35,6 @@ export function App() {
   const page = path === '/success' || path === '/cancel' ? <PaymentReturnPage paymentId={query.get('payment_id') || ''} cancelled={path === '/cancel'} />
     : path.startsWith('/v/') ? <PublicVehiclePage vehicleCode={path.split('/')[2]} checksum={query.get('c') || ''} />
     : <>{error && <p role="alert">{error}</p>}{operator ? <AdminDashboard operatorName={operator.name} todaName={operator.group} onSignOut={() => void signOut().then(() => setOperator(null)).catch(e => setError(e.message))} /> : <TodaLogin onAuthenticated={setOperator} />}</>;
-  return <>{testPayments && <div role="status" className="bg-amber-100 px-4 py-3 text-center text-sm font-semibold text-amber-950">PayMongo test mode — no real money is charged.</div>}{page}</>;
+  return <>{testPayments && <div role="status" className="bg-warning-soft px-4 py-3 text-center text-sm font-semibold text-warning">PayMongo test mode — no real money is charged.</div>}{page}</>;
 }
 export default App;
