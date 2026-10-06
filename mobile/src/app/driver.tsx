@@ -3,7 +3,9 @@ import { AppState, Image, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Screen } from '@/components/Screen';
-import { Button, Card, Copy, Detail, Field, Icon, Title } from '@/components/ui';
+import { Button, Card, Copy, Detail, Field, Icon, IconButton, Title } from '@/components/ui';
+import { PortalShell } from '@/components/PortalShell';
+import type { PortalTab } from '@/components/BottomNav';
 import { DriverEnrollment, type RegisteredDriver } from '@/components/DriverEnrollment';
 import { QrImage } from '@/components/QrImage';
 import { apiRequest, ApiError } from '@/api/client';
@@ -33,12 +35,17 @@ type Account = {
 
 type PortalSection = 'overview' | 'history' | 'fares' | 'notifications' | 'profile';
 
-const portalSections: { id: PortalSection; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'history', label: 'History' },
-  { id: 'fares', label: 'Fares' },
-  { id: 'notifications', label: 'Alerts' },
-  { id: 'profile', label: 'Profile' },
+const portalSections: PortalTab[] = [
+  { id: 'overview', label: 'Home', icon: 'home-outline', activeIcon: 'home' },
+  { id: 'history', label: 'History', icon: 'calendar-outline', activeIcon: 'calendar' },
+  { id: 'fares', label: 'Fares', icon: 'cash-outline', activeIcon: 'cash' },
+  {
+    id: 'notifications',
+    label: 'Alerts',
+    icon: 'notifications-outline',
+    activeIcon: 'notifications',
+  },
+  { id: 'profile', label: 'Profile', icon: 'person-outline', activeIcon: 'person' },
 ];
 
 function pesos(centavos: number) {
@@ -345,7 +352,21 @@ function DriverAccountScreen() {
   const totalFare = completedRides.reduce((total, item) => total + item.fare_amount_centavos, 0);
 
   return (
-    <Screen>
+    <PortalShell
+      activeTab={section}
+      tabs={portalSections}
+      onTabSelect={(tab) => {
+        setSection(tab.id as PortalSection);
+        setError('');
+      }}
+      headerAction={
+        <IconButton
+          name="notifications-outline"
+          label="Open driver alerts"
+          onPress={() => setSection('notifications')}
+        />
+      }
+    >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <View
           style={{
@@ -369,21 +390,6 @@ function DriverAccountScreen() {
           <Copy style={{ color: colors.muted }}>{driver.driver_code} · Verified driver</Copy>
         </View>
         <Icon name={online ? 'cloud-done-outline' : 'cloud-offline-outline'} color={colors.green} />
-      </View>
-
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 18 }}>
-        {portalSections.map((item) => (
-          <Button
-            key={item.id}
-            label={item.label}
-            variant={section === item.id ? 'primary' : 'subtle'}
-            onPress={() => {
-              setSection(item.id);
-              setError('');
-            }}
-            style={{ minWidth: '30%', flexGrow: 1 }}
-          />
-        ))}
       </View>
 
       {section === 'overview' && (
@@ -653,6 +659,6 @@ function DriverAccountScreen() {
       )}
 
       {!!error && <Copy style={{ marginTop: 12, color: colors.red }}>{error}</Copy>}
-    </Screen>
+    </PortalShell>
   );
 }

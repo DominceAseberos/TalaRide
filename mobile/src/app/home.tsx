@@ -1,7 +1,6 @@
 import { Pressable, View } from 'react-native';
-import { Screen } from '@/components/Screen';
-import { Brand, Copy, Icon, IconButton, Title, go, s } from '@/components/ui';
-import { BottomNav } from '@/components/BottomNav';
+import { Copy, Icon, IconButton, Title, go } from '@/components/ui';
+import { PortalShell } from '@/components/PortalShell';
 import { RideRow } from '@/components/RideRow';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/auth/AuthProvider';
@@ -15,18 +14,22 @@ export default function HomeScreen() {
   const recent = rides.slice(0, 1);
   const progress = Math.min(rides.length % (REWARD_THRESHOLD + 1), REWARD_THRESHOLD);
   return (
-    <Screen footer={<BottomNav active="Home" />}>
-      <View style={[s.row, { justifyContent: 'space-between', marginBottom: 22 }]}>
-        <Brand />
+    <PortalShell
+      activeTab="home"
+      headerAction={
         <IconButton
           name="notifications-outline"
           label="Open notifications"
           onPress={() => go('/activity?tab=notifications')}
         />
-      </View>
-      <Title style={{ fontSize: 25, lineHeight: 30, color: colors.darkGreen }}>Ready for your next ride?</Title>
+      }
+    >
+      <Title style={{ fontSize: 25, lineHeight: 30, color: colors.darkGreen }}>
+        Ready for your next ride?
+      </Title>
       <Copy style={{ fontSize: 13, color: colors.muted, marginTop: 6, marginBottom: 20 }}>
-        Hi {displayName.split(' ')[0]}. Scan the vehicle QR, verify your ride, then choose your fare and payment.
+        Hi {displayName.split(' ')[0]}. Scan the vehicle QR, verify your ride, then choose your fare
+        and payment.
       </Copy>
       {/* Primary CTA — SCAN RIDE */}
       <Pressable
@@ -50,25 +53,10 @@ export default function HomeScreen() {
           <Copy bold style={{ color: colors.darkGreen, fontSize: 17 }}>
             Scan a ride
           </Copy>
-          <Copy style={{ color: colors.muted, fontSize: 12 }}>Verify the driver and fare before paying</Copy>
+          <Copy style={{ color: colors.muted, fontSize: 12 }}>
+            Verify the driver and fare before paying
+          </Copy>
         </View>
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => go('/driver-portal')}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          marginTop: 12,
-          paddingVertical: 10,
-        }}
-      >
-        <Icon name="car-outline" size={18} color={colors.darkGreen} />
-        <Copy style={{ color: colors.darkGreen, fontSize: 13 }}>
-          Driver portal — account and shifts
-        </Copy>
       </Pressable>
       <View style={{ marginTop: 16, gap: 12 }}>
         <Copy bold>Recent ride</Copy>
@@ -95,6 +83,6 @@ export default function HomeScreen() {
           </Copy>
         </Pressable>
       </View>
-    </Screen>
+    </PortalShell>
   );
 }
