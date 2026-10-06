@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
+import { randomInt } from 'node:crypto';
 import path from 'node:path';
 import { env } from '../env.js';
 import { supabaseAdmin } from './supabase-admin.js';
@@ -54,6 +56,8 @@ export class TalaRideRepository {
   }
 
   private loadInitialData(): StorageSchema {
+    // Production never loads demo seeds or an ephemeral local cache.
+    if (env.NODE_ENV === 'production') return this.emptyState();
     // If persistent disk file exists, load it directly to survive process restart
     if (fs.existsSync(this.localFilePath)) {
       try {
@@ -205,38 +209,80 @@ export class TalaRideRepository {
   }
 
   private persistToDisk(state: StorageSchema): void {
+    if (env.NODE_ENV === 'production') return;
     try {
       if (!fs.existsSync(this.localDataDir)) {
         fs.mkdirSync(this.localDataDir, { recursive: true });
       }
       fs.writeFileSync(this.localFilePath, JSON.stringify(state, null, 2), 'utf-8');
     } catch (err) {
-      console.error('Failed to persist database state to disk', err);
+      throw new Error('Could not persist records.');
     }
   }
 
-  // --- Readiness check ---
-  async checkReadiness(): Promise<{ ready: boolean; details: any }> {
-    const hasSecrets =
-      Boolean(env.QR_INTENT_SECRET) &&
-      Boolean(env.PAYMENT_WEBHOOK_SECRET);
-
-    const durablePersistenceReady =
-      env.NODE_ENV !== 'production' ||
-      Boolean(env.DATA_DIR) ||
-      env.ALLOW_EPHEMERAL_STATE;
-
+  private emptyState(): StorageSchema {
     return {
-      ready: hasSecrets && durablePersistenceReady,
-      details: {
-        supabaseConfigured: this.isSupabaseConfigured,
-        durablePersistenceReady,
-        ephemeralStateAllowed: env.ALLOW_EPHEMERAL_STATE,
-        dataDirectory: env.DATA_DIR ? 'configured' : 'local-filesystem',
-        environment: env.NODE_ENV,
-        paymentMode: env.PAYMENT_MODE
-      }
+      profiles: [], drivers: [], vehicles: [], shifts: [], rides: [], payments: [],
+      paymentEvents: [], lostItems: [], rewards: [], paymentIssues: [], notifications: [],
+      fareConfig: { id: 'current', standard_fares_centavos: [1500, 2000, 2500, 3000, 4000],
+        min_custom_fare_centavos: 1500, max_custom_fare_centavos: 50000,
+        provider_fee_basis_points: 175, talaride_fee_basis_points: 0 },
     };
+  }
+
+  private cloudQueue: Promise<unknown> = Promise.resolve();
+
+  // Serialize local operations and use a database compare-and-swap to protect writes
+  // across restarts/instances. No response is acknowledged before its cloud commit.
+  cloudCall(method: string, args: unknown[]): Promise<unknown> {
+    const run = async () => {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const initial = await supabaseAdmin.from('talaride_backend_state').upsert(
+          { id: 'canonical', state: this.emptyState() }, { onConflict: 'id', ignoreDuplicates: true },
+        );
+        if (initial.error) throw new Error('Durable database unavailable. Apply the backend storage migration.');
+        const { data, error } = await supabaseAdmin.from('talaride_backend_state').select('state,revision').eq('id', 'canonical').single();
+        if (error || !data) throw new Error('Durable database unavailable.');
+        this.memoryState = structuredClone(data.state) as StorageSchema;
+        const before = JSON.stringify(this.memoryState);
+        const result = await (this as any)[method](...args);
+        if (JSON.stringify(this.memoryState) === before) return structuredClone(result);
+        const committed = await supabaseAdmin.rpc('talaride_commit_state', {
+          expected_revision: data.revision, next_state: this.memoryState,
+        });
+        if (committed.error) throw new Error('Database write failed. Please try again.');
+        if (committed.data === true) return structuredClone(result);
+      }
+      throw new Error('Records changed during this request. Please retry.');
+    };
+    const next = this.cloudQueue.then(run, run);
+    this.cloudQueue = next.catch(() => {});
+    return next;
+  }
+
+  async checkReadiness(): Promise<{ ready: boolean; details: any }> {
+    let databaseReady = env.NODE_ENV !== 'production';
+    let commitFunctionReady = env.NODE_ENV !== 'production';
+    if (env.NODE_ENV === 'production') {
+      const { error } = await supabaseAdmin.from('talaride_backend_state').select('id').limit(1);
+      databaseReady = !error;
+      const commit = await supabaseAdmin.rpc('talaride_commit_state', { expected_revision: -1, next_state: {} });
+      commitFunctionReady = !commit.error && commit.data === false;
+    }
+    const configuration = {
+      demoAuthDisabled: !env.DEMO_AUTH,
+      livePaymentsEnabled: env.PAYMENT_MODE === 'live',
+      liveProviderKeyConfigured: env.PAYMENT_PROVIDER_KEY.startsWith('sk_live_'),
+      publicAuthKeyConfigured: !!env.SUPABASE_PUBLISHABLE_KEY,
+      qrSigningConfigured: env.QR_INTENT_SECRET.length >= 32 && !env.QR_INTENT_SECRET.includes('talaride_qr_secret'),
+      webhookConfigured: !!env.PAYMENT_WEBHOOK_SECRET && !env.PAYMENT_WEBHOOK_SECRET.startsWith('mock_'),
+    };
+    const liveConfiguration = env.NODE_ENV !== 'production' || Object.values(configuration).every(Boolean);
+    return { ready: databaseReady && commitFunctionReady && liveConfiguration, details: {
+      durablePersistenceReady: databaseReady, environment: env.NODE_ENV,
+      persistence: env.NODE_ENV === 'production' ? 'supabase' : 'test-local',
+      paymentMode: env.PAYMENT_MODE, liveConfiguration, commitFunctionReady, configuration,
+    } };
   }
 
   // --- Profiles & Users ---
@@ -269,6 +315,13 @@ export class TalaRideRepository {
 
   async getAllDrivers(): Promise<Driver[]> {
     return [...this.memoryState.drivers];
+  }
+
+  async registerDriver(userId: string, details: Pick<Driver, 'full_name' | 'mobile_number' | 'toda_operator' | 'license_number'>): Promise<Driver> {
+    if (this.memoryState.drivers.some(d => d.user_id === userId)) throw new Error('Driver already registered.');
+    let code: string;
+    do { code = `DR-${String(randomInt(0, 1000000)).padStart(6, '0')}`; } while (this.memoryState.drivers.some(d => d.driver_code === code));
+    return this.createDriver({ ...details, user_id: userId, driver_code: code, verification_status: 'pending', assigned_vehicle_code: null, shift_status: 'ended', active_shift_id: null, created_at: new Date().toISOString() });
   }
 
   async createDriver(driver: Driver): Promise<Driver> {
@@ -318,6 +371,9 @@ export class TalaRideRepository {
     const driver = await this.getDriver(driverCode);
     const vehicle = await this.getVehicle(vehicleCode);
     if (!driver || !vehicle) throw new Error('Driver or vehicle not found');
+    if (driver.verification_status !== 'verified') throw new Error('Verify the driver before assigning a vehicle.');
+    if (vehicle.assigned_driver_code && vehicle.assigned_driver_code !== driverCode) throw new Error('Vehicle is already assigned to another driver.');
+    if (driver.assigned_vehicle_code && driver.assigned_vehicle_code !== vehicleCode) throw new Error('Driver already has an assigned vehicle.');
 
     driver.assigned_vehicle_code = vehicleCode;
     vehicle.assigned_driver_code = driverCode;
@@ -360,7 +416,7 @@ export class TalaRideRepository {
       throw new Error(`Vehicle ${vehicleCode} is already assigned to active shift ${existingVehicleShift.shift_id}`);
     }
 
-    const shiftId = `SHIFT-${Date.now().toString().slice(-6)}`;
+    const shiftId = `SHIFT-${randomUUID()}`;
     const newShift: DriverShift = {
       shift_id: shiftId,
       driver_code: driverCode,
@@ -410,13 +466,12 @@ export class TalaRideRepository {
     if (driver) {
       driver.shift_status = 'ended';
       driver.active_shift_id = null;
-      driver.assigned_vehicle_code = null;
     }
 
     const vehicle = await this.getVehicle(shift.vehicle_code);
     if (vehicle) {
-      vehicle.assigned_driver_code = null;
-      vehicle.assigned_driver_name = null;
+      vehicle.assigned_driver_code = driverCode;
+      vehicle.assigned_driver_name = driver?.full_name || null;
     }
 
     this.persistToDisk(this.memoryState);
@@ -428,12 +483,16 @@ export class TalaRideRepository {
     // If clientOperationId is set, check if already recorded
     if (ride.client_operation_id) {
       const existing = this.memoryState.rides.find(
-        (r) => r.client_operation_id === ride.client_operation_id
+        (r) => r.client_operation_id === ride.client_operation_id && r.passenger_id === ride.passenger_id && r.driver_code === ride.driver_code
       );
       if (existing) return existing;
     }
 
     this.memoryState.rides.push(ride);
+    if (ride.payment_method === 'cash' && ride.status === 'completed' && !ride.is_checkin_only) {
+      const shift = this.memoryState.shifts.find(s => s.driver_code === ride.driver_code && s.vehicle_code === ride.vehicle_code && s.status === 'active');
+      if (shift) { shift.cash_rides_count += 1; shift.cash_gross_centavos += ride.fare_amount_centavos; }
+    }
     this.persistToDisk(this.memoryState);
     return ride;
   }
@@ -470,6 +529,16 @@ export class TalaRideRepository {
   }
 
   // --- Payments ---
+  async createRideAndPayment(ride: Ride, payment: Payment, event: PaymentEvent): Promise<{ ride: Ride; payment: Payment }> {
+    if (payment.ride_id !== ride.ride_id || event.payment_id !== payment.payment_id) throw new Error('Payment record mismatch');
+    if (this.memoryState.rides.some(r => r.ride_id === ride.ride_id) || this.memoryState.payments.some(p => p.ride_id === ride.ride_id || p.payment_id === payment.payment_id)) throw new Error('Payment already exists');
+    this.memoryState.rides.push(ride);
+    this.memoryState.payments.push(payment);
+    this.memoryState.paymentEvents.push(event);
+    this.persistToDisk(this.memoryState);
+    return { ride, payment };
+  }
+
   async createPayment(payment: Payment): Promise<Payment> {
     // Enforce ride_id unique constraint
     const existing = this.memoryState.payments.find((p) => p.ride_id === payment.ride_id);
@@ -584,7 +653,7 @@ export class TalaRideRepository {
 
     // Record payment event
     this.addPaymentEvent({
-      event_id: `EVT-${Date.now().toString().slice(-6)}`,
+      event_id: `EVT-${randomUUID()}`,
       payment_id: payment.payment_id,
       event_type: 'payment_confirmed',
       provider_ref: params.providerRef,
@@ -626,7 +695,7 @@ export class TalaRideRepository {
     }
 
     const reward: RewardsLedger = {
-      reward_id: `REW-${Date.now().toString().slice(-6)}`,
+      reward_id: `REW-${randomUUID()}`,
       user_id: params.userId,
       ride_id: params.rideId,
       points: params.points ?? 1,
@@ -668,7 +737,7 @@ export class TalaRideRepository {
     }
 
     const redemption: RewardsLedger = {
-      reward_id: `REW-RED-${Date.now().toString().slice(-6)}`,
+      reward_id: `REW-RED-${randomUUID()}`,
       user_id: userId,
       ride_id: null,
       points: 10,
@@ -730,7 +799,7 @@ export class TalaRideRepository {
   async createPaymentIssue(ticket: PaymentIssueTicket): Promise<PaymentIssueTicket> {
     if (ticket.client_operation_id) {
       const existing = this.memoryState.paymentIssues.find(
-        (t) => t.client_operation_id === ticket.client_operation_id
+        (t) => t.client_operation_id === ticket.client_operation_id && t.reported_by === ticket.reported_by
       );
       if (existing) return existing;
     }
@@ -792,4 +861,13 @@ export class TalaRideRepository {
   }
 }
 
-export const repository = new TalaRideRepository();
+const localRepository = new TalaRideRepository();
+export const repository: TalaRideRepository = env.NODE_ENV !== 'production' ? localRepository : new Proxy(localRepository, {
+  get(target, property) {
+    const value = Reflect.get(target, property);
+    if (typeof value !== 'function') return value;
+    if (property === 'checkReadiness') return value.bind(target);
+    if (property === 'resetForTesting') return () => { throw new Error('Unavailable in production'); };
+    return (...args: unknown[]) => target.cloudCall(String(property), args);
+  },
+});

@@ -1,3 +1,4 @@
+import { authToken } from './auth';
 import {
   Driver,
   Vehicle,
@@ -13,43 +14,24 @@ const TOKEN_KEY = 'talaride.auth-token';
 
 export const eventBus = new BroadcastChannel('talaride_events');
 
-function isSimulatorMode() {
-  return typeof window !== 'undefined' && window.location.pathname === '/simulator';
-}
+export function getWebPaymentMode(): 'live' | 'mock' { return 'live'; }
+function broadcastSimulation(_type: string, _payload: unknown) {}
+export function setAuthToken(_token: string | null) { window.sessionStorage.removeItem(TOKEN_KEY); }
+async function getAuthToken() { return authToken(); }
 
-export function getWebPaymentMode(): 'live' | 'mock' {
-  const configured = String(import.meta.env.VITE_PAYMENT_MODE || '').trim().toLowerCase();
-  if (configured === 'mock') return 'mock';
-  return isSimulatorMode() ? 'mock' : 'live';
-}
-
-function broadcastSimulation(type: string, payload: unknown) {
-  if (isSimulatorMode()) eventBus.postMessage({ type, payload });
-}
-
-export function setAuthToken(token: string | null) {
-  if (typeof window === 'undefined') return;
-  if (token) {
-    window.sessionStorage.setItem(TOKEN_KEY, token);
-  } else {
-    window.sessionStorage.removeItem(TOKEN_KEY);
-  }
-}
-
-function getAuthToken(): string {
-  if (typeof window === 'undefined') return '';
-  const stored = window.sessionStorage.getItem(TOKEN_KEY);
-  if (stored) return stored;
-  if (window.location.pathname.startsWith('/admin')) {
-    return import.meta.env.VITE_DEMO_ADMIN_TOKEN || '';
-  }
-  return import.meta.env.VITE_DEMO_AUTH_TOKEN || '';
+function rideOwner() {
+  const key = 'talaride.ride-browser-key';
+  let owner = window.sessionStorage.getItem(key);
+  if (!owner) { owner = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', ''); window.sessionStorage.setItem(key, owner); }
+  return owner;
 }
 
 async function apiFetch(path: string, init: RequestInit = {}) {
-  const token = getAuthToken();
+  const publicRequest = path.startsWith('/public/') || path.startsWith('/payment-status') || path === '/payment-intent';
+  const token = publicRequest ? await getAuthToken().catch(() => '') : await getAuthToken();
   const headers = new Headers(init.headers);
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (path.startsWith('/public/vehicles/') || path === '/payment-intent') headers.set('x-ride-owner', rideOwner());
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
@@ -208,6 +190,9 @@ function normalizeFareConfig(raw: any): FareConfiguration {
 }
 
 export const api = {
+  getCurrentAccount: () => apiJson<any>('/auth/me'),
+  enrollDriver: (data: { full_name: string; mobile_number: string; toda_operator: string; license_number: string }) => apiJson<any>('/drivers/enroll', { method: 'POST', body: JSON.stringify(data) }),
+  getDriverNotifications: (code: string) => apiJson<any>(`/drivers/${encodeURIComponent(code)}/notifications`),
   requestOtp: async (mobileNumber: string, role = 'commuter') =>
     apiJson<any>('/auth/otp-request', {
       method: 'POST',
@@ -602,49 +587,14 @@ export function connectSSE(options: {
   onShiftUpdated?: (data: any) => void;
   onGeneralEvent?: (event: string, data: any) => void;
 }) {
-  const token = getAuthToken();
-  const query = new URLSearchParams();
-  if (token) query.set('token', token);
-
-  let es: EventSource | null = null;
-  if (token) {
-    try {
-      es = new EventSource(`${API_BASE}/events?${query.toString()}`);
-
-      es.addEventListener('payment_confirmed', (e: MessageEvent) => {
-        const data = JSON.parse(e.data);
-        options.onPaymentConfirmed?.(data);
-      });
-
-      es.addEventListener('lost_item_reported', (e: MessageEvent) => {
-        const data = JSON.parse(e.data);
-        options.onLostItemReported?.(data);
-      });
-
-      es.addEventListener('shift_updated', (e: MessageEvent) => {
-        const data = JSON.parse(e.data);
-        options.onShiftUpdated?.(data);
-      });
-    } catch (err) {
-      console.warn('SSE connection could not be established', err);
-    }
-  }
-
-  const handleBroadcast = (e: MessageEvent) => {
-    if (!isSimulatorMode()) return;
-    if (e.data?.type === 'payment_confirmed') {
-      options.onPaymentConfirmed?.(e.data.payload);
-    } else if (e.data?.type === 'lost_item_reported') {
-      options.onLostItemReported?.(e.data.payload);
-    } else if (e.data?.type === 'shift_updated') {
-      options.onShiftUpdated?.(e.data.payload);
-    }
-  };
-
-  if (isSimulatorMode()) eventBus.addEventListener('message', handleBroadcast);
-
-  return () => {
-    if (es) es.close();
-    if (isSimulatorMode()) eventBus.removeEventListener('message', handleBroadcast);
-  };
+  let stopped = false;
+  let source: EventSource | null = null;
+  void getAuthToken().then(token => {
+    if (stopped || !token) return;
+    source = new EventSource(`${API_BASE}/events?token=${encodeURIComponent(token)}`);
+    source.addEventListener('payment_confirmed', (e: MessageEvent) => options.onPaymentConfirmed?.(JSON.parse(e.data)));
+    source.addEventListener('lost_item_reported', (e: MessageEvent) => options.onLostItemReported?.(JSON.parse(e.data)));
+    source.addEventListener('shift_updated', (e: MessageEvent) => options.onShiftUpdated?.(JSON.parse(e.data)));
+  }).catch(() => {});
+  return () => { stopped = true; source?.close(); };
 }

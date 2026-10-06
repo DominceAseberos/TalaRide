@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { productionAuth, requireRole } from '../lib/auth.js';
 import { repository } from '../lib/repository.js';
 import { generateVehicleChecksum, verifyVehicleChecksum } from '../lib/qr.js';
 import { publicVehiclesRouter } from './public-vehicles.js';
@@ -9,7 +10,7 @@ export const vehiclesRouter = Router();
 vehiclesRouter.use('/', publicVehiclesRouter);
 
 // GET /api/vehicles
-vehiclesRouter.get('/', async (_req: Request, res: Response) => {
+vehiclesRouter.get('/', requireRole('talaride_admin', 'lgu_admin'), async (_req: Request, res: Response) => {
   try {
     const vehicles = await repository.getAllVehicles();
     return res.json(vehicles);
@@ -19,7 +20,7 @@ vehiclesRouter.get('/', async (_req: Request, res: Response) => {
 });
 
 // GET /api/vehicles/:id
-vehiclesRouter.get('/:id', async (req: Request, res: Response) => {
+vehiclesRouter.get('/:id', productionAuth, async (req: Request, res: Response) => {
   try {
     const vehicle = await repository.getVehicle(String(req.params.id));
     if (!vehicle) {
@@ -33,7 +34,7 @@ vehiclesRouter.get('/:id', async (req: Request, res: Response) => {
 
     return res.json({
       vehicle,
-      currentDriver
+      currentDriver: currentDriver ? { driver_code: currentDriver.driver_code, full_name: currentDriver.full_name, verification_status: currentDriver.verification_status } : null
     });
   } catch (err: any) {
     return res.status(500).json({ error: 'Server error', message: err.message });
@@ -41,12 +42,12 @@ vehiclesRouter.get('/:id', async (req: Request, res: Response) => {
 });
 
 // POST /api/vehicles
-vehiclesRouter.post('/', async (req: Request, res: Response) => {
+vehiclesRouter.post('/', requireRole('talaride_admin', 'lgu_admin'), async (req: Request, res: Response) => {
   try {
     const { vehicle_id, plate_body_number, toda } = req.body;
     const vehicleCode = vehicle_id || req.body.vehicle_code;
 
-    if (!vehicleCode || !plate_body_number) {
+    if (!/^TR-\d{5}$/.test(vehicleCode || '') || typeof plate_body_number !== 'string' || !plate_body_number.trim() || typeof toda !== 'string' || !toda.trim()) {
       return res.status(400).json({ error: 'vehicle_id and plate_body_number are required' });
     }
 
@@ -59,7 +60,7 @@ vehiclesRouter.post('/', async (req: Request, res: Response) => {
     const vehicle = await repository.createVehicle({
       vehicle_code: vehicleCode,
       plate_body_number,
-      toda: toda || 'Tagum Poblacion TODA',
+      toda: toda.trim(),
       status: 'active',
       assigned_driver_code: null,
       assigned_driver_name: null,

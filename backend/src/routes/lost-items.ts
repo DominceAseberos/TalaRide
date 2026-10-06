@@ -1,12 +1,13 @@
+import { randomUUID } from 'node:crypto';
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { repository } from '../lib/repository.js';
-import { idempotencyStore } from '../lib/idempotency.js';
-import { optionalAuth } from '../lib/auth.js';
+import { optionalAuth, productionAuth } from '../lib/auth.js';
 import { sse } from '../sse.js';
 import { LostItemReport } from '../types.js';
 
 export const lostItemsRouter = Router();
+lostItemsRouter.use(productionAuth);
 
 export const LostItemReportSchema = z.object({
   ride_id: z.string().min(1, 'ride_id is required'),
@@ -31,7 +32,7 @@ lostItemsRouter.post('/lost-item-report', optionalAuth, async (req: Request, res
       item_category: req.body.item_category || req.body.itemCategory,
       description: req.body.description,
       passenger_name: req.body.passenger_name || req.body.passengerName || req.user?.full_name || 'Passenger',
-      passenger_contact: req.body.passenger_contact || req.body.passengerContact || req.user?.mobile_number || '09187654321',
+      passenger_contact: req.body.passenger_contact || req.body.passengerContact || req.user?.mobile_number || '',
       client_operation_id: req.body.client_operation_id || req.body.clientOperationId
     };
 
@@ -42,19 +43,14 @@ lostItemsRouter.post('/lost-item-report', optionalAuth, async (req: Request, res
 
     const { ride_id, item_category, description, passenger_name, passenger_contact, client_operation_id } = parsed.data;
 
-    if (client_operation_id) {
-      const cached = idempotencyStore.get(client_operation_id);
-      if (cached) {
-        return res.status(cached.statusCode).json(cached.responseBody);
-      }
-    }
 
     const ride = await repository.getRide(ride_id);
     if (!ride) {
       return res.status(404).json({ error: 'Ride record not found' });
     }
 
-    const reportId = `LIR-${Date.now().toString().slice(-4)}`;
+    if (req.user && !['talaride_admin', 'lgu_admin'].includes(req.user.role) && ride.passenger_id !== req.user.id) return res.status(403).json({ error: 'You can only report items from your own ride.' });
+    const reportId = `LIR-${randomUUID()}`;
     const newReport: LostItemReport = {
       report_id: reportId,
       ride_id: ride.ride_id,
@@ -90,9 +86,6 @@ lostItemsRouter.post('/lost-item-report', optionalAuth, async (req: Request, res
       report: createdReport
     };
 
-    if (client_operation_id) {
-      idempotencyStore.set(client_operation_id, '/api/lost-item-report', 201, responseBody);
-    }
 
     return res.status(201).json(responseBody);
   } catch (err: any) {
@@ -117,6 +110,11 @@ lostItemsRouter.post('/lost-item-respond', optionalAuth, async (req: Request, re
 
     const { report_id, response, note } = parsed.data;
 
+    if (req.user && !['talaride_admin', 'lgu_admin'].includes(req.user.role)) {
+      if (!req.user.driver_code) return res.status(403).json({ error: 'Driver account required.' });
+      const ownReports = await repository.getLostItems({ driver_code: req.user.driver_code });
+      if (!ownReports.some(report => report.report_id === report_id)) return res.status(403).json({ error: 'Report belongs to another driver.' });
+    }
     const updated = await repository.respondToLostItem(report_id, response, note);
     if (!updated) {
       return res.status(404).json({ error: 'Report not found' });
@@ -136,8 +134,8 @@ lostItemsRouter.post('/lost-item-respond', optionalAuth, async (req: Request, re
 // GET /api/lost-items
 lostItemsRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
   try {
-    const driverCode = (req.query.driver_code || req.query.driverId) as string | undefined;
-    const passengerId = (req.query.passenger_id || req.query.passengerId) as string | undefined;
+    const driverCode = req.user?.role === 'driver' ? req.user.driver_code || '__none__' : (req.query.driver_code || req.query.driverId) as string | undefined;
+    const passengerId = req.user && !['driver', 'talaride_admin', 'lgu_admin'].includes(req.user.role) ? req.user.id : (req.query.passenger_id || req.query.passengerId) as string | undefined;
 
     const reports = await repository.getLostItems({
       driver_code: driverCode,

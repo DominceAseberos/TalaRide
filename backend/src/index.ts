@@ -46,8 +46,8 @@ app.use(
       return callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-provider-signature', 'idempotency-key']
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-provider-signature', 'idempotency-key', 'x-ride-owner']
   })
 );
 
@@ -103,7 +103,7 @@ app.get('/api/ready', async (_req, res) => {
 
 // 1. Payment Lifecycle
 app.use('/api/payment-intent', paymentIntentRouter);
-app.use('/api/mock-confirm', mockConfirmRouter);
+if (env.NODE_ENV === 'test') app.use('/api/mock-confirm', mockConfirmRouter);
 app.use('/api/payment-webhook', paymentWebhookRouter);
 app.use('/api/payment-status', paymentStatusRouter);
 
@@ -174,9 +174,18 @@ const isTestEnv =
   process.argv.some((arg) => arg.includes('test'));
 
 if (!isTestEnv) {
-  app.listen(PORT, () => {
-    console.log(`🚀 TalaRide Canonical Backend running on http://localhost:${PORT}`);
-    console.log(`📡 Secure Authenticated SSE stream at http://localhost:${PORT}/api/events`);
-    console.log(`🔒 Payment Mode: ${env.PAYMENT_MODE.toUpperCase()}`);
+  void repository.checkReadiness().then(({ ready, details }) => {
+    if (env.NODE_ENV === 'production' && !ready) {
+      console.error('Production startup blocked by missing configuration:', JSON.stringify(details));
+      process.exitCode = 1;
+      return;
+    }
+    app.listen(PORT, () => {
+      console.log(`TalaRide backend listening on port ${PORT}`);
+      console.log(`Payment mode: ${env.PAYMENT_MODE.toUpperCase()}`);
+    });
+  }).catch(() => {
+    console.error('Production startup could not verify database readiness.');
+    process.exitCode = 1;
   });
 }

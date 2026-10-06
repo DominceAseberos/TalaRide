@@ -13,57 +13,7 @@ import { authConfigurationError, requireSupabase, supabase } from './client';
 import { loadProfile, saveProfile, type UserProfile } from './profiles';
 import { clearDraft } from '@/scan/draft';
 
-export const DEMO_USERS = {
-  passenger: {
-    id: 'USR-COM-001',
-    aud: 'authenticated',
-    role: 'passenger',
-    email: 'maria.santos@talaride.ph',
-    app_metadata: { provider: 'demo' },
-    user_metadata: { display_name: 'Maria Santos' },
-    created_at: '2026-09-10T10:00:00.000Z',
-  },
-  driver: {
-    id: 'USR-DRV-001',
-    aud: 'authenticated',
-    role: 'driver',
-    email: 'juan.delacruz@talaride.ph',
-    app_metadata: { provider: 'demo' },
-    user_metadata: { display_name: 'Juan Dela Cruz' },
-    created_at: '2026-09-01T08:00:00.000Z',
-  },
-};
-
-let inMemoryDemoSession: Session | null = null;
 const PROFILE_CACHE_PREFIX = 'talaride.profile-cache-v2:';
-
-function getStoredDemoSession(): Session | null {
-  if (inMemoryDemoSession) return inMemoryDemoSession;
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-    try {
-      const raw = window.localStorage.getItem('talaride.demo_session');
-      return raw ? (JSON.parse(raw) as Session) : null;
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-function saveStoredDemoSession(session: Session | null) {
-  inMemoryDemoSession = session;
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-    try {
-      if (session) {
-        window.localStorage.setItem('talaride.demo_session', JSON.stringify(session));
-      } else {
-        window.localStorage.removeItem('talaride.demo_session');
-      }
-    } catch {
-      // ignore
-    }
-  }
-}
 
 type AuthState = {
   ready: boolean;
@@ -77,7 +27,6 @@ type AuthState = {
   signOut: () => Promise<void>;
   updateProfile: (name: string, avatarUrl?: string | null) => Promise<void>;
   refreshProfile: () => Promise<void>;
-  signInAsDemo: (role?: 'passenger' | 'driver') => Promise<void>;
 };
 const Context = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -119,23 +68,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
           if (result.session) {
             account.current = result.session?.user.id ?? null;
             setSession(result.session);
-          } else {
-            const demoSession = getStoredDemoSession();
-            if (demoSession && active && !eventReceived) {
-              account.current = demoSession.user.id;
-              setSession(demoSession);
-            }
           }
         }
       })
       .catch(() => {
         if (!active) return;
-        const demoSession = getStoredDemoSession();
-        if (demoSession && active && !eventReceived) {
-          account.current = demoSession.user.id;
-          setSession(demoSession);
-          return;
-        }
         setError('Your saved session could not be restored. Please sign in again.');
       })
       .finally(() => {
@@ -199,27 +136,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         profileError: profileFailure?.id === id ? profileFailure.message : null,
         displayName: currentProfile?.display_name || 'Passenger',
         setRecovery,
-        async signInAsDemo(role: 'passenger' | 'driver' = 'passenger') {
-          const user = DEMO_USERS[role];
-          const demoSession: Session = {
-            access_token: `demo-${role}-token`,
-            refresh_token: `demo-${role}-refresh-token`,
-            expires_in: 86400,
-            token_type: 'bearer',
-            user: user as any,
-          };
-          account.current = user.id;
-          setSession(demoSession);
-          setProfile({
-            id: user.id,
-            display_name: user.user_metadata.display_name,
-            avatar_url: null,
-          });
-          setError(null);
-          saveStoredDemoSession(demoSession);
-        },
         async signOut() {
-          saveStoredDemoSession(null);
           try {
             if (supabase) {
               const client = requireSupabase();

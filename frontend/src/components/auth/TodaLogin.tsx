@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Building2, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
+
+import { getAuthClient } from '../../services/auth';
+import { api } from '../../services/api';
 
 export interface TodaSession {
   name: string;
@@ -11,59 +14,51 @@ interface Props {
   onAuthenticated: (session: TodaSession) => void;
 }
 
-const DEMO_EMAIL = 'operator@talaride.ph';
-const DEMO_PASSWORD = 'talaride-demo';
-const ACCOUNT_KEY = 'talaride.toda-account';
-
 export const TodaLogin: React.FC<Props> = ({ onAuthenticated }) => {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [name, setName] = useState('');
   const [group, setGroup] = useState('');
-  const [email, setEmail] = useState(DEMO_EMAIL);
-  const [password, setPassword] = useState(DEMO_PASSWORD);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const submit = (event: React.FormEvent) => {
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  async function openAccount() {
+    const result = await api.getCurrentAccount();
+    if (!['talaride_admin', 'lgu_admin'].includes(result.user.role)) {
+      setNotice('Your account is signed in. TODA dashboard access requires approval from TalaRide.');
+      return;
+    }
+    onAuthenticated({ name: result.user.full_name, group: 'TODA operations', email });
+  }
+  useEffect(() => {
+    window.localStorage.removeItem('talaride.toda-account');
+    window.sessionStorage.removeItem('talaride.toda-session');
+  }, []);
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setError('');
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      setError('Enter a valid email address.');
-      return;
-    }
-    if (password.length < 8) {
-      setError('Use a password with at least 8 characters.');
-      return;
-    }
-    if (mode === 'signup') {
-      if (name.trim().length < 2 || group.trim().length < 2) {
-        setError('Enter your name and TODA group.');
-        return;
-      }
-      const account = { name: name.trim(), group: group.trim(), email: normalizedEmail, password };
-      window.localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
-      onAuthenticated({ name: account.name, group: account.group, email: account.email });
-      return;
-    }
-    let account: { name: string; group: string; email: string; password: string } | null = null;
+    if (busy) return;
+    setError(''); setNotice(''); setBusy(true);
     try {
-      const stored = window.localStorage.getItem(ACCOUNT_KEY);
-      account = stored ? JSON.parse(stored) : null;
-    } catch {
-      account = null;
-    }
-    const accepted =
-      (normalizedEmail === DEMO_EMAIL && password === DEMO_PASSWORD) ||
-      (account?.email === normalizedEmail && account.password === password);
-    if (!accepted) {
-      setError('Those credentials were not recognized. Use your TODA account or the demo account shown below.');
-      return;
-    }
-    onAuthenticated({
-      name: account?.name ?? 'TalaRide Operator',
-      group: account?.group ?? 'Tagum City TODA',
-      email: normalizedEmail,
-    });
+      const client = await getAuthClient();
+      const normalizedEmail = email.trim().toLowerCase();
+      if (mode === 'signup') {
+        if (name.trim().length < 2 || group.trim().length < 2) throw new Error('Enter your name and TODA group.');
+        const { error: failure } = await client.auth.signUp({
+          email: normalizedEmail, password,
+          options: { emailRedirectTo: window.location.origin, data: { display_name: name.trim(), full_name: name.trim(), toda_group: group.trim(), requested_role: 'operator' } },
+        });
+        if (failure) throw failure;
+        setPassword(''); setMode('signin');
+        setNotice('Check your email to confirm your account. TODA access will be available after approval.');
+      } else {
+        const { error: failure } = await client.auth.signInWithPassword({ email: normalizedEmail, password });
+        if (failure) throw failure;
+        await openAccount();
+      }
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not connect to your account.'); }
+    finally { setBusy(false); }
   };
 
   return (
@@ -101,7 +96,7 @@ export const TodaLogin: React.FC<Props> = ({ onAuthenticated }) => {
               <p className="mt-2 text-sm leading-6 text-slate-500">
                 {mode === 'signin'
                   ? 'Use your operator account to view today’s members, locations, reports, and activity.'
-                  : 'Create an operator profile for your TODA group. You can update the group details after signing in.'}
+                  : 'Register your TODA group and request access. An approved account is required to view member records.'}
               </p>
             </div>
 
@@ -125,31 +120,27 @@ export const TodaLogin: React.FC<Props> = ({ onAuthenticated }) => {
                 <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Email</span>
                 <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-emerald-500">
                   <Mail className="h-4 w-4 text-slate-400" />
-                  <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full bg-transparent px-3 py-3 text-sm outline-none" placeholder="operator@example.com" autoComplete="email" />
+                  <input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full bg-transparent px-3 py-3 text-sm outline-none" placeholder="operator@example.com" autoComplete="email" />
                 </div>
               </label>
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Password</span>
                 <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-emerald-500">
                   <LockKeyhole className="h-4 w-4 text-slate-400" />
-                  <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="w-full bg-transparent px-3 py-3 text-sm outline-none" placeholder="At least 8 characters" autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} />
+                  <input required minLength={8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="w-full bg-transparent px-3 py-3 text-sm outline-none" placeholder="At least 8 characters" autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} />
                 </div>
               </label>
               {error && <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{error}</p>}
-              <button type="submit" className="min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700">
-                {mode === 'signin' ? 'Sign in to dashboard' : 'Create TODA account'}
+              <button disabled={busy} type="submit" className="min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700">
+                {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in to dashboard' : 'Create TODA account'}
               </button>
             </form>
 
-            {mode === 'signin' && (
-              <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-xs text-emerald-900">
-                <div className="font-bold">Demo access</div>
-                <div className="mt-1 font-mono">{DEMO_EMAIL} · {DEMO_PASSWORD}</div>
-              </div>
-            )}
+            {notice && <p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
             <button type="button" onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); }} className="mt-6 w-full text-center text-sm font-bold text-emerald-700 hover:underline">
               {mode === 'signin' ? 'Create a TODA account' : 'Already have an account? Sign in'}
             </button>
+            <a href="/driver" className="mt-4 block text-center text-sm font-semibold text-slate-600 hover:underline">Driver sign in or registration</a>
           </section>
         </div>
       </div>

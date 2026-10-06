@@ -7,16 +7,8 @@ import { colors } from '@/constants/theme';
 import { useAuth } from '@/auth/AuthProvider';
 import { performEmailAction } from '@/auth/actions';
 
-function checkDemoMode(): boolean {
-  try {
-    return typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_DEMO_MODE === 'true';
-  } catch {
-    return false;
-  }
-}
-
 export default function SignInScreen() {
-  const { recovery, setRecovery, signOut, signInAsDemo, error: sessionError } = useAuth();
+  const { recovery, setRecovery, signOut, error: sessionError } = useAuth();
   const [mode, setMode] = useState<'signin' | 'register' | 'recover'>('signin');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -32,17 +24,6 @@ export default function SignInScreen() {
     locked.current = true;
     setBusy(true);
     try {
-      if (
-        checkDemoMode() &&
-        signInAsDemo &&
-        (email.toLowerCase().includes('demo') ||
-          email.toLowerCase().includes('maria') ||
-          email.toLowerCase().includes('test'))
-      ) {
-        await signInAsDemo('passenger');
-        replace('/home');
-        return;
-      }
       const result = await performEmailAction(recovery ? 'reset' : mode, email, password, name);
       if (recovery) {
         setPassword('');
@@ -298,65 +279,6 @@ export default function SignInScreen() {
             </Pressable>
           </View>
         </>
-      )}
-      {checkDemoMode() && !recovery && (
-        <View
-          style={{
-            marginTop: 24,
-            padding: 16,
-            borderRadius: 14,
-            backgroundColor: colors.paleGreen,
-            borderWidth: 1,
-            borderColor: colors.border,
-            gap: 10,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Icon name="flash" size={16} color={colors.darkGreen} />
-            <Copy bold style={{ color: colors.darkGreen, fontSize: 13 }}>
-              Development Testing Mode
-            </Copy>
-          </View>
-          <Copy style={{ fontSize: 12, color: colors.muted }}>
-            Instant local test session for paired web/mobile testing.
-          </Copy>
-          <View style={{ gap: 8, marginTop: 4 }}>
-            <Button
-              label="Sign In as Commuter (Maria Santos)"
-              variant="primary"
-              disabled={busy}
-              onPress={async () => {
-                if (locked.current) return;
-                locked.current = true;
-                setBusy(true);
-                try {
-                  if (signInAsDemo) await signInAsDemo('passenger');
-                  replace('/home');
-                } finally {
-                  locked.current = false;
-                  setBusy(false);
-                }
-              }}
-            />
-            <Button
-              label="Sign In as Driver (Juan Dela Cruz)"
-              variant="subtle"
-              disabled={busy}
-              onPress={async () => {
-                if (locked.current) return;
-                locked.current = true;
-                setBusy(true);
-                try {
-                  if (signInAsDemo) await signInAsDemo('driver');
-                  replace('/driver');
-                } finally {
-                  locked.current = false;
-                  setBusy(false);
-                }
-              }}
-            />
-          </View>
-        </View>
       )}
       {!!notice && (
         <Notice title="Account information" message={notice} onClose={() => setNotice('')} />

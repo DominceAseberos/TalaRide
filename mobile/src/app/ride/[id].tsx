@@ -175,7 +175,7 @@ export default function RideDetailsScreen() {
       {dialog === 'delete' && (
         <Notice
           title="Delete Ride?"
-          message="Remove this ride and its linked sample requests from My Rides?"
+          message="Remove this ride and its linked local requests from My Rides?"
           onClose={() => setDialog(null)}
         >
           <Button label="Delete Ride" disabled={busy} onPress={() => void mutate('delete')} />

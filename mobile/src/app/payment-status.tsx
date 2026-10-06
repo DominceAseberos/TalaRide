@@ -5,14 +5,11 @@ import { Screen } from '@/components/Screen';
 import { Button, Card, Copy, Header, Icon, Title, replace } from '@/components/ui';
 import { colors } from '@/constants/theme';
 import { formatCentavos } from '@talaride/shared';
-import { getPaymentMode } from '@/api/client';
 import { fetchPaymentStatus, statusToLabel } from '@/api/payments';
-import { getMockStatus } from '@/payments/mock';
 
 export default function PaymentStatusScreen() {
   const { payment_id } = useLocalSearchParams<{ payment_id?: string }>();
   const id = String(payment_id ?? '');
-  const mode = getPaymentMode();
   const [status, setStatus] = useState(id ? 'loading' : 'missing');
   const [amountCentavos, setAmountCentavos] = useState(0);
   const [error, setError] = useState('');
@@ -21,10 +18,6 @@ export default function PaymentStatusScreen() {
     if (!id) return;
     setError('');
     try {
-      if (mode === 'mock-local') {
-        setStatus(await getMockStatus(id));
-        return;
-      }
       const result = await fetchPaymentStatus(id);
       setStatus(result.status);
       setAmountCentavos(result.amount_centavos);
@@ -37,19 +30,17 @@ export default function PaymentStatusScreen() {
   useEffect(() => {
     if (!id) return;
     let live = true;
+    let settled = false;
     const poll = async () => {
+      if (settled) return;
       try {
-        if (mode === 'mock-local') {
-          const next = await getMockStatus(id);
-          if (live) setStatus(next);
-          return;
-        }
         const result = await fetchPaymentStatus(id);
         if (!live) return;
         setStatus(result.status);
         setAmountCentavos(result.amount_centavos);
+        settled = ['confirmed', 'failed', 'refunded', 'reversed'].includes(result.status);
       } catch {
-        if (live) setStatus('unknown');
+        if (live) setError('Could not refresh payment status. Check again when connected.');
       }
     };
     void poll();
@@ -58,7 +49,7 @@ export default function PaymentStatusScreen() {
       live = false;
       clearInterval(timer);
     };
-  }, [id, mode]);
+  }, [id]);
 
   const confirmed = status === 'confirmed';
 

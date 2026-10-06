@@ -1,4 +1,4 @@
-import { requireSupabase, supabase } from './client';
+import { requireSupabase } from './client';
 export type UserProfile = { id: string; display_name: string; avatar_url?: string | null };
 export async function loadProfile(id: string): Promise<UserProfile> {
   const { data, error } = await requireSupabase()
@@ -38,8 +38,7 @@ export async function uploadProfileImage(
   uri: string,
   mimeType = 'image/jpeg',
 ): Promise<string> {
-  // Demo sessions have no cloud storage; keep the selected local URI for the current session.
-  if (!supabase) return uri;
+  requireSupabase();
   const response = await fetch(uri);
   if (!response.ok) throw new Error('The selected profile image could not be read.');
   const bytes = await response.arrayBuffer();
@@ -60,7 +59,7 @@ export async function uploadLostItemImage(
   uri: string,
   mimeType = 'image/jpeg',
 ): Promise<string> {
-  if (!supabase) return uri;
+  requireSupabase();
   const response = await fetch(uri);
   if (!response.ok) throw new Error('The selected lost-item image could not be read.');
   const bytes = await response.arrayBuffer();

@@ -1,9 +1,20 @@
 import { Router, Request, Response } from 'express';
+import { requireAuth } from '../lib/auth.js';
 import { env } from '../env.js';
 import { repository } from '../lib/repository.js';
 import { otpRateLimiter } from '../middleware/rate-limit.js';
 
 export const authRouter = Router();
+authRouter.get('/config', (_req, res) => {
+  if (!env.SUPABASE_PUBLISHABLE_KEY) return res.status(503).json({ error: 'Account service is not configured.' });
+  return res.json({ url: env.SUPABASE_URL, publishableKey: env.SUPABASE_PUBLISHABLE_KEY });
+});
+authRouter.get('/me', requireAuth, async (req, res) => {
+  const driver = await repository.getDriverByUserId(req.user!.id);
+  const vehicle = driver?.assigned_vehicle_code ? await repository.getVehicle(driver.assigned_vehicle_code) : null;
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json({ user: req.user, driver, vehicle });
+});
 
 // POST /api/auth/otp-request
 authRouter.post('/otp-request', otpRateLimiter, async (req: Request, res: Response) => {
@@ -13,7 +24,7 @@ authRouter.post('/otp-request', otpRateLimiter, async (req: Request, res: Respon
       return res.status(400).json({ error: 'Mobile number is required' });
     }
 
-    if (!env.DEMO_AUTH) {
+    if (env.NODE_ENV !== 'test' || !env.DEMO_AUTH) {
       return res.status(501).json({
         error: 'Production auth required',
         message: 'Direct demo OTP generation is disabled in production. Use Supabase Auth SMS provider.'
@@ -38,7 +49,7 @@ authRouter.post('/otp-verify', async (req: Request, res: Response) => {
   try {
     const { mobileNumber, otp, role = 'commuter', pin } = req.body;
 
-    if (!env.DEMO_AUTH) {
+    if (env.NODE_ENV !== 'test' || !env.DEMO_AUTH) {
       return res.status(501).json({
         error: 'Production auth required',
         message: 'Direct demo OTP verification is disabled in production. Verify through Supabase Auth.'

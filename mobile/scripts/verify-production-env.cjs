@@ -55,4 +55,9 @@ for (const [name, value] of [
   }
 }
 
+if (values.get('EXPO_PUBLIC_DEMO_MODE') !== 'false' || values.get('EXPO_PUBLIC_PAYMENT_MODE') !== 'live') {
+  console.error('Production requires live payments and disabled demo mode.'); process.exit(1);
+}
+if (webApi !== 'https://talaride-backend.onrender.com/api') { console.error('Production must use the canonical backend.'); process.exit(1); }
+
 console.log('Production environment is present and structurally valid.');

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { repository } from '../lib/repository.js';
-import { verifyVehicleChecksum } from '../lib/qr.js';
+import { requireAuth } from '../lib/auth.js';
+import { generateVehicleChecksum, verifyVehicleChecksum } from '../lib/qr.js';
 import { createWebSession, getWebSessionExpiry, validateWebSession } from '../lib/web-session.js';
 
 export const publicVehiclesRouter = Router();
@@ -13,11 +14,21 @@ function formatSafeDriverName(fullName: string): string {
   return `${firstName} ${lastInitial}.`;
 }
 
+// Manual entry is available only to authenticated commuters and exposes the same safe fields.
+publicVehiclesRouter.get('/:code/lookup', requireAuth, (req, res, next) => {
+  const code = String(req.params.code);
+  if (!/^TR-\d{5}$/.test(code)) return res.status(400).json({ error: 'Enter a valid vehicle code.' });
+  req.query.c = generateVehicleChecksum(code);
+  (publicVehiclesRouter as any).handle(Object.assign(req, { url: `/${code}/public?c=${generateVehicleChecksum(code)}` }), res, next);
+});
+
 // GET /api/vehicles/:code/public?c=...
 publicVehiclesRouter.get('/:code/public', async (req: Request, res: Response) => {
   try {
     const vehicleCode = String(req.params.code);
     const checksum = req.query.c as string | undefined;
+    res.setHeader('Cache-Control', 'no-store');
+    const owner = req.get('x-ride-owner') || '';
     const requestedSessionId = typeof req.query.sid === 'string' ? req.query.sid : undefined;
 
     // Verify HMAC checksum
@@ -28,11 +39,11 @@ publicVehiclesRouter.get('/:code/public', async (req: Request, res: Response) =>
       });
     }
 
-    let webSession = requestedSessionId
-      ? (validateWebSession(requestedSessionId, vehicleCode)
-        ? { sessionId: requestedSessionId, expiresAt: getWebSessionExpiry(requestedSessionId, vehicleCode) }
+    const webSession = requestedSessionId
+      ? (validateWebSession(requestedSessionId, vehicleCode, owner)
+        ? { sessionId: requestedSessionId, expiresAt: getWebSessionExpiry(requestedSessionId, vehicleCode, owner) }
         : null)
-      : createWebSession(vehicleCode);
+      : owner ? createWebSession(vehicleCode, owner) : { sessionId: null, expiresAt: null };
     if (!webSession) {
       return res.status(410).json({
         error: 'Session expired',

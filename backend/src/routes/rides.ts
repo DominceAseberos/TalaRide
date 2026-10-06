@@ -1,11 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { repository } from '../lib/repository.js';
-import { idempotencyStore } from '../lib/idempotency.js';
-import { optionalAuth } from '../lib/auth.js';
+import { optionalAuth, productionAuth, canManageDriver } from '../lib/auth.js';
 import { Ride } from '../types.js';
 
 export const ridesRouter = Router();
+ridesRouter.use(productionAuth);
 
 export const CashRecordSchema = z.object({
   driver_code: z.string().regex(/^DR-[0-9]{6}$/, 'driver_code must match DR-000000 format'),
@@ -45,30 +46,27 @@ ridesRouter.post('/cash-record', optionalAuth, async (req: Request, res: Respons
 
     const { driver_code, vehicle_code, amount_centavos, approximate_location, client_operation_id } = parsed.data;
 
-    // Check idempotency store first
-    if (client_operation_id) {
-      const cached = idempotencyStore.get(client_operation_id);
-      if (cached) {
-        return res.status(cached.statusCode).json(cached.responseBody);
-      }
-    }
-
+    if (!canManageDriver(req, driver_code)) return res.status(403).json({ error: 'Driver account does not match.' });
     // Validate driver
     const driver = await repository.getDriver(driver_code);
     if (!driver) {
       return res.status(404).json({ error: 'Driver not found' });
     }
 
-    // Create ride
-    const rideId = `RIDE-${Date.now().toString().slice(-6)}`;
+    const vehicle = await repository.getVehicle(vehicle_code);
+    if (driver.verification_status !== 'verified' || !vehicle || vehicle.status !== 'active' || vehicle.assigned_driver_code !== driver_code) {
+      return res.status(403).json({ error: 'A verified driver and assigned active vehicle are required.' });
+    }
+    // Cash entries can synchronize after the shift ends. They never mark digital payments paid.
+    const rideId = `RIDE-${randomUUID()}`;
     const newRide: Ride = {
       ride_id: rideId,
       driver_code,
       driver_name: driver.full_name,
       vehicle_code,
-      passenger_id: req.user?.id || null,
-      passenger_name: req.user?.full_name || 'Cash Passenger',
-      passenger_mobile: req.user?.mobile_number || null,
+      passenger_id: null,
+      passenger_name: null,
+      passenger_mobile: null,
       timestamp: new Date().toISOString(),
       approximate_location,
       payment_method: 'cash',
@@ -81,22 +79,12 @@ ridesRouter.post('/cash-record', optionalAuth, async (req: Request, res: Respons
 
     const createdRide = await repository.createRide(newRide);
 
-    // If active shift, update cash metrics
-    const activeShift = await repository.getActiveShiftForDriver(driver_code);
-    if (activeShift) {
-      activeShift.cash_rides_count += 1;
-      activeShift.cash_gross_centavos += amount_centavos;
-    }
-
     const responseBody = {
       success: true,
       message: `Cash ride recorded: ₱${(amount_centavos / 100).toFixed(2)}`,
       ride: createdRide
     };
 
-    if (client_operation_id) {
-      idempotencyStore.set(client_operation_id, '/api/cash-record', 201, responseBody);
-    }
 
     return res.status(201).json(responseBody);
   } catch (err: any) {
@@ -122,12 +110,6 @@ ridesRouter.post('/ride-checkin', optionalAuth, async (req: Request, res: Respon
 
     const { vehicle_code, passenger_name, approximate_location, client_operation_id } = parsed.data;
 
-    if (client_operation_id) {
-      const cached = idempotencyStore.get(client_operation_id);
-      if (cached) {
-        return res.status(cached.statusCode).json(cached.responseBody);
-      }
-    }
 
     const vehicle = await repository.getVehicle(vehicle_code);
     if (!vehicle) {
@@ -138,11 +120,12 @@ ridesRouter.post('/ride-checkin', optionalAuth, async (req: Request, res: Respon
       ? await repository.getDriver(vehicle.assigned_driver_code)
       : null;
 
-    const rideId = `RIDE-${Date.now().toString().slice(-6)}`;
+    if (!driver || driver.verification_status !== 'verified' || vehicle.status !== 'active') return res.status(409).json({ error: 'No verified driver is assigned to this vehicle.' });
+    const rideId = `RIDE-${randomUUID()}`;
     const newRide: Ride = {
       ride_id: rideId,
-      driver_code: driver?.driver_code || 'DR-000481',
-      driver_name: driver?.full_name || 'TalaRide Driver',
+      driver_code: driver.driver_code,
+      driver_name: driver.full_name,
       vehicle_code,
       passenger_id: req.user?.id || null,
       passenger_name: passenger_name || req.user?.full_name || 'Commuter',
@@ -159,23 +142,12 @@ ridesRouter.post('/ride-checkin', optionalAuth, async (req: Request, res: Respon
 
     const createdRide = await repository.createRide(newRide);
 
-    // If driver has active shift, increment cash count
-    if (driver) {
-      const shift = await repository.getActiveShiftForDriver(driver.driver_code);
-      if (shift) {
-        shift.cash_rides_count += 1;
-      }
-    }
-
     const responseBody = {
       success: true,
       message: `Safety check-in recorded for vehicle ${vehicle_code}`,
       ride: createdRide
     };
 
-    if (client_operation_id) {
-      idempotencyStore.set(client_operation_id, '/api/ride-checkin', 201, responseBody);
-    }
 
     return res.status(201).json(responseBody);
   } catch (err: any) {
@@ -193,7 +165,7 @@ ridesRouter.get('/', optionalAuth, async (req: Request, res: Response) => {
 
     // Authenticated clients are always scoped to their own history. Query filters are
     // retained for admin/test compatibility only when there is no end-user identity.
-    if (req.user?.role === 'passenger') {
+    if (req.user && !['driver', 'talaride_admin', 'lgu_admin'].includes(req.user.role)) {
       passengerId = req.user.id;
       driverCode = undefined;
     } else if (req.user?.role === 'driver') {
@@ -222,6 +194,7 @@ ridesRouter.get('/:id', optionalAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Ride not found' });
     }
 
+    if (req.user && !['talaride_admin', 'lgu_admin'].includes(req.user.role) && ride.passenger_id !== req.user.id && ride.driver_code !== req.user.driver_code) return res.status(403).json({ error: 'You cannot view this ride.' });
     const driver = await repository.getDriver(ride.driver_code);
     const vehicle = await repository.getVehicle(ride.vehicle_code);
     const payment = await repository.getPaymentByRideId(ride.ride_id);
