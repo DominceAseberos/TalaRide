@@ -7,7 +7,7 @@ import { otpRateLimiter } from '../middleware/rate-limit.js';
 export const authRouter = Router();
 authRouter.get('/config', (_req, res) => {
   if (!env.SUPABASE_PUBLISHABLE_KEY) return res.status(503).json({ error: 'Account service is not configured.' });
-  return res.json({ url: env.SUPABASE_URL, publishableKey: env.SUPABASE_PUBLISHABLE_KEY });
+  return res.json({ url: env.SUPABASE_URL, publishableKey: env.SUPABASE_PUBLISHABLE_KEY, paymentEnvironment: env.PAYMENT_ENVIRONMENT });
 });
 authRouter.get('/me', requireAuth, async (req, res) => {
   const driver = await repository.getDriverByUserId(req.user!.id);

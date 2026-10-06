@@ -166,6 +166,7 @@ export default function RideConfirmScreen() {
   return (
     <Screen>
       <Header title="Pay fare" />
+      {vehicle?.payment_environment === 'test' && <Card><Copy bold>PayMongo test mode — no real money is charged.</Copy></Card>}
       <Title style={{ fontSize: 22 }}>Scan • Choose fare • Pay</Title>
       <Copy style={{ marginTop: 5, color: colors.muted }}>
         No payment is created until you choose a fare, choose a payment method, and tap Proceed.

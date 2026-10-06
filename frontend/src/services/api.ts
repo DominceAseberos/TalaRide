@@ -124,6 +124,7 @@ function normalizeRide(raw: any): Ride {
 
 function normalizePayment(raw: any): Payment {
   return {
+    payment_environment: raw.payment_environment,
     payment_id: raw.payment_id,
     ride_id: raw.ride_id,
     driver_id: raw.driver_id ?? raw.driver_code,
@@ -389,13 +390,9 @@ export const api = {
     if (status.payment.payment_status !== 'paid') {
       return { success: false, status: status.payment.payment_status, payment: status.payment };
     }
-    const rideResult = await api.getRide(status.payment.ride_id);
     return {
       success: true,
-      payment: status.payment,
-      ride: rideResult.ride,
-      driver: rideResult.driver,
-      vehicle: rideResult.vehicle
+      payment: status.payment
     };
   },
 

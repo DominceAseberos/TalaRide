@@ -46,12 +46,13 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
 
       try {
         const res = await api.getConfirmedPaymentResult(paymentId);
+        setResult(res);
         if (res.success) {
           terminalStateReached.current = true;
           stopPolling();
           setResult(res);
           setState('confirmed');
-          setMessage('Payment confirmed by TalaRide.');
+          setMessage(res.payment.payment_environment === 'test' ? 'Test confirmed by PayMongo. No real money was charged.' : 'Payment confirmed by TalaRide.');
           return;
         }
 
@@ -179,7 +180,7 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
           <div>
             <h1 className="text-xl font-black">
               {state === 'confirmed'
-                ? 'Payment successful'
+                ? (result?.payment?.payment_environment === 'test' ? 'Test payment successful' : 'Payment successful')
                 : state === 'failed'
                   ? 'Payment not completed'
                   : 'Verifying payment'}

@@ -13,6 +13,7 @@ export default function PaymentStatusScreen() {
   const [status, setStatus] = useState(id ? 'loading' : 'missing');
   const [amountCentavos, setAmountCentavos] = useState(0);
   const [error, setError] = useState('');
+  const [testPayment, setTestPayment] = useState(false);
 
   async function refresh() {
     if (!id) return;
@@ -20,6 +21,7 @@ export default function PaymentStatusScreen() {
     try {
       const result = await fetchPaymentStatus(id);
       setStatus(result.status);
+      setTestPayment(result.payment_environment === 'test');
       setAmountCentavos(result.amount_centavos);
     } catch (e) {
       setStatus('unknown');
@@ -37,6 +39,7 @@ export default function PaymentStatusScreen() {
         const result = await fetchPaymentStatus(id);
         if (!live) return;
         setStatus(result.status);
+        setTestPayment(result.payment_environment === 'test');
         setAmountCentavos(result.amount_centavos);
         settled = ['confirmed', 'failed', 'refunded', 'reversed'].includes(result.status);
       } catch {
@@ -56,6 +59,7 @@ export default function PaymentStatusScreen() {
   return (
     <Screen>
       <Header title="Payment status" />
+      {testPayment && <Card><Copy bold>PayMongo test payment — no real money was charged.</Copy></Card>}
 
       {confirmed ? (
         <>
@@ -72,12 +76,12 @@ export default function PaymentStatusScreen() {
             >
               <Icon name="checkmark" size={46} color={colors.white} />
             </View>
-            <Title style={{ fontSize: 24 }}>Payment successful</Title>
+            <Title style={{ fontSize: 24 }}>{testPayment ? 'Test payment successful' : 'Payment successful'}</Title>
             {amountCentavos > 0 && (
               <Title style={{ color: colors.green }}>{formatCentavos(amountCentavos)}</Title>
             )}
             <Copy style={{ textAlign: 'center', color: colors.muted }}>
-              Provider confirmation received. This ride is paid.
+              {testPayment ? 'Test confirmation received from PayMongo.' : 'Provider confirmation received. This ride is paid.'}
             </Copy>
           </View>
 

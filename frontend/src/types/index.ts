@@ -76,6 +76,7 @@ export interface Ride {
 }
 
 export interface Payment {
+  payment_environment?: 'test' | 'live';
   payment_id: string;
   ride_id: string;
   driver_id: string;

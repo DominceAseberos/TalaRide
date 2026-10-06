@@ -8,7 +8,7 @@ import { optionalAuth } from '../lib/auth.js';
 import { paymentIntentRateLimiter } from '../middleware/rate-limit.js';
 import { createPayMongoCheckout, createPayMongoDirectGcash } from '../lib/paymongo.js';
 import type { Ride, Payment } from '../types.js';
-import { env } from '../env.js';
+import { env, paymentProviderConfigured } from '../env.js';
 import { consumeWebSession, reserveWebSession, releaseWebSession } from '../lib/web-session.js';
 
 export const paymentIntentRouter = Router();
@@ -28,7 +28,7 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
   let completed = false;
   const owner = req.get('x-ride-owner') || '';
   try {
-    if (env.NODE_ENV === 'production' && (env.PAYMENT_MODE !== 'live' || !env.PAYMENT_PROVIDER_KEY.startsWith('sk_live_'))) return res.status(503).json({ error: 'Live payments are not configured.' });
+    if (env.NODE_ENV === 'production' && !paymentProviderConfigured()) return res.status(503).json({ error: 'Payment gateway is not configured for this environment.' });
     // Normalize body if legacy camelCase properties are provided
     const rawBody = {
       driver_code: req.body.driver_code || req.body.driverId,
@@ -216,6 +216,7 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       checkout_session_id: checkoutSessionId,
       checkout_url: checkoutUrl,
       payment_status: 'awaiting_confirmation',
+      payment_environment: env.PAYMENT_ENVIRONMENT,
       provider_fee_centavos: feeBreakdown.providerFeeCentavos,
       talaride_fee_centavos: feeBreakdown.talarideFeeCentavos,
       net_centavos: feeBreakdown.netCentavos,
@@ -250,6 +251,7 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       talaride_fee_centavos: payment.talaride_fee_centavos,
       net_centavos: payment.net_centavos,
       payment_status: payment.payment_status,
+      payment_environment: payment.payment_environment,
       expires_at: payment.expires_at,
       qr_payload: payment.qr_payload,
       checkout_url: checkoutUrl,

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { repository } from '../lib/repository.js';
+import { env } from '../env.js';
 import { requireAuth } from '../lib/auth.js';
 import { generateVehicleChecksum, verifyVehicleChecksum } from '../lib/qr.js';
 import { createWebSession, getWebSessionExpiry, validateWebSession } from '../lib/web-session.js';
@@ -77,6 +78,7 @@ publicVehiclesRouter.get('/:code/public', async (req: Request, res: Response) =>
     // Strictly safe public metadata: no phone numbers, no license number, no addresses
     return res.json({
       vehicle_code: vehicle.vehicle_code,
+      payment_environment: env.PAYMENT_ENVIRONMENT,
       plate_body_number: vehicle.plate_body_number,
       toda: vehicle.toda,
       status: vehicle.status === 'active' ? 'Active' : 'Inactive',

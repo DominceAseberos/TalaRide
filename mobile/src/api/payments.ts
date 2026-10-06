@@ -14,6 +14,7 @@ export interface IntentResponse {
 }
 
 export interface StatusResponse {
+  payment_environment?: 'test' | 'live';
   payment_id: string;
   status: string;
   amount_centavos: number;
@@ -58,6 +59,7 @@ export async function claimPayment(qr_payload: string) {
 
 export async function fetchPaymentStatus(payment_id: string): Promise<StatusResponse> {
   const data = await apiRequest<{
+    payment_environment?: 'test' | 'live';
     payment_id: string;
     payment_status: string;
     amount_centavos: number;
@@ -65,6 +67,7 @@ export async function fetchPaymentStatus(payment_id: string): Promise<StatusResp
     checkout_url?: string | null;
   }>('/payment-status?payment_id=' + encodeURIComponent(payment_id));
   return {
+    payment_environment: data.payment_environment,
     payment_id: data.payment_id,
     status: data.payment_status,
     amount_centavos: data.amount_centavos,

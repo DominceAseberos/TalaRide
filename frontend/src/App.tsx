@@ -10,6 +10,15 @@ import { getAuthClient, signOut } from './services/auth';
 export function App() {
   const [operator, setOperator] = useState<TodaSession | null>(null);
   const [error, setError] = useState('');
+  const [testPayments, setTestPayments] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch(`${import.meta.env.VITE_API_URL || '/api'}/auth/config`, { signal: controller.signal })
+      .then(response => response.ok ? response.json() : null)
+      .then(config => setTestPayments(config?.paymentEnvironment === 'test'))
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
   const path = window.location.pathname;
   const query = new URLSearchParams(window.location.search);
   useEffect(() => {
@@ -24,9 +33,10 @@ export function App() {
     }).catch(() => {});
     return () => { active = false; };
   }, [path]);
-  if (path === '/success' || path === '/cancel') return <PaymentReturnPage paymentId={query.get('payment_id') || ''} cancelled={path === '/cancel'} />;
-  if (path.startsWith('/v/')) return <PublicVehiclePage vehicleCode={path.split('/')[2]} checksum={query.get('c') || ''} />;
-  if (path === '/driver') return <RegisteredDriverPortal />;
-  return <>{error && <p role="alert">{error}</p>}{operator ? <AdminDashboard operatorName={operator.name} todaName={operator.group} onSignOut={() => void signOut().then(() => setOperator(null)).catch(e => setError(e.message))} /> : <TodaLogin onAuthenticated={setOperator} />}</>;
+  const page = path === '/success' || path === '/cancel' ? <PaymentReturnPage paymentId={query.get('payment_id') || ''} cancelled={path === '/cancel'} />
+    : path.startsWith('/v/') ? <PublicVehiclePage vehicleCode={path.split('/')[2]} checksum={query.get('c') || ''} />
+    : path === '/driver' ? <RegisteredDriverPortal />
+    : <>{error && <p role="alert">{error}</p>}{operator ? <AdminDashboard operatorName={operator.name} todaName={operator.group} onSignOut={() => void signOut().then(() => setOperator(null)).catch(e => setError(e.message))} /> : <TodaLogin onAuthenticated={setOperator} />}</>;
+  return <>{testPayments && <div role="status" className="bg-amber-100 px-4 py-3 text-center text-sm font-semibold text-amber-950">PayMongo test mode — no real money is charged.</div>}{page}</>;
 }
 export default App;

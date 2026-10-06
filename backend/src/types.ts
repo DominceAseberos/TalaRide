@@ -90,6 +90,7 @@ export interface Ride {
 }
 
 export interface Payment {
+  payment_environment?: 'test' | 'live';
   payment_id: string; // e.g. PAY-842109
   ride_id: string;
   driver_code: string;

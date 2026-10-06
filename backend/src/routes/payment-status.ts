@@ -17,6 +17,7 @@ async function getPaymentStatusHandler(req: Request, res: Response) {
 
     return res.json({
       payment_id: payment.payment_id,
+      payment_environment: payment.payment_environment ?? 'live',
       ride_id: payment.ride_id,
       driver_code: payment.driver_code,
       vehicle_code: payment.vehicle_code,

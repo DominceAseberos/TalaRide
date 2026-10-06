@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import { randomInt } from 'node:crypto';
 import path from 'node:path';
-import { env } from '../env.js';
+import { env, paymentProviderConfigured } from '../env.js';
 import { supabaseAdmin } from './supabase-admin.js';
 import { generateVehicleChecksum } from './qr.js';
 import {
@@ -271,8 +271,8 @@ export class TalaRideRepository {
     }
     const configuration = {
       demoAuthDisabled: !env.DEMO_AUTH,
-      livePaymentsEnabled: env.PAYMENT_MODE === 'live',
-      liveProviderKeyConfigured: env.PAYMENT_PROVIDER_KEY.startsWith('sk_live_'),
+      providerPaymentsEnabled: env.PAYMENT_MODE === 'live',
+      providerKeyConfigured: paymentProviderConfigured(),
       publicAuthKeyConfigured: !!env.SUPABASE_PUBLISHABLE_KEY,
       qrSigningConfigured: env.QR_INTENT_SECRET.length >= 32 && !env.QR_INTENT_SECRET.includes('talaride_qr_secret'),
       webhookConfigured: !!env.PAYMENT_WEBHOOK_SECRET && !env.PAYMENT_WEBHOOK_SECRET.startsWith('mock_'),
@@ -281,7 +281,8 @@ export class TalaRideRepository {
     return { ready: databaseReady && commitFunctionReady && liveConfiguration, details: {
       durablePersistenceReady: databaseReady, environment: env.NODE_ENV,
       persistence: env.NODE_ENV === 'production' ? 'supabase' : 'test-local',
-      paymentMode: env.PAYMENT_MODE, liveConfiguration, commitFunctionReady, configuration,
+      paymentMode: env.PAYMENT_MODE, paymentEnvironment: env.PAYMENT_ENVIRONMENT,
+      liveConfiguration, commitFunctionReady, configuration,
     } };
   }
 

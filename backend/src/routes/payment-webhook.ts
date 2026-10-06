@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'node:crypto';
 import { z } from 'zod';
-import { env } from '../env.js';
+import { env, paymentProviderConfigured } from '../env.js';
 import { repository } from '../lib/repository.js';
 import { sse } from '../sse.js';
 
@@ -23,9 +23,17 @@ paymentWebhookRouter.post('/', async (req: Request, res: Response) => {
     const paymongoSignature = (req.headers['paymongo-signature'] || req.headers['Paymongo-Signature']) as string | undefined;
 
     let normalizedPayload: any = req.body;
+    let nativePayMongo = false;
 
     // Check if this is a native PayMongo webhook payload
     if (paymongoSignature || req.body?.data?.type === 'event') {
+      nativePayMongo = true;
+      if (!paymongoSignature || !env.PAYMENT_WEBHOOK_SECRET || env.PAYMENT_WEBHOOK_SECRET.startsWith('mock_')) {
+        return res.status(401).json({ error: 'Signed PayMongo confirmation is required' });
+      }
+      if (env.NODE_ENV === 'production' && !paymentProviderConfigured()) {
+        return res.status(503).json({ error: 'Payment gateway is not configured for this environment' });
+      }
       const eventType = req.body?.data?.attributes?.type;
       const eventData = req.body?.data?.attributes?.data;
 
@@ -34,15 +42,11 @@ paymentWebhookRouter.post('/', async (req: Request, res: Response) => {
       const refNum = attrs.reference_number || attrs.external_reference_number || '';
       const metaPaymentId = attrs.metadata?.payment_id || '';
       const desc = attrs.description || '';
-      const matchedPayId = (refNum || metaPaymentId || desc).match(/PAY-[0-9]+/i)?.[0];
-
-      if (!matchedPayId) {
-        return res.status(400).json({ error: 'Could not identify TalaRide payment_id in PayMongo payload' });
-      }
+      const matchedPayId = [metaPaymentId, refNum, desc].map(value => String(value).match(/\bPAY-(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9]+)\b/i)?.[0]).find(Boolean);
 
       // Extract amount in centavos
       const amountCentavos = attrs.amount || attrs.payments?.[0]?.attributes?.amount || 0;
-      const providerRef = eventData?.id || attrs.payments?.[0]?.id || `pm_${Date.now()}`;
+      const providerRef = attrs.payments?.[0]?.id || eventData?.id;
       const methodUsed = attrs.payment_method_used || attrs.source?.type || 'gcash';
 
       // Verify PayMongo signature if configured
@@ -63,7 +67,7 @@ paymentWebhookRouter.post('/', async (req: Request, res: Response) => {
           .update(`${t}.${rawBody.toString('utf8')}`)
           .digest('hex');
 
-        const providedSig = env.PAYMENT_PROVIDER_KEY.startsWith('sk_test_') ? testSig : liveSig;
+        const providedSig = env.PAYMENT_ENVIRONMENT === 'test' ? testSig : liveSig;
         if (!providedSig) {
           return res.status(401).json({ error: 'Missing PayMongo environment signature' });
         }
@@ -77,6 +81,18 @@ paymentWebhookRouter.post('/', async (req: Request, res: Response) => {
         if (!valid) {
           return res.status(401).json({ error: 'Invalid PayMongo signature' });
         }
+      }
+
+      if (typeof req.body?.data?.attributes?.livemode === 'boolean' &&
+        req.body.data.attributes.livemode !== (env.PAYMENT_ENVIRONMENT === 'live')) {
+        return res.status(400).json({ error: 'Payment environment mismatch' });
+      }
+      // Failed, chargeable, refund and unrelated events must never mark a ride paid.
+      if (!['payment.paid', 'checkout_session.payment.paid'].includes(eventType)) {
+        return res.json({ received: true, ignored: true });
+      }
+      if (!matchedPayId || !providerRef) {
+        return res.status(400).json({ error: 'Could not identify TalaRide payment_id in PayMongo payload' });
       }
 
       const normalizedProvider =
@@ -96,6 +112,9 @@ paymentWebhookRouter.post('/', async (req: Request, res: Response) => {
         amount_centavos: amountCentavos
       };
     } else {
+      if (env.NODE_ENV !== 'test') {
+        return res.status(401).json({ error: 'Signed PayMongo confirmation is required' });
+      }
       // 1. Verify standard webhook signature
       if (!xSignature) {
         return res.status(401).json({ error: 'Missing x-provider-signature header' });
@@ -110,8 +129,7 @@ paymentWebhookRouter.post('/', async (req: Request, res: Response) => {
       const sigBuf = Buffer.from(xSignature);
       const expBuf = Buffer.from(expectedSignature);
       const isValidSignature =
-        (sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)) ||
-        xSignature === env.PAYMENT_WEBHOOK_SECRET;
+        sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf);
 
       if (!isValidSignature) {
         return res.status(401).json({ error: 'Invalid provider signature' });
@@ -129,6 +147,9 @@ paymentWebhookRouter.post('/', async (req: Request, res: Response) => {
     const payment = await repository.getPayment(payment_id);
     if (!payment) {
       return res.status(404).json({ error: 'Payment not found' });
+    }
+    if (nativePayMongo && (payment.payment_environment ?? 'live') !== env.PAYMENT_ENVIRONMENT) {
+      return res.status(400).json({ error: 'Payment environment mismatch' });
     }
 
     // 3. Verify payment amount matches exactly
@@ -184,7 +205,7 @@ paymentWebhookRouter.post('/', async (req: Request, res: Response) => {
     });
 
     // 8. Mint reward if passenger attached
-    if (finalPassengerId) {
+    if (finalPassengerId && payment.payment_environment !== 'test') {
       await repository.mintReward({
         userId: finalPassengerId,
         rideId: result.payment.ride_id,
@@ -195,6 +216,7 @@ paymentWebhookRouter.post('/', async (req: Request, res: Response) => {
     // 9. Real-time driver notification
     sse.notifyDriver(result.payment.driver_code, 'payment_confirmed', {
       payment_id: result.payment.payment_id,
+      payment_environment: result.payment.payment_environment ?? 'live',
       ride_id: result.payment.ride_id,
       amount_centavos: result.payment.amount_centavos,
       net_centavos: result.payment.net_centavos,

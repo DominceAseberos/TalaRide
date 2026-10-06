@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiRequest, ApiError } from './client';
 
 export interface PublicVehicle {
+  payment_environment?: 'test' | 'live';
   vehicle_code: string;
   plate_body_number: string;
   toda: string;

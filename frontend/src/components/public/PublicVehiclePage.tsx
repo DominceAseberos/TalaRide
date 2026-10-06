@@ -14,6 +14,7 @@ import { api } from '../../services/api';
 type PaymentMethod = 'gcash' | 'maya' | 'card' | 'qrph';
 
 interface PublicVehicleData {
+  payment_environment?: 'test' | 'live';
   vehicle_code: string;
   plate_body_number: string;
   toda: string;
@@ -422,7 +423,7 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
             </button>
 
             <p className="px-4 text-center text-[11px] leading-relaxed text-[#78847E]">
-              Nothing is charged until you tap Proceed. TalaRide marks the ride paid only after the payment provider confirms it.
+              {data.payment_environment === 'test' ? 'PayMongo test checkout — no real money is charged.' : 'Nothing is charged until you authorize payment with the provider.'} TalaRide shows success only after the payment provider confirms it.
             </p>
           </div>
         )}
