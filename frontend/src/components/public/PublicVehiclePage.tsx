@@ -24,6 +24,8 @@ interface PublicVehicleData {
   verification_status?: 'verified' | 'pending' | 'suspended';
   driver_photo_url?: string | null;
   fare_config?: { standard_fares_centavos?: number[] };
+  session_id?: string;
+  session_expires_at?: string | null;
   error?: string;
   message?: string;
 }
@@ -46,6 +48,8 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
   const [customFare, setCustomFare] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const fares = useMemo(() => {
     const configured = data?.fare_config?.standard_fares_centavos;
@@ -97,13 +101,20 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
 
   useEffect(() => {
     let ignore = false;
-    api.getPublicVehicle(vehicleCode, checksum)
+    const requestedSessionId = new URLSearchParams(window.location.search).get('sid') || undefined;
+    api.getPublicVehicle(vehicleCode, checksum, requestedSessionId)
       .then((res) => {
         if (ignore) return;
         if (res.error || res.message) {
           setErrorMessage(res.message || 'Vehicle QR could not be verified');
         } else {
           setData(res);
+          if (res.session_id) {
+            setSessionId(res.session_id);
+            const url = new URL(window.location.href);
+            url.searchParams.set('sid', res.session_id);
+            window.history.replaceState({}, '', url.toString());
+          }
         }
         setLoading(false);
       })
@@ -115,6 +126,13 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
       });
     return () => { ignore = true; };
   }, [vehicleCode, checksum]);
+
+  useEffect(() => {
+    if (!data?.session_expires_at) return;
+    const remaining = Math.max(0, new Date(data.session_expires_at).getTime() - Date.now());
+    const timer = window.setTimeout(() => setSessionExpired(true), remaining);
+    return () => window.clearTimeout(timer);
+  }, [data?.session_expires_at]);
 
   const finalFare = useMemo(() => {
     if (!customMode) return presetFare ?? 0;
@@ -157,7 +175,8 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
         data.vehicle_code,
         finalFare,
         customMode,
-        paymentMethod
+        paymentMethod,
+        sessionId ?? undefined
       );
       if (!result.checkoutUrl) {
         throw new Error('The payment gateway is unavailable right now.');
@@ -213,7 +232,15 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
           </div>
         )}
 
-        {!loading && data && (
+        {!loading && sessionExpired && (
+          <div className="rounded-3xl border border-[#F0C8C5] bg-[#FFF3F1] p-6 text-center shadow-sm">
+            <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-[#C73E3A]" />
+            <div className="font-black text-[#8A2926]">Ride session expired</div>
+            <p className="mt-1 text-sm leading-relaxed text-[#9A4B47]">Scan the vehicle QR code again to start a new private payment session.</p>
+          </div>
+        )}
+
+        {!loading && data && !sessionExpired && (
           <div className="space-y-4">
             <section className="overflow-hidden rounded-3xl border border-[#CFE0D5] bg-white shadow-sm">
               <div className="bg-[#003D2B] px-5 py-4 text-white">

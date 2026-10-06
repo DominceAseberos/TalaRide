@@ -11,13 +11,54 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Driver, Vehicle, Payment, LostItemReport, PaymentIssueTicket, FareConfiguration } from '../../types';
 import { api } from '../../services/api';
 
-export const AdminDashboard: React.FC = () => {
+interface Props {
+  operatorName?: string;
+  todaName?: string;
+  demoData?: boolean;
+  onSignOut?: () => void;
+}
+
+const PREVIEW_DRIVERS: Driver[] = [
+  {
+    driver_id: 'DR-000481', user_id: 'USR-DRV-001', name: 'Juan Dela Cruz', mobile_number: '09171234567',
+    verification_status: 'verified', toda_operator: 'Tagum Poblacion TODA', assigned_vehicle_id: 'TR-01842',
+    shift_status: 'active', active_shift_id: 'SHIFT-2026-001', license_number: 'N02-14-098765', created_at: '2026-09-01T08:00:00.000Z'
+  },
+  {
+    driver_id: 'DR-000512', user_id: 'USR-DRV-002', name: 'Rodrigo Bautista', mobile_number: '09201122334',
+    verification_status: 'verified', toda_operator: 'Magsaysay TODA', assigned_vehicle_id: null,
+    shift_status: 'ended', active_shift_id: null, license_number: 'N03-16-123456', created_at: '2026-09-15T09:30:00.000Z'
+  },
+  {
+    driver_id: 'DR-000999', user_id: 'USR-DRV-003', name: 'Suspended Driver', mobile_number: '09999999999',
+    verification_status: 'suspended', toda_operator: 'San Miguel TODA', assigned_vehicle_id: null,
+    shift_status: 'ended', active_shift_id: null, license_number: 'N01-99-999999', created_at: '2026-09-10T09:30:00.000Z'
+  }
+];
+
+const PREVIEW_VEHICLES: Vehicle[] = [
+  { vehicle_id: 'TR-01842', plate_body_number: 'TAG-842', toda: 'Tagum Poblacion TODA', status: 'active', assigned_driver_id: 'DR-000481', assigned_driver_name: 'Juan Dela Cruz', qr_code_payload: '', created_at: '2026-09-01T08:00:00.000Z' },
+  { vehicle_id: 'TR-00421', plate_body_number: 'TAG-421', toda: 'Magsaysay TODA', status: 'active', assigned_driver_id: null, assigned_driver_name: null, qr_code_payload: '', created_at: '2026-09-05T09:00:00.000Z' },
+  { vehicle_id: 'TR-02910', plate_body_number: 'TAG-910', toda: 'San Miguel TODA', status: 'active', assigned_driver_id: null, assigned_driver_name: null, qr_code_payload: '', created_at: '2026-09-12T11:00:00.000Z' }
+];
+
+const PREVIEW_LOST_ITEMS: LostItemReport[] = [
+  { report_id: 'LIR-8421', ride_id: 'RIDE-2026-8941', vehicle_id: 'TR-01842', driver_id: 'DR-000481', passenger_id: 'USR-COM-001', passenger_name: 'Maria Santos', passenger_contact: 'Private', item_category: 'bag', description: 'Black shoulder bag with a blue keychain', status: 'driver_notified', driver_response: null, created_at: '2026-10-06T08:15:00.000Z' }
+];
+
+const PREVIEW_OVERVIEW = {
+  metrics: { activeDriversOnShift: 1, digitalAdoptionPct: 60, totalDigitalVolume: 620, totalFeesCollected: 10.85 },
+  active_lost_items_count: 1,
+  pending_payment_issues_count: 0
+};
+
+export const AdminDashboard: React.FC<Props> = ({ operatorName = 'TalaRide Operator', todaName = 'Tagum City TODA', demoData = false, onSignOut }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'drivers' | 'vehicles' | 'transactions' | 'lostItems' | 'issues' | 'fares'>('overview');
-  const [overview, setOverview] = useState<any>(null);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [overview, setOverview] = useState<any>(demoData ? PREVIEW_OVERVIEW : null);
+  const [drivers, setDrivers] = useState<Driver[]>(demoData ? PREVIEW_DRIVERS : []);
+  const [vehicles, setVehicles] = useState<Vehicle[]>(demoData ? PREVIEW_VEHICLES : []);
   const [transactions, setTransactions] = useState<Payment[]>([]);
-  const [lostItems, setLostItems] = useState<LostItemReport[]>([]);
+  const [lostItems, setLostItems] = useState<LostItemReport[]>(demoData ? PREVIEW_LOST_ITEMS : []);
   const [paymentIssues, setPaymentIssues] = useState<PaymentIssueTicket[]>([]);
   const [fareConfig, setFareConfig] = useState<FareConfiguration | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,8 +79,23 @@ export const AdminDashboard: React.FC = () => {
   // Printable sticker modal
   const [stickerVehicle, setStickerVehicle] = useState<Vehicle | null>(null);
 
+  const applyPreviewData = () => {
+    setOverview(PREVIEW_OVERVIEW);
+    setDrivers(PREVIEW_DRIVERS);
+    setVehicles(PREVIEW_VEHICLES);
+    setTransactions([]);
+    setLostItems(PREVIEW_LOST_ITEMS);
+    setPaymentIssues([]);
+    setFareConfig({ standard_fares: [15, 20, 25, 30, 40], min_custom_fare: 15, max_custom_fare: 500, provider_fee_percentage: 1.75, talaride_platform_fee: 0 });
+  };
+
   const loadAllData = useCallback(async () => {
     setLoading(true);
+    if (demoData) {
+      applyPreviewData();
+      setLoading(false);
+      return;
+    }
     try {
       const [ov, drvs, vehs, txs, items, issues, fares] = await Promise.all([
         api.getAdminOverview(),
@@ -62,9 +118,10 @@ export const AdminDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [demoData]);
 
   useEffect(() => {
+    if (demoData) return;
     let ignore = false;
     (async () => {
       setLoading(true);
@@ -96,14 +153,22 @@ export const AdminDashboard: React.FC = () => {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [demoData]);
 
   const handleVerifyDriver = async (driverId: string) => {
+    if (demoData) {
+      setDrivers((items) => items.map((item) => item.driver_id === driverId ? { ...item, verification_status: 'verified' } : item));
+      return;
+    }
     await api.verifyDriver(driverId);
     await loadAllData();
   };
 
   const handleSuspendDriver = async (driverId: string) => {
+    if (demoData) {
+      setDrivers((items) => items.map((item) => item.driver_id === driverId ? { ...item, verification_status: 'suspended' } : item));
+      return;
+    }
     await api.suspendDriver(driverId);
     await loadAllData();
   };
@@ -165,11 +230,11 @@ export const AdminDashboard: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-black text-white text-lg tracking-tight">TalaRide Ops Portal</h1>
-              <span className="text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded">
-                Tagum City TODA
+                <span className="text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded">
+                {todaName}
               </span>
             </div>
-            <p className="text-xs text-slate-400">Admin Control Center • Philippine Micro-Transit</p>
+            <p className="text-xs text-slate-400">{operatorName} · TODA operations dashboard</p>
           </div>
         </div>
 
@@ -227,6 +292,14 @@ export const AdminDashboard: React.FC = () => {
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
+        {onSignOut && (
+          <button
+            onClick={onSignOut}
+            className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-bold text-slate-300 transition hover:border-emerald-500 hover:text-white"
+          >
+            Sign out
+          </button>
+        )}
       </div>
 
       {/* Main Content Area */}

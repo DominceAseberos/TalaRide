@@ -192,7 +192,7 @@ export const DriverLogin: React.FC<Props> = ({ onLoginSuccess, onBackToCommuter 
             onClick={onBackToCommuter}
             className="w-full text-center text-xs font-semibold text-slate-400 hover:text-white"
           >
-            Back to commuter portal
+            Back to TODA sign in
           </button>
         )}
       </div>

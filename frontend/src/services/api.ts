@@ -295,8 +295,11 @@ export const api = {
     return data.vehicle ? { ...data, vehicle: normalizeVehicle(data.vehicle) } : normalizeVehicle(data);
   },
 
-  getPublicVehicle: async (vehicleCode: string, checksum: string) =>
-    apiJson<any>(`/public/vehicles/${vehicleCode}/public?c=${encodeURIComponent(checksum)}`),
+  getPublicVehicle: async (vehicleCode: string, checksum: string, sessionId?: string) => {
+    const query = new URLSearchParams({ c: checksum });
+    if (sessionId) query.set('sid', sessionId);
+    return apiJson<any>(`/public/vehicles/${vehicleCode}/public?${query.toString()}`);
+  },
 
   registerVehicle: async (data: { vehicle_id: string; plate_body_number: string; toda: string }) => {
     const result = await apiJson<any>('/admin/vehicles', {
@@ -354,7 +357,8 @@ export const api = {
     vehicleId: string,
     fareAmount: number,
     _isCustom = false,
-    paymentMethod: 'gcash' | 'maya' | 'card' | 'qrph' = 'gcash'
+    paymentMethod: 'gcash' | 'maya' | 'card' | 'qrph' = 'gcash',
+    sessionId?: string
   ) => {
     const raw = await apiJson<any>('/payment-intent', {
       method: 'POST',
@@ -362,7 +366,8 @@ export const api = {
         driver_code: driverId,
         vehicle_code: vehicleId,
         amount_centavos: Math.round(fareAmount * 100),
-        payment_method: paymentMethod
+        payment_method: paymentMethod,
+        ...(sessionId ? { session_id: sessionId } : {})
       })
     });
     const payment = normalizePayment({

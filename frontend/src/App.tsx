@@ -35,6 +35,7 @@ import { DriverLostItems } from './components/driver/DriverLostItems';
 import { GuestQRPhPayment } from './components/guest/GuestQRPhPayment';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { DualScreenSimulator } from './components/simulator/DualScreenSimulator';
+import { TodaLogin, type TodaSession } from './components/auth/TodaLogin';
 
 import { Ride, Driver } from './types';
 import { api, connectSSE } from './services/api';
@@ -42,7 +43,7 @@ import { playAlertChime } from './utils/audio';
 
 const SEED_TIMESTAMP = '2026-10-01T08:00:00.000Z';
 
-type ActivePortal = 'commuter' | 'driver' | 'guest' | 'admin' | 'simulator';
+type ActivePortal = 'operator' | 'commuter' | 'driver' | 'guest' | 'admin' | 'simulator';
 
 export function App() {
   const [activePortal, setActivePortal] = useState<ActivePortal>(() => {
@@ -53,7 +54,16 @@ export function App() {
       if (path === '/driver') return 'driver';
       if (path === '/guest') return 'guest';
     }
-    return 'commuter';
+    return 'operator';
+  });
+
+  const [operatorSession, setOperatorSession] = useState<TodaSession | null>(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? window.sessionStorage.getItem('talaride.toda-session') : null;
+      return raw ? (JSON.parse(raw) as TodaSession) : null;
+    } catch {
+      return null;
+    }
   });
 
   const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
@@ -107,8 +117,23 @@ export function App() {
 
   const openCommuterPortal = () => {
     if (typeof window !== 'undefined') window.history.pushState({}, '', '/');
-    setActivePortal('commuter');
-    setCommuterTab('home');
+    setOperatorSession(null);
+    if (typeof window !== 'undefined') window.sessionStorage.removeItem('talaride.toda-session');
+    setActivePortal('operator');
+  };
+
+  const openOperatorDashboard = (session: TodaSession) => {
+    setOperatorSession(session);
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('talaride.toda-session', JSON.stringify(session));
+      window.history.pushState({}, '', '/');
+    }
+    setActivePortal('operator');
+  };
+
+  const signOutOperator = () => {
+    setOperatorSession(null);
+    if (typeof window !== 'undefined') window.sessionStorage.removeItem('talaride.toda-session');
   };
 
   // Initialize data & SSE Listener
@@ -177,6 +202,18 @@ export function App() {
 
       {/* Main Dynamic Viewport */}
       <main className="flex-1 flex justify-center items-stretch p-0 overflow-hidden">
+        {activePortal === 'operator' && (
+          operatorSession ? (
+            <AdminDashboard
+              operatorName={operatorSession.name}
+              todaName={operatorSession.group}
+              demoData
+              onSignOut={signOutOperator}
+            />
+          ) : (
+            <TodaLogin onAuthenticated={openOperatorDashboard} />
+          )
+        )}
         {/* VIEW 1: COMMUTER APP */}
         {activePortal === 'commuter' && (
           <div className="w-full min-h-[100dvh] bg-[#FFFEF9] overflow-hidden flex flex-col relative">

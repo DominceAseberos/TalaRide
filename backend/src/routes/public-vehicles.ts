@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { repository } from '../lib/repository.js';
 import { verifyVehicleChecksum } from '../lib/qr.js';
+import { createWebSession, getWebSessionExpiry, validateWebSession } from '../lib/web-session.js';
 
 export const publicVehiclesRouter = Router();
 
@@ -17,12 +18,25 @@ publicVehiclesRouter.get('/:code/public', async (req: Request, res: Response) =>
   try {
     const vehicleCode = String(req.params.code);
     const checksum = req.query.c as string | undefined;
+    const requestedSessionId = typeof req.query.sid === 'string' ? req.query.sid : undefined;
 
     // Verify HMAC checksum
     if (!checksum || !verifyVehicleChecksum(vehicleCode, checksum)) {
       return res.status(400).json({
         error: 'Invalid checksum',
         message: 'Vehicle QR could not be verified'
+      });
+    }
+
+    let webSession = requestedSessionId
+      ? (validateWebSession(requestedSessionId, vehicleCode)
+        ? { sessionId: requestedSessionId, expiresAt: getWebSessionExpiry(requestedSessionId, vehicleCode) }
+        : null)
+      : createWebSession(vehicleCode);
+    if (!webSession) {
+      return res.status(410).json({
+        error: 'Session expired',
+        message: 'This ride link has expired. Scan the vehicle QR code again to start a new session.'
       });
     }
 
@@ -60,7 +74,9 @@ publicVehiclesRouter.get('/:code/public', async (req: Request, res: Response) =>
       driver_name: driverName || 'No driver assigned',
       verification_status: verificationStatus,
       driver_photo_url: driverPhotoUrl,
-      fare_config: await repository.getFareConfig()
+      fare_config: await repository.getFareConfig(),
+      session_id: webSession.sessionId,
+      session_expires_at: webSession.expiresAt ?? null
     });
   } catch (err: any) {
     console.error('Error in public vehicle lookup:', err);

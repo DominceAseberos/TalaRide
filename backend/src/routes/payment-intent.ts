@@ -7,6 +7,7 @@ import { optionalAuth } from '../lib/auth.js';
 import { paymentIntentRateLimiter } from '../middleware/rate-limit.js';
 import { createPayMongoCheckout, createPayMongoDirectGcash } from '../lib/paymongo.js';
 import { env } from '../env.js';
+import { consumeWebSession, validateWebSession } from '../lib/web-session.js';
 
 export const paymentIntentRouter = Router();
 
@@ -15,7 +16,8 @@ export const PaymentIntentSchema = z.object({
   vehicle_code: z.string().regex(/^TR-[0-9]{5}$/, 'vehicle_code must match TR-00000 format'),
   amount_centavos: z.number().int().positive('amount_centavos must be a positive integer'),
   payment_method: z.enum(['gcash', 'maya', 'card', 'qrph']).default('gcash'),
-  approximate_location: z.string().optional().default('Tagum City')
+  approximate_location: z.string().optional().default('Tagum City'),
+  session_id: z.string().min(20).max(128).optional()
 });
 
 // POST /api/payment-intent
@@ -32,7 +34,8 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
           ? Math.round(Number(req.body.fareAmount) * 100)
           : undefined,
       payment_method: req.body.payment_method || req.body.paymentMethod || 'gcash',
-      approximate_location: req.body.approximate_location || req.body.approximateLocation
+      approximate_location: req.body.approximate_location || req.body.approximateLocation,
+      session_id: req.body.session_id || req.body.sessionId
     };
 
     const parsed = PaymentIntentSchema.safeParse(rawBody);
@@ -43,7 +46,14 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       });
     }
 
-    const { driver_code, vehicle_code, amount_centavos, payment_method, approximate_location } = parsed.data;
+    const { driver_code, vehicle_code, amount_centavos, payment_method, approximate_location, session_id } = parsed.data;
+
+    if (session_id && !validateWebSession(session_id, vehicle_code)) {
+      return res.status(410).json({
+        error: 'Session expired',
+        message: 'This ride session has expired. Scan the vehicle QR code again to start a new payment.'
+      });
+    }
 
     // 1. Validate Driver exists
     const driver = await repository.getDriver(driver_code);
@@ -221,9 +231,11 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       event_id: `EVT-${Date.now().toString().slice(-6)}`,
       payment_id: paymentId,
       event_type: 'intent_created',
-      payload: { amount_centavos, ride_id: rideId, payment_method },
+      payload: { amount_centavos, ride_id: rideId, payment_method, session_id: session_id ?? null },
       created_at: new Date().toISOString()
     });
+
+    if (session_id) consumeWebSession(session_id, vehicle_code);
 
     return res.status(201).json({
       success: true,
@@ -240,6 +252,7 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       expires_at: payment.expires_at,
       qr_payload: payment.qr_payload,
       checkout_url: checkoutUrl,
+      session_id: session_id ?? null,
       payment_flow: payment_method === 'gcash' ? 'direct_gcash' : 'paymongo_checkout'
     });
   } catch (err: any) {
