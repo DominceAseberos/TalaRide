@@ -39,6 +39,7 @@ export interface Driver {
   active_shift_id?: string | null;
   created_at: string;
   updated_at?: string;
+  photo_url?: string | null;
 }
 
 export interface Vehicle {

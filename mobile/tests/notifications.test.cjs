@@ -104,6 +104,11 @@ test('notification provider requests permission explicitly, registers physical d
   const routes = [];
   const module = load('src/notifications/NotificationProvider.tsx', {
     react: React,
+    '@react-native-async-storage/async-storage': {
+      getItem: async () => null,
+      setItem: async () => {},
+      removeItem: async () => {},
+    },
     'expo-constants': { __esModule: true, default: { easConfig: { projectId: 'project-id' } } },
     'expo-device': { isDevice: true },
     'expo-router': { router: { replace: (route) => routes.push(route) } },
@@ -187,6 +192,11 @@ test('notification provider hides prior-account data and ignores stale account r
   });
   const module = load('src/notifications/NotificationProvider.tsx', {
     react: React,
+    '@react-native-async-storage/async-storage': {
+      getItem: async () => null,
+      setItem: async () => {},
+      removeItem: async () => {},
+    },
     'expo-constants': { __esModule: true, default: {} },
     'expo-device': { isDevice: true },
     'expo-router': { router: { replace() {} } },

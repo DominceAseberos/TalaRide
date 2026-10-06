@@ -66,19 +66,35 @@ Deno.serve(async (request: Request) => {
         return respond(400, { error: 'Invalid JSON' });
       }
       const name = typeof body?.display_name === 'string' ? body.display_name.trim() : '';
-      if (!name || name.length > 80 || Object.keys(body).some((key) => key !== 'display_name'))
+      const avatarUrl =
+        body?.avatar_url === null
+          ? null
+          : typeof body?.avatar_url === 'string' && body.avatar_url.length <= 1000
+            ? body.avatar_url
+            : undefined;
+      if (
+        (!name && avatarUrl === undefined) ||
+        (name && name.length > 80) ||
+        Object.keys(body).some((key) => !['display_name', 'avatar_url'].includes(key))
+      )
         return respond(400, { error: 'Invalid display name' });
+      const updates: { display_name?: string; avatar_url?: string | null; avatar_updated_at?: string } = {};
+      if (name) updates.display_name = name;
+      if (avatarUrl !== undefined) {
+        updates.avatar_url = avatarUrl;
+        updates.avatar_updated_at = new Date().toISOString();
+      }
       const { data, error: failure } = await client
         .from('profiles')
-        .update({ display_name: name })
+        .update(updates)
         .eq('id', user.id)
-        .select('id, display_name')
+        .select('id, display_name, avatar_url')
         .single();
       return failure ? respond(503, { error: 'Profile unavailable' }) : respond(200, data);
     }
     const { data, error: failure } = await client
       .from('profiles')
-      .select('id, display_name')
+      .select('id, display_name, avatar_url')
       .eq('id', user.id)
       .single();
     return failure ? respond(503, { error: 'Profile unavailable' }) : respond(200, data);

@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createContext,
   useContext,
@@ -33,6 +34,7 @@ type NotificationState = {
   read: (id: string) => Promise<void>;
 };
 const Context = createContext<NotificationState | null>(null);
+const NOTIFICATION_CACHE_PREFIX = 'talaride.notification-cache-v2:';
 
 try {
   Notifications.setNotificationHandler({
@@ -75,6 +77,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     setNotifications(items);
     setLoadedAccount(accountId);
     setEnabled(preference);
+    await AsyncStorage.setItem(NOTIFICATION_CACHE_PREFIX + accountId, JSON.stringify(items)).catch(() => {});
   }
   async function enable() {
     const accountId = userId;
@@ -162,12 +165,27 @@ export function NotificationProvider({ children }: PropsWithChildren) {
       .catch(() => {
         if (active) setPermission('unavailable');
       });
+    void AsyncStorage.getItem(NOTIFICATION_CACHE_PREFIX + userId)
+      .then((raw) => {
+        if (!active || !raw) return;
+        try {
+          const cached = JSON.parse(raw) as Notification[];
+          if (account.current === userId) {
+            setNotifications(cached);
+            setLoadedAccount(userId);
+          }
+        } catch {
+          // Ignore corrupt notification cache and continue with the cloud request.
+        }
+      })
+      .catch(() => {});
     Promise.all([listRelayNotifications(), getNotificationPreference()])
       .then(([items, preference]) => {
         if (active) {
           setNotifications(items);
           setLoadedAccount(userId);
           setEnabled(preference);
+          void AsyncStorage.setItem(NOTIFICATION_CACHE_PREFIX + userId, JSON.stringify(items)).catch(() => {});
         }
       })
       .catch(() => {

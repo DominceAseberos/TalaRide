@@ -37,11 +37,15 @@ publicVehiclesRouter.get('/:code/public', async (req: Request, res: Response) =>
     const activeShift = await repository.getActiveShiftForVehicle(vehicleCode);
     const publicDriverCode = activeShift?.driver_code || vehicle.assigned_driver_code || null;
     let driverName: string | null = null;
+    let verificationStatus: 'verified' | 'pending' | 'suspended' = 'pending';
+    let driverPhotoUrl: string | null = null;
 
     if (publicDriverCode) {
       const driver = await repository.getDriver(publicDriverCode);
       if (driver) {
         driverName = formatSafeDriverName(driver.full_name);
+        verificationStatus = driver.verification_status;
+        driverPhotoUrl = driver.photo_url ?? null;
       }
     }
 
@@ -53,7 +57,10 @@ publicVehiclesRouter.get('/:code/public', async (req: Request, res: Response) =>
       status: vehicle.status === 'active' ? 'Active' : 'Inactive',
       shift_status: activeShift ? 'Active' : 'Not currently active',
       driver_code: publicDriverCode,
-      driver_name: driverName || 'No driver assigned'
+      driver_name: driverName || 'No driver assigned',
+      verification_status: verificationStatus,
+      driver_photo_url: driverPhotoUrl,
+      fare_config: await repository.getFareConfig()
     });
   } catch (err: any) {
     console.error('Error in public vehicle lookup:', err);

@@ -56,3 +56,4 @@ pnpm-debug.log*
 .DS_Store
 .idea/
 *.pem
+.codebase-memory/

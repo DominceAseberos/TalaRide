@@ -235,6 +235,11 @@ test('Auth provider restores sessions, handles refresh/recovery/sign-out and ign
     },
   };
   const provider = load('src/auth/AuthProvider.tsx', {
+    '@react-native-async-storage/async-storage': {
+      getItem: async () => null,
+      setItem: async () => {},
+      removeItem: async () => {},
+    },
     'react-native': {
       Platform: { OS: 'android' },
       AppState: {

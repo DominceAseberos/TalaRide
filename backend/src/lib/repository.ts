@@ -290,6 +290,14 @@ export class TalaRideRepository {
     return driver;
   }
 
+  async updateDriverPhoto(driverCode: string, photoUrl: string | null): Promise<Driver | null> {
+    const driver = await this.getDriver(driverCode);
+    if (!driver) return null;
+    driver.photo_url = photoUrl;
+    this.persistToDisk(this.memoryState);
+    return driver;
+  }
+
   // --- Vehicles ---
   async getVehicle(vehicleCode: string): Promise<Vehicle | null> {
     const vehicle = this.memoryState.vehicles.find((v) => v.vehicle_code === vehicleCode);

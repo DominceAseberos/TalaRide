@@ -81,6 +81,7 @@ function normalizeDriver(raw: any): Driver {
     shift_status: raw.shift_status ?? 'ended',
     active_shift_id: raw.active_shift_id ?? null,
     license_number: raw.license_number ?? '',
+    photo_url: raw.photo_url ?? null,
     created_at: raw.created_at
   };
 }

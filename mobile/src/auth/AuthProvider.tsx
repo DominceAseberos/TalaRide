@@ -7,6 +7,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 import { AppState, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@supabase/supabase-js';
 import { authConfigurationError, requireSupabase, supabase } from './client';
 import { loadProfile, saveProfile, type UserProfile } from './profiles';
@@ -34,6 +35,7 @@ export const DEMO_USERS = {
 };
 
 let inMemoryDemoSession: Session | null = null;
+const PROFILE_CACHE_PREFIX = 'talaride.profile-cache-v2:';
 
 function getStoredDemoSession(): Session | null {
   if (inMemoryDemoSession) return inMemoryDemoSession;
@@ -73,7 +75,7 @@ type AuthState = {
   displayName: string;
   setRecovery: (value: boolean) => void;
   signOut: () => Promise<void>;
-  updateProfile: (name: string) => Promise<void>;
+  updateProfile: (name: string, avatarUrl?: string | null) => Promise<void>;
   refreshProfile: () => Promise<void>;
   signInAsDemo: (role?: 'passenger' | 'driver') => Promise<void>;
 };
@@ -155,17 +157,32 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const id = session?.user.id ?? null;
   useEffect(() => {
     let active = true;
-    if (id)
+    if (id) {
+      const cacheKey = PROFILE_CACHE_PREFIX + id;
+      void AsyncStorage.getItem(cacheKey)
+        .then((raw) => {
+          if (!active || account.current !== id || !raw) return;
+          try {
+            setProfile(JSON.parse(raw) as UserProfile);
+          } catch {
+            // Ignore a corrupt local profile and use the cloud copy.
+          }
+        })
+        .catch(() => {});
       void loadProfile(id)
         .then((value) => {
           if (active && account.current === id) {
             setProfile(value);
             setProfileFailure(null);
+            void AsyncStorage.setItem(cacheKey, JSON.stringify(value)).catch(() => {});
           }
         })
         .catch((failure) => {
-          if (active && account.current === id) setProfileFailure({ id, message: failure.message });
+          if (active && account.current === id) {
+            setProfileFailure({ id, message: failure.message });
+          }
         });
+    }
     return () => {
       active = false;
     };
@@ -196,6 +213,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           setProfile({
             id: user.id,
             display_name: user.user_metadata.display_name,
+            avatar_url: null,
           });
           setError(null);
           saveStoredDemoSession(demoSession);
@@ -219,9 +237,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
           setRecovery(false);
           await clearDraft();
         },
-        async updateProfile(name) {
+        async updateProfile(name, avatarUrl) {
           if (!id) throw new Error('Sign in to update your profile.');
-          const value = await saveProfile(id, name);
+          if (!supabase) {
+            const value: UserProfile = {
+              id,
+              display_name: name.trim() || 'Passenger',
+              avatar_url: avatarUrl ?? profile?.avatar_url ?? null,
+            };
+            setProfile(value);
+            return;
+          }
+          const value = await saveProfile(id, name, avatarUrl);
           if (account.current === id) {
             setProfile(value);
             setProfileFailure(null);

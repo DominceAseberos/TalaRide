@@ -1,11 +1,13 @@
 import { useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Image, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Screen } from '@/components/Screen';
 import { BottomNav } from '@/components/BottomNav';
 import { Notice } from '@/components/Notice';
 import { ActionRow, Button, Copy, Field, Icon, go, s, type IconName } from '@/components/ui';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/auth/AuthProvider';
+import { uploadProfileImage } from '@/auth/profiles';
 import { useNotifications } from '@/notifications/NotificationProvider';
 import { useMock } from '@/mocks/MockProvider';
 import {
@@ -54,10 +56,12 @@ const settings: { label: string; icon: IconName; message: string }[] = [
   },
 ];
 export default function ProfileScreen() {
-  const { signOut, session, displayName, profileError, updateProfile, refreshProfile } = useAuth();
+  const { signOut, session, profile, displayName, profileError, updateProfile, refreshProfile } = useAuth();
   const notificationState = useNotifications();
   const { rides, clearRideHistory, deleteAccount } = useMock();
   const [name, setName] = useState(displayName);
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? '');
+  const [avatarMime, setAvatarMime] = useState('image/jpeg');
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
   const [error, setError] = useState('');
@@ -65,6 +69,30 @@ export default function ProfileScreen() {
   const [confirmation, setConfirmation] = useState<'history' | 'account' | null>(null);
   const [availableUpdate, setAvailableUpdate] = useState<AvailableUpdate | null>(null);
   const [updateMessage, setUpdateMessage] = useState('');
+  const displayedAvatar = avatarUrl || profile?.avatar_url || '';
+  async function chooseAvatar() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setError('Allow photo access to choose a profile image.');
+      return;
+    }
+    const picked = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+    });
+    const asset = picked.canceled ? undefined : picked.assets[0];
+    if (asset?.uri) {
+      if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+        setError('Choose an image smaller than 5 MB.');
+        return;
+      }
+      setAvatarUrl(asset.uri);
+      setAvatarMime(asset.mimeType ?? 'image/jpeg');
+      setError('');
+    }
+  }
   return (
     <Screen footer={<BottomNav active="Account" />}>
       <View
@@ -88,7 +116,11 @@ export default function ProfileScreen() {
             justifyContent: 'center',
           }}
         >
-          <Icon name="person-circle" size={66} color={colors.disabled} />
+          {displayedAvatar ? (
+            <Image source={{ uri: displayedAvatar }} style={{ width: 68, height: 68, borderRadius: 34 }} />
+          ) : (
+            <Icon name="person-circle" size={66} color={colors.disabled} />
+          )}
         </View>
         <View style={{ flex: 1 }}>
           <Copy bold style={{ fontSize: 18 }}>
@@ -118,6 +150,7 @@ export default function ProfileScreen() {
           onPress={() => {
             if (!busy) {
               setName(displayName);
+              setAvatarUrl(profile?.avatar_url ?? '');
               setError('');
               setSelected(setting);
             }
@@ -157,6 +190,17 @@ export default function ProfileScreen() {
         >
           {selected.label === 'Account Settings' && (
             <>
+              <View style={{ alignItems: 'center', gap: 8 }}>
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={{ width: 88, height: 88, borderRadius: 44 }} />
+                ) : (
+                  <Icon name="person-circle" size={88} color={colors.disabled} />
+                )}
+                <Button label="Choose profile image" variant="outline" onPress={() => void chooseAvatar()} />
+                <Copy style={{ color: colors.muted, textAlign: 'center', fontSize: 12 }}>
+                  JPG, PNG, or WEBP up to 5 MB. Your image is shown with your driver identity only when applicable.
+                </Copy>
+              </View>
               <Copy>{session?.user.email}</Copy>
               <Field
                 label="Display name"
@@ -178,7 +222,13 @@ export default function ProfileScreen() {
                   locked.current = true;
                   setBusy(true);
                   setError('');
-                  void updateProfile(name)
+                  void (async () => {
+                    let savedAvatar = avatarUrl || null;
+                    if (savedAvatar && !savedAvatar.startsWith('http')) {
+                      savedAvatar = await uploadProfileImage(session?.user.id ?? '', savedAvatar, avatarMime);
+                    }
+                    await updateProfile(name, savedAvatar);
+                  })()
                     .then(() => setSelected(null))
                     .catch((failure) => setError(failure.message))
                     .finally(() => {

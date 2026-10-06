@@ -77,7 +77,11 @@ export const DriverMainFare: React.FC<Props> = ({
       {/* Top Header: High-contrast vehicle and driver info */}
       <div className="space-y-3">
         <div className="bg-slate-900 border-2 border-slate-800 rounded-2xl p-3.5 flex items-center justify-between shadow-md">
-          <div>
+          <div className="flex items-center gap-3">
+            {driver.photo_url ? (
+              <img src={driver.photo_url} alt="Driver profile" className="h-12 w-12 rounded-2xl object-cover" />
+            ) : null}
+            <div>
             <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">Current Vehicle</div>
             <div className="flex items-center gap-2">
               <span className="text-2xl font-black font-mono tracking-tight text-white">
@@ -89,6 +93,7 @@ export const DriverMainFare: React.FC<Props> = ({
             </div>
             <div className="text-xs text-slate-400 mt-0.5">
               Driver: <strong className="text-slate-200">{driver.name}</strong> ({driver.driver_id})
+            </div>
             </div>
           </div>
 

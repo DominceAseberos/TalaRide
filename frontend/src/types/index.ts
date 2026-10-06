@@ -29,6 +29,7 @@ export interface Driver {
   shift_status: ShiftStatus;
   active_shift_id?: string | null;
   license_number: string;
+  photo_url?: string | null;
   created_at: string;
 }
 

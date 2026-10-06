@@ -21,6 +21,9 @@ interface PublicVehicleData {
   shift_status: string;
   driver_code: string | null;
   driver_name: string;
+  verification_status?: 'verified' | 'pending' | 'suspended';
+  driver_photo_url?: string | null;
+  fare_config?: { standard_fares_centavos?: number[] };
   error?: string;
   message?: string;
 }
@@ -43,6 +46,11 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
   const [customFare, setCustomFare] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const fares = useMemo(() => {
+    const configured = data?.fare_config?.standard_fares_centavos;
+    return configured?.length ? configured.map((value) => value / 100) : PRESET_FARES;
+  }, [data?.fare_config?.standard_fares_centavos]);
 
   const appDeepLink = useMemo(
     () =>
@@ -117,6 +125,7 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
   const hasValidFare = finalFare >= MIN_FARE && finalFare <= 100000;
   const canPay =
     !!data?.driver_code &&
+    data.verification_status === 'verified' &&
     data.status === 'Active' &&
     data.shift_status === 'Active' &&
     hasValidFare &&
@@ -208,11 +217,22 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
           <div className="space-y-4">
             <section className="overflow-hidden rounded-3xl border border-[#CFE0D5] bg-white shadow-sm">
               <div className="bg-[#003D2B] px-5 py-4 text-white">
-                <div className="flex items-center gap-2 text-sm font-bold text-[#D7F2E2]">
-                  <CheckCircle2 className="h-5 w-5" />
-                  Verified TalaRide
+                <div className="flex items-center gap-3">
+                  {data.driver_photo_url ? (
+                    <img src={data.driver_photo_url} alt="Driver profile" className="h-14 w-14 rounded-2xl object-cover ring-2 ring-white/25" />
+                  ) : (
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-xl font-black text-[#D7F2E2]">
+                      {data.driver_name.slice(0, 1)}
+                    </div>
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-bold text-[#D7F2E2]">
+                      <CheckCircle2 className="h-5 w-5" />
+                      {data.verification_status === 'verified' ? 'Verified driver' : 'Verification pending'}
+                    </div>
+                    <div className="mt-1 text-2xl font-black">{data.driver_name}</div>
+                  </div>
                 </div>
-                <div className="mt-2 text-2xl font-black">{data.driver_name}</div>
                 <div className="mt-1 text-sm text-[#D7E5DE]">
                   {data.vehicle_code} • Body {data.plate_body_number}
                 </div>
@@ -238,7 +258,7 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
                 Select the exact fare before choosing how to pay.
               </p>
               <div className="mt-4 grid grid-cols-5 gap-2">
-                {PRESET_FARES.map((amount) => {
+                {fares.map((amount) => {
                   const selected = !customMode && presetFare === amount;
                   return (
                     <button
@@ -341,6 +361,12 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
             {errorMessage && (
               <div className="rounded-2xl border border-[#F0C8C5] bg-[#FFF3F1] px-4 py-3 text-sm font-medium text-[#9B3833]">
                 {errorMessage}
+              </div>
+            )}
+
+            {data.verification_status !== 'verified' && (
+              <div className="rounded-2xl border border-[#F0C8C5] bg-[#FFF3F1] px-4 py-3 text-sm font-medium text-[#9B3833]">
+                Digital payment is unavailable until this driver is verified by TalaRide/TODA.
               </div>
             )}
 

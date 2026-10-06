@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Linking, Pressable, TextInput, View } from 'react-native';
+import { Image, Linking, Pressable, TextInput, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Button, Card, Copy, Detail, Header, Title, replace } from '@/components/ui';
@@ -133,6 +133,7 @@ export default function RideConfirmScreen() {
 
   const canProceed =
     !!vehicle?.driver_code &&
+    vehicle.verification_status === 'verified' &&
     vehicle.status === 'Active' &&
     vehicle.shift_status === 'Active' &&
     amountCentavos >= MIN_FARE_CENTAVOS &&
@@ -287,9 +288,19 @@ export default function RideConfirmScreen() {
       {vehicle && (
         <>
           <Card style={{ marginTop: 14 }}>
-            <Copy bold style={{ color: colors.green }}>
-              ✓ Verified driver
-            </Copy>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {vehicle.driver_photo_url ? (
+                <Image source={{ uri: vehicle.driver_photo_url }} style={{ width: 48, height: 48, borderRadius: 24 }} />
+              ) : null}
+              <View style={{ flex: 1 }}>
+                <Copy bold style={{ color: vehicle.verification_status === 'verified' ? colors.green : colors.yellow }}>
+                  {vehicle.verification_status === 'verified' ? '✓ Verified driver' : 'Verification pending'}
+                </Copy>
+                <Copy style={{ marginTop: 2, color: colors.muted, fontSize: 12 }}>
+                  {vehicle.status} vehicle · {vehicle.shift_status}
+                </Copy>
+              </View>
+            </View>
             <Detail icon="person-outline" label="Driver" value={vehicle.driver_name} />
             <Detail
               icon="bus-outline"
@@ -424,6 +435,11 @@ export default function RideConfirmScreen() {
           </Card>
 
           {!!error && <Copy style={{ color: colors.red, marginTop: 10 }}>{error}</Copy>}
+          {vehicle.verification_status !== 'verified' && (
+            <Copy style={{ color: colors.red, marginTop: 10 }}>
+              Payment is unavailable until this driver is verified by TalaRide/TODA.
+            </Copy>
+          )}
 
           <View style={{ gap: 10, marginTop: 14 }}>
             <Button

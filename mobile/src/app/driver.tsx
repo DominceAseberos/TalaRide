@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Alert, Pressable, TextInput, View } from 'react-native';
 import { randomUUID } from 'expo-crypto';
 import { Screen } from '@/components/Screen';
 import { Button, Card, Copy, Header, Title } from '@/components/ui';
@@ -13,6 +13,7 @@ import { fetchFares } from '@/api/fares';
 import { createMockIntent, expireMockIntent, getMockStatus } from '@/payments/mock';
 import { enqueueOutbox } from '@/offline/queue';
 import { triggerSync } from '@/api/sync';
+import { fetchDriverNotifications, type DriverNotification } from '@/api/drivers';
 import { useAuth } from '@/auth/AuthProvider';
 import { useMock } from '@/mocks/MockProvider';
 import { colors } from '@/constants/theme';
@@ -35,6 +36,8 @@ export default function DriverScreen() {
   const [todayCentavos, setTodayCentavos] = useState(0);
   const [cashMsg, setCashMsg] = useState('');
   const [fares, setFares] = useState(DEFAULT_FARES);
+  const [driverNotifications, setDriverNotifications] = useState<DriverNotification[]>([]);
+  const [lastNotificationAt, setLastNotificationAt] = useState('');
 
   useEffect(() => {
     void fetchFares()
@@ -42,6 +45,30 @@ export default function DriverScreen() {
       .catch(() => {});
     void triggerSync().catch(() => {});
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const poll = async () => {
+      try {
+        const result = await fetchDriverNotifications(
+          driverCode.trim().toUpperCase(),
+          lastNotificationAt || undefined,
+        );
+        if (!active || !result.notifications.length) return;
+        setDriverNotifications((items) => [...result.notifications, ...items].slice(0, 20));
+        setLastNotificationAt(result.notifications[0].created_at);
+        Alert.alert(result.notifications[0].title, result.notifications[0].message);
+      } catch {
+        // Offline driver mode keeps working; the next interval retries.
+      }
+    };
+    void poll();
+    const timer = setInterval(() => void poll(), 10000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [driverCode, lastNotificationAt]);
 
   useEffect(() => {
     if (!expiresAt) return;
@@ -197,6 +224,15 @@ export default function DriverScreen() {
         {mode === 'live' ? 'LIVE' : mode === 'mock-server' ? 'DEMO SERVER' : 'DEMO LOCAL'}
         {shiftId ? ` · Shift ${shiftId.slice(0, 8)}` : ' · No shift yet'}
       </Copy>
+      {driverNotifications.length > 0 && (
+        <Card style={{ marginTop: 12, backgroundColor: colors.paleGreen }}>
+          <Copy bold style={{ color: colors.darkGreen }}>Driver notifications</Copy>
+          <Copy style={{ marginTop: 4 }}>{driverNotifications[0].message}</Copy>
+          <Copy style={{ marginTop: 2, color: colors.muted, fontSize: 12 }}>
+            {driverNotifications.length} recent notification{driverNotifications.length === 1 ? '' : 's'}
+          </Copy>
+        </Card>
+      )}
       <TextInput
         accessibilityLabel="Vehicle code"
         value={vehicleCode}
