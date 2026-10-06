@@ -263,10 +263,14 @@ export class TalaRideRepository {
   async checkReadiness(): Promise<{ ready: boolean; details: any }> {
     let databaseReady = env.NODE_ENV !== 'production';
     let commitFunctionReady = env.NODE_ENV !== 'production';
+    let databaseHttpStatus: number | undefined;
+    let commitHttpStatus: number | undefined;
     if (env.NODE_ENV === 'production') {
-      const { error } = await supabaseAdmin.from('talaride_backend_state').select('id').limit(1);
+      const { error, status } = await supabaseAdmin.from('talaride_backend_state').select('id').limit(1);
+      databaseHttpStatus = status;
       databaseReady = !error;
       const commit = await supabaseAdmin.rpc('talaride_commit_state', { expected_revision: -1, next_state: {} });
+      commitHttpStatus = commit.status;
       commitFunctionReady = !commit.error && commit.data === false;
     }
     const configuration = {
@@ -280,6 +284,10 @@ export class TalaRideRepository {
     const liveConfiguration = env.NODE_ENV !== 'production' || Object.values(configuration).every(Boolean);
     return { ready: databaseReady && commitFunctionReady && liveConfiguration, details: {
       durablePersistenceReady: databaseReady, environment: env.NODE_ENV,
+      databaseHttpStatus, commitHttpStatus,
+      databaseCredentialType: env.SUPABASE_SERVICE_ROLE_KEY.startsWith('sb_publishable_') ? 'publishable'
+        : env.SUPABASE_SERVICE_ROLE_KEY.startsWith('sb_secret_') ? 'secret'
+        : env.SUPABASE_SERVICE_ROLE_KEY.startsWith('eyJ') ? 'legacy-jwt' : 'unrecognized',
       persistence: env.NODE_ENV === 'production' ? 'supabase' : 'test-local',
       paymentMode: env.PAYMENT_MODE, paymentEnvironment: env.PAYMENT_ENVIRONMENT,
       liveConfiguration, commitFunctionReady, configuration,
