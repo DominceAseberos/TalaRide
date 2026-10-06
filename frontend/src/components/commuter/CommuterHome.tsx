@@ -4,6 +4,7 @@ import { Ride } from '../../types';
 
 interface Props {
   onScanRide: () => void;
+  onOpenDriverPortal: () => void;
   onOpenSafetyCheckIn: () => void;
   onViewHistory: () => void;
   onViewRewards: () => void;
@@ -14,6 +15,7 @@ interface Props {
 
 export const CommuterHome: React.FC<Props> = ({
   onScanRide,
+  onOpenDriverPortal,
   onOpenSafetyCheckIn,
   onViewHistory,
   onViewRewards,
@@ -40,9 +42,18 @@ export const CommuterHome: React.FC<Props> = ({
             <p className="text-xs text-slate-500 mt-0.5">Tagum City Commuter Portal</p>
           </div>
 
-          <div className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-200 text-xs font-semibold">
-            <Shield className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Tagum TODA Verified</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-200 text-xs font-semibold">
+              <Shield className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Tagum TODA Verified</span>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenDriverPortal}
+              className="text-xs font-bold text-emerald-700 hover:text-emerald-800 underline underline-offset-2"
+            >
+              Driver Portal
+            </button>
           </div>
         </div>
 
@@ -58,6 +69,18 @@ export const CommuterHome: React.FC<Props> = ({
           <span className="text-xs text-emerald-100 font-medium">
             Scan driver's QR to pay or vehicle sticker to record
           </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenDriverPortal}
+          className="w-full p-3.5 bg-white border border-emerald-200 rounded-2xl flex items-center justify-between text-left hover:border-emerald-500/60 hover:shadow-xs transition"
+        >
+          <div>
+            <h4 className="font-bold text-xs text-slate-800">Are you a TalaRide driver?</h4>
+            <p className="text-[11px] text-slate-500">Open the driver portal to sign in, start a shift, and receive payment alerts.</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-emerald-600" />
         </button>
 
         {/* Section 11: Cash Safety Check-In Callout */}

@@ -76,18 +76,7 @@ export function App() {
   const [recentRide, setRecentRide] = useState<Ride | null>(null);
 
   // Driver State
-  const [driver, setDriver] = useState<Driver | null>({
-    driver_id: 'DR-000481',
-    user_id: 'USR-DRV-001',
-    name: 'Juan Dela Cruz',
-    mobile_number: '09171234567',
-    verification_status: 'verified',
-    toda_operator: 'Tagum Poblacion TODA',
-    assigned_vehicle_id: 'TR-01842',
-    shift_status: 'active',
-    license_number: 'N02-14-098765',
-    created_at: SEED_TIMESTAMP
-  });
+  const [driver, setDriver] = useState<Driver | null>(null);
 
   const [driverShift, setDriverShift] = useState<any>({
     shift_id: 'SHIFT-2026-001',
@@ -104,10 +93,23 @@ export function App() {
     cash_gross_total: 360
   });
 
-  const [driverScreen, setDriverScreen] = useState<'login' | 'shift_select' | 'fare' | 'qr' | 'success' | 'history' | 'lost_items'>('fare');
+  const [driverScreen, setDriverScreen] = useState<'login' | 'shift_select' | 'fare' | 'qr' | 'success' | 'history' | 'lost_items'>('login');
   const [activeFareAmount, setActiveFareAmount] = useState<number>(30);
   const [isCustomFare, setIsCustomFare] = useState(false);
   const [driverPaymentSuccess, setDriverPaymentSuccess] = useState<any>(null);
+
+  const openDriverPortal = () => {
+    if (typeof window !== 'undefined') window.history.pushState({}, '', '/driver');
+    setDriver(null);
+    setDriverScreen('login');
+    setActivePortal('driver');
+  };
+
+  const openCommuterPortal = () => {
+    if (typeof window !== 'undefined') window.history.pushState({}, '', '/');
+    setActivePortal('commuter');
+    setCommuterTab('home');
+  };
 
   // Initialize data & SSE Listener
   useEffect(() => {
@@ -220,6 +222,7 @@ export function App() {
                   {commuterTab === 'home' && (
                     <CommuterHome
                       onScanRide={() => setIsScanning(true)}
+                      onOpenDriverPortal={openDriverPortal}
                       onOpenSafetyCheckIn={() =>
                         setSafetyCheckInVehicle({
                           vehicleId: 'TR-01842',
@@ -326,6 +329,7 @@ export function App() {
             <div className="flex-1 overflow-y-auto">
               {!driver || driverScreen === 'login' ? (
                 <DriverLogin
+                  onBackToCommuter={openCommuterPortal}
                   onLoginSuccess={(d) => {
                     setDriver(d);
                     setDriverScreen(d.assigned_vehicle_id ? 'fare' : 'shift_select');

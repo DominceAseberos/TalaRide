@@ -4,7 +4,7 @@ import { Button, Card, Copy, go, Header, Icon, Title } from '@/components/ui';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/auth/AuthProvider';
 
-const DRIVER_PORTAL_URL = 'https://talaride-web-frontend.vercel.app';
+const DRIVER_PORTAL_URL = 'https://talaride-web-frontend.vercel.app/driver';
 
 export default function DriverPortalScreen() {
   const { session, displayName } = useAuth();

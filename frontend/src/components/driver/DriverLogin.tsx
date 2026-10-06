@@ -4,9 +4,10 @@ import { api } from '../../services/api';
 
 interface Props {
   onLoginSuccess: (driver: any) => void;
+  onBackToCommuter?: () => void;
 }
 
-export const DriverLogin: React.FC<Props> = ({ onLoginSuccess }) => {
+export const DriverLogin: React.FC<Props> = ({ onLoginSuccess, onBackToCommuter }) => {
   const [mobileNumber, setMobileNumber] = useState('09171234567');
   const [otp, setOtp] = useState('8842');
   const [pin, setPin] = useState('8842');
@@ -184,6 +185,15 @@ export const DriverLogin: React.FC<Props> = ({ onLoginSuccess }) => {
               {loading ? 'Opening Portal...' : 'Unlock Driver Shift'}
             </button>
           </form>
+        )}
+        {onBackToCommuter && (
+          <button
+            type="button"
+            onClick={onBackToCommuter}
+            className="w-full text-center text-xs font-semibold text-slate-400 hover:text-white"
+          >
+            Back to commuter portal
+          </button>
         )}
       </div>
     </div>
