@@ -50,7 +50,7 @@
     "experiments": {
       "typedRoutes": true
     },
-    "version": "1.2.3",
+    "version": "1.2.4",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -71,7 +71,7 @@
     },
     "android": {
       "package": "com.beepanjero.talaride",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "backgroundColor": "#FFFEF9",
         "foregroundImage": "./assets/android-icon-foreground.png",
