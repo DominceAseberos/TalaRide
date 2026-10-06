@@ -327,9 +327,98 @@ export class TalaRideRepository {
     if ((this.memoryState.todaGroups || []).some(group => group.name.toLowerCase() === cleanName.toLowerCase())) {
       throw new Error('A TODA group with this name already exists.');
     }
-    const group: TodaGroup = { id: randomUUID(), name: cleanName, created_at: new Date().toISOString(), created_by: createdBy };
+    const group: TodaGroup = {
+      id: randomUUID(),
+      name: cleanName,
+      is_placeholder: false,
+      created_at: new Date().toISOString(),
+      created_by: createdBy,
+    };
     this.memoryState.todaGroups ||= [];
     this.memoryState.todaGroups.push(group);
+    this.persistToDisk(this.memoryState);
+    return group;
+  }
+
+  async ensureOperatorTodaGroup(userId: string): Promise<TodaGroup> {
+    const profile = this.memoryState.profiles.find(profile => profile.id === userId);
+    if (!profile) throw new Error('Operator profile not found.');
+
+    if (profile.toda_group_id) {
+      const existing = (this.memoryState.todaGroups || []).find(group => group.id === profile.toda_group_id);
+      if (existing) return existing;
+    }
+
+    const now = new Date().toISOString();
+    const group: TodaGroup = {
+      id: randomUUID(),
+      name: 'Untitled TODA',
+      is_placeholder: true,
+      created_at: now,
+      created_by: userId,
+      updated_at: now,
+    };
+    this.memoryState.todaGroups ||= [];
+    this.memoryState.todaGroups.push(group);
+    profile.toda_group_id = group.id;
+    profile.updated_at = now;
+    this.persistToDisk(this.memoryState);
+    return group;
+  }
+
+  async ensureTodaGroupReference(
+    id: string,
+    name: string,
+    createdBy: string,
+  ): Promise<TodaGroup> {
+    const existing = (this.memoryState.todaGroups || []).find(group => group.id === id);
+    if (existing) return existing;
+    const now = new Date().toISOString();
+    const group: TodaGroup = {
+      id,
+      name: name.trim() || 'Untitled TODA',
+      is_placeholder: !name.trim(),
+      created_at: now,
+      created_by: createdBy,
+      updated_at: now,
+    };
+    this.memoryState.todaGroups ||= [];
+    this.memoryState.todaGroups.push(group);
+    this.persistToDisk(this.memoryState);
+    return group;
+  }
+
+  async assignOperatorToTodaGroup(userId: string, groupId: string): Promise<TodaGroup | null> {
+    const profile = this.memoryState.profiles.find(profile => profile.id === userId);
+    const group = (this.memoryState.todaGroups || []).find(group => group.id === groupId);
+    if (!profile || !group) return null;
+    profile.toda_group_id = group.id;
+    profile.updated_at = new Date().toISOString();
+    this.persistToDisk(this.memoryState);
+    return group;
+  }
+
+  async renameTodaGroup(groupId: string, name: string): Promise<TodaGroup | null> {
+    const cleanName = name.trim();
+    const group = (this.memoryState.todaGroups || []).find(group => group.id === groupId);
+    if (!group) return null;
+    if ((this.memoryState.todaGroups || []).some(
+      other => other.id !== groupId && other.name.toLowerCase() === cleanName.toLowerCase() && !other.is_placeholder
+    )) {
+      throw new Error('A TODA group with this name already exists.');
+    }
+
+    const now = new Date().toISOString();
+    group.name = cleanName;
+    group.is_placeholder = false;
+    group.updated_at = now;
+
+    for (const driver of this.memoryState.drivers) {
+      if (driver.toda_group_id !== groupId) continue;
+      driver.toda_operator = cleanName;
+      driver.updated_at = now;
+    }
+
     this.persistToDisk(this.memoryState);
     return group;
   }

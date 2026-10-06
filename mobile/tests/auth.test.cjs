@@ -1111,11 +1111,12 @@ test('TODA operator dashboard shows assigned members and lost-item notices read-
     '../frontend/src/components/toda/TodaDashboard.tsx',
     {
       react: React,
-      'lucide-react': { Bell: icon, CircleAlert: icon, Users: icon },
+      'lucide-react': { Bell: icon, CircleAlert: icon, Save: icon, Users: icon },
       '../../services/api': {
         api: {
           getTodaMembers: async () => { memberReads++; return { group, members }; },
           getTodaLostItems: async () => { lostItemReads++; return lostItems; },
+          renameTodaGroup: async (name) => ({ group: { ...group, name } }),
         },
       },
       '../ops/OpsLayout': { OpsLayout },
@@ -1142,7 +1143,9 @@ test('TODA operator dashboard shows assigned members and lost-item notices read-
   });
   const notices = JSON.stringify(tree.toJSON());
   assert.ok(notices.includes('Blue backpack left on seat'));
-  assert.ok(!tree.root.findAllByType('form').length, 'operators cannot add or assign drivers');
+  assert.equal(tree.root.findAllByType('form').length, 1, 'operators can rename only their own TODA group');
+  assert.ok(!notices.includes('Add driver'), 'operators still cannot add drivers');
+  assert.ok(!notices.includes('Assign driver'), 'operators still cannot assign drivers');
   await act(async () => {
     tree.unmount();
   });

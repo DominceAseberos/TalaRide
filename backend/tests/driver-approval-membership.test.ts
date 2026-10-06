@@ -27,7 +27,15 @@ test('only admin approval unlocks a driver; operator membership is scoped, durab
     const queue = await call('admin', '/api/admin/drivers');
     assert.ok(queue.body.some((driver: any) => driver.driver_code === code && driver.verification_status === 'pending'));
     for (const token of ['operator-a', 'driver', 'lgu']) assert.equal((await call(token, `/api/admin/drivers/${code}/verify`, 'POST')).status, 403);
-    assert.equal((await call('unassigned', '/api/toda/members')).status, 403, 'signup group metadata cannot authorize group access');
+    const autoProvisioned = await call('unassigned', '/api/toda/members');
+    assert.equal(autoProvisioned.status, 200);
+    assert.equal(autoProvisioned.body.group.name, 'Untitled TODA');
+    assert.equal(autoProvisioned.body.group.is_placeholder, true);
+    const renamedPlaceholder = await call('unassigned', '/api/toda/group', 'PUT', { name: 'Sunrise TODA' });
+    assert.equal(renamedPlaceholder.status, 200);
+    assert.equal(renamedPlaceholder.body.group.name, 'Sunrise TODA');
+    assert.equal(renamedPlaceholder.body.group.is_placeholder, false);
+    assert.equal((await call('unassigned', '/api/toda/members')).body.group.name, 'Sunrise TODA');
     assert.equal((await call('driver', '/api/toda/members')).status, 403);
     assert.equal((await call('operator-a', '/api/toda/members')).body.members.length, 0);
     assert.equal((await call('operator-a', '/api/toda/members', 'POST', { driver_code: code })).status, 404, 'TODA operators have read-only membership access');
@@ -42,10 +50,15 @@ test('only admin approval unlocks a driver; operator membership is scoped, durab
     const approval = await call('admin', `/api/admin/drivers/${code}/verify`, 'POST');
     assert.equal(approval.status, 200);
     assert.equal(approval.body.driver.verified_by, 'account-admin');
+    const renamedAssignedGroup = await call('operator-a', '/api/toda/group', 'PUT', { name: 'Group A Renamed' });
+    assert.equal(renamedAssignedGroup.status, 200);
+    assert.equal(renamedAssignedGroup.body.group.name, 'Group A Renamed');
     const account = await call('driver', '/api/auth/me');
     assert.equal(account.body.driver.verification_status, 'verified');
-    assert.equal(account.body.driver.toda_operator, 'Group A');
-    assert.equal((await call('operator-a', '/api/toda/members')).body.members[0].verification_status, 'verified');
+    assert.equal(account.body.driver.toda_operator, 'Group A Renamed');
+    const operatorView = await call('operator-a', '/api/toda/members');
+    assert.equal(operatorView.body.group.name, 'Group A Renamed');
+    assert.equal(operatorView.body.members[0].verification_status, 'verified');
     assert.equal((await call('operator-a', '/api/toda/members', 'POST', { driver_code: 'DR-999999' })).status, 404);
   } finally { env.DEMO_AUTH = previous; }
 });

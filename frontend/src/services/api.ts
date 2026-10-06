@@ -192,8 +192,14 @@ function normalizeFareConfig(raw: any): FareConfiguration {
 
 export const api = {
   getCurrentAccount: () => apiJson<any>('/auth/me'),
-  getTodaMembers: async (): Promise<{ group: { id: string; name: string }; members: Driver[] }> => {
-    const data = await apiJson<{ group: { id: string; name: string }; members: any[] }>('/toda/members');
+  getTodaGroup: () => apiJson<{ group: { id: string; name: string; is_placeholder?: boolean } }>('/toda/group'),
+  renameTodaGroup: (name: string) =>
+    apiJson<{ group: { id: string; name: string; is_placeholder?: boolean } }>('/toda/group', {
+      method: 'PUT',
+      body: JSON.stringify({ name }),
+    }),
+  getTodaMembers: async (): Promise<{ group: { id: string; name: string; is_placeholder?: boolean }; members: Driver[] }> => {
+    const data = await apiJson<{ group: { id: string; name: string; is_placeholder?: boolean }; members: any[] }>('/toda/members');
     return { group: data.group, members: data.members.map(normalizeDriver) };
   },
   getTodaLostItems: async (): Promise<any[]> => (await apiJson<{ items: any[] }>('/toda/lost-items')).items,

@@ -16,7 +16,7 @@ export interface AuthenticatedUser {
   full_name: string;
   mobile_number: string;
   driver_code?: string | null;
-  toda_group?: { id: string; name: string } | null;
+  toda_group?: { id: string; name: string; is_placeholder?: boolean } | null;
 }
 
 declare global {
@@ -85,9 +85,12 @@ export async function authenticateRequest(req: Request): Promise<AuthenticatedUs
     const userId = data.user.id;
     let profile = await repository.getProfile(userId);
     let driver: Driver | null = await repository.getDriverByUserId(userId);
-    const { data: storedProfile } = await supabaseAdmin.from('profiles').select('role').eq('id', userId).maybeSingle();
     const managedRole = canonicalRole(data.user.app_metadata?.role);
-    const storedRole = canonicalRole(storedProfile?.role);
+    let storedRole: AppRole | null = null;
+    if (managedRole !== 'admin' && managedRole !== 'operator') {
+      const { data: storedProfile } = await supabaseAdmin.from('profiles').select('role').eq('id', userId).maybeSingle();
+      storedRole = canonicalRole(storedProfile?.role);
+    }
     const role: AppRole = managedRole === 'admin' || managedRole === 'operator'
       ? managedRole
       : storedRole === 'admin' || storedRole === 'operator'
@@ -111,6 +114,28 @@ export async function authenticateRequest(req: Request): Promise<AuthenticatedUs
       driver = await repository.getDriverByUserId(userId);
     }
 
+    let todaGroup: { id: string; name: string; is_placeholder?: boolean } | null = null;
+    if (role === 'operator') {
+      const managedGroupId = typeof data.user.app_metadata?.toda_group_id === 'string'
+        ? data.user.app_metadata.toda_group_id.trim()
+        : '';
+      const managedGroupName = typeof data.user.app_metadata?.toda_group_name === 'string'
+        ? data.user.app_metadata.toda_group_name.trim()
+        : '';
+
+      if (managedGroupId) {
+        const canonicalGroup = await repository.ensureTodaGroupReference(managedGroupId, managedGroupName, userId);
+        if (profile.toda_group_id !== canonicalGroup.id) {
+          await repository.assignOperatorToTodaGroup(userId, canonicalGroup.id);
+          profile = { ...profile, toda_group_id: canonicalGroup.id };
+        }
+        todaGroup = { id: canonicalGroup.id, name: canonicalGroup.name, is_placeholder: canonicalGroup.is_placeholder };
+      } else if (profile.toda_group_id) {
+        const canonicalGroup = await repository.getTodaGroup(profile.toda_group_id);
+        if (canonicalGroup) todaGroup = { id: canonicalGroup.id, name: canonicalGroup.name, is_placeholder: canonicalGroup.is_placeholder };
+      }
+    }
+
     if (profile.status !== 'active') return null;
     return {
       id: profile.id,
@@ -118,9 +143,7 @@ export async function authenticateRequest(req: Request): Promise<AuthenticatedUs
       full_name: profile.full_name,
       mobile_number: profile.mobile_number,
       driver_code: driver?.driver_code || null,
-      toda_group: typeof data.user.app_metadata?.toda_group_id === 'string' && typeof data.user.app_metadata?.toda_group_name === 'string'
-        && data.user.app_metadata.toda_group_id.trim() && data.user.app_metadata.toda_group_name.trim()
-        ? { id: data.user.app_metadata.toda_group_id.trim(), name: data.user.app_metadata.toda_group_name.trim() } : null
+      toda_group: todaGroup
     };
   } catch (err) {
     console.error('Supabase token verification error:', err);

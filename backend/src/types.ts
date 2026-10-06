@@ -20,6 +20,7 @@ export interface Profile {
   mobile_number: string;
   full_name: string;
   role: AppRole;
+  toda_group_id?: string | null;
   status: 'active' | 'suspended' | 'pending';
   created_at: string;
   updated_at?: string;
@@ -28,8 +29,10 @@ export interface Profile {
 export interface TodaGroup {
   id: string;
   name: string;
+  is_placeholder?: boolean;
   created_at: string;
   created_by: string;
+  updated_at?: string;
 }
 
 export interface Driver {
