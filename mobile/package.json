@@ -1,6 +1,6 @@
 {
   "name": "@talaride/mobile",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/roboto": "^0.4.3",

@@ -109,7 +109,7 @@ jobs:
               pos = text.index(marker) + len(marker)
               text = text[:pos] + release + text[pos:]
 
-          pattern = r"(release\s*\{.*?signingConfig\s+)signingConfigs\.debug"
+          pattern = r"(buildTypes\s*\{.*?\brelease\s*\{.*?signingConfig\s+)signingConfigs\.debug"
           text, count = re.subn(pattern, r"\1signingConfigs.release", text, count=1, flags=re.S)
           if count != 1:
               raise SystemExit("Android release signing assignment was not found.")
@@ -134,6 +134,17 @@ jobs:
         run: |
           cd mobile/android
           ./gradlew app:assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      - name: Verify finished APK signer and package
+        shell: bash
+        run: |
+          APK="mobile/android/app/build/outputs/apk/release/app-release.apk"
+          ACTUAL="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          EXPECTED="$(printf '%s' "$EXPECTED_SIGNER_SHA256" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          test "$ACTUAL" = "$EXPECTED"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | sed -n '1p' > apk-package.txt
+          grep -F "name='com.beepanjero.talaride'" apk-package.txt
+          grep -F "versionName='${RELEASE_TAG#v}'" apk-package.txt
 
       - name: Prepare release assets
         shell: bash
