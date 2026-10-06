@@ -46,12 +46,20 @@ mockConfirmRouter.post('/', optionalAuth, async (req: Request, res: Response) =>
     // 3. Idempotent check
     if (payment.payment_status === 'confirmed') {
       const ride = await repository.getRide(payment.ride_id);
+      const driver = await repository.getDriver(payment.driver_code);
+      const rewardsAwarded = await repository.mintRideRewards({
+        passengerUserId: ride?.passenger_id,
+        driverUserId: driver?.user_id,
+        rideId: payment.ride_id,
+        environment: payment.payment_environment ?? env.PAYMENT_ENVIRONMENT
+      });
       return res.json({
         success: true,
         message: 'Payment was already confirmed',
         payment,
         ride,
-        points_awarded: 0
+        points_awarded: rewardsAwarded.passengerPointsAwarded,
+        driver_points_awarded: rewardsAwarded.driverPointsAwarded
       });
     }
 
@@ -84,18 +92,14 @@ mockConfirmRouter.post('/', optionalAuth, async (req: Request, res: Response) =>
       passengerMobile: req.user?.mobile_number || passengerProfile?.mobile_number || null
     });
 
-    // 6. Evaluate and mint rewards (Server-minted)
-    let pointsAwarded = 0;
-    if (finalPassengerId) {
-      const reward = await repository.mintReward({
-        userId: finalPassengerId,
-        rideId: result.payment.ride_id,
-        points: 1
-      });
-      if (reward) {
-        pointsAwarded = 1;
-      }
-    }
+    // 6. Mint a point for both participants as one durable write.
+    const driver = await repository.getDriver(result.payment.driver_code);
+    const rewardsAwarded = await repository.mintRideRewards({
+      passengerUserId: finalPassengerId,
+      driverUserId: driver?.user_id,
+      rideId: result.payment.ride_id,
+      environment: result.payment.payment_environment ?? env.PAYMENT_ENVIRONMENT
+    });
 
     // 7. Secure SSE push to authenticated driver
     sse.notifyDriver(result.payment.driver_code, 'payment_confirmed', {
@@ -114,7 +118,8 @@ mockConfirmRouter.post('/', optionalAuth, async (req: Request, res: Response) =>
       message: 'Payment confirmed successfully',
       payment: result.payment,
       ride: result.ride,
-      points_awarded: pointsAwarded
+      points_awarded: rewardsAwarded.passengerPointsAwarded,
+      driver_points_awarded: rewardsAwarded.driverPointsAwarded
     });
   } catch (err: any) {
     console.error('Error in mock confirmation:', err);

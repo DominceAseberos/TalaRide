@@ -992,11 +992,12 @@ test('driver waits for admin approval then dashboard and saved membership update
     vehicle: { vehicle_code: 'TR-12345', qr_checksum: 'checksum' },
   };
   let tick;
+  let approvalPollMs;
   let foreground;
   const stored = new Map();
   let unavailable = false;
   const ui = Object.fromEntries(
-    ['Button', 'Card', 'Copy', 'Header', 'Title'].map((name) => [name, name]),
+    ['Button', 'Card', 'Copy', 'Detail', 'Header', 'Icon', 'Title'].map((name) => [name, name]),
   );
   const screen = load(
     'src/app/driver.tsx',
@@ -1020,6 +1021,7 @@ test('driver waits for admin approval then dashboard and saved membership update
       '@/components/ui': { ...ui, replace() {} },
       '@/components/DriverEnrollment': { DriverEnrollment: 'DriverEnrollment' },
       '@/components/QrImage': { QrImage: 'QrImage' },
+      '@/components/RewardsPanel': { RewardsPanel: 'RewardsPanel' },
       '@/api/client': {
         ApiError: class extends Error {},
         apiRequest: async () => {
@@ -1043,8 +1045,9 @@ test('driver waits for admin approval then dashboard and saved membership update
     },
     {
       structuredClone,
-      setInterval: (fn) => {
+      setInterval: (fn, ms) => {
         tick = fn;
+        approvalPollMs = ms;
         return 1;
       },
       clearInterval() {},
@@ -1054,7 +1057,11 @@ test('driver waits for admin approval then dashboard and saved membership update
   await act(async () => {
     tree = create(React.createElement(screen.default));
   });
-  assert.ok(JSON.stringify(tree.toJSON()).includes('Awaiting admin verification'));
+  let rendered = JSON.stringify(tree.toJSON());
+  assert.ok(rendered.includes('Verification pending'));
+  assert.ok(!rendered.includes('Driver portal'), 'driver screen has no back-navigation header');
+  assert.ok(!rendered.includes('Check approval'), 'approval refreshes automatically');
+  assert.equal(approvalPollMs, 5000, 'pending approval is checked every five seconds');
   assert.equal(tree.root.findAllByType('QrImage').length, 0);
   account.driver = { ...account.driver, toda_group_id: 'group-a', toda_operator: 'Group A' };
   await act(async () => {
@@ -1071,24 +1078,105 @@ test('driver waits for admin approval then dashboard and saved membership update
     foreground('active');
   });
   assert.equal(tree.root.findAllByType('QrImage').length, 1);
-  assert.ok(JSON.stringify(tree.toJSON()).includes('Verified driver'));
-  assert.ok(!JSON.stringify(tree.toJSON()).includes('Awaiting admin verification'));
+  rendered = JSON.stringify(tree.toJSON());
+  assert.ok(rendered.includes('Verified driver'));
+  assert.ok(!rendered.includes('Verification pending'));
+  assert.ok(!rendered.includes('Driver portal'));
+  assert.equal(tree.root.findAllByType('RewardsPanel').length, 1);
   assert.equal(
     JSON.parse(stored.get('talaride.driver-account:driver')).driver.toda_operator,
     'Group A',
   );
   unavailable = true;
   await act(async () => {
-    tick();
+    foreground('active');
   });
   assert.ok(
     JSON.stringify(tree.toJSON()).includes('Group A'),
     'offline view retains saved membership',
   );
   assert.ok(JSON.stringify(tree.toJSON()).includes('Saved QR'));
+  unavailable = false;
+  account.driver = { ...account.driver, verification_status: 'verified', toda_group_id: undefined, toda_operator: undefined };
+  await act(async () => {
+    foreground('active');
+  });
+  rendered = JSON.stringify(tree.toJSON());
+  assert.ok(rendered.includes('Registered driver'));
+  assert.ok(rendered.includes('Not yet added to a TODA group'));
+  assert.equal(tree.root.findAllByType('QrImage').length, 1);
+  assert.ok(!rendered.includes('Verification pending'), 'verified driver stays on dashboard without a group');
   await act(async () => {
     tree.unmount();
   });
+});
+
+test('passenger and driver can claim only their own tenth-ride rewards', async () => {
+  for (const audience of ['passenger', 'driver']) {
+    let claimedType;
+    let claimed = false;
+    const screen = load(
+      'src/components/RewardsPanel.tsx',
+      {
+        'react-native': {
+          AppState: { addEventListener: () => ({ remove() {} }) },
+          View: 'View',
+        },
+        '@/components/ui': {
+          Button: 'Button',
+          Card: 'Card',
+          Copy: 'Copy',
+          Detail: 'Detail',
+          Title: 'Title',
+        },
+        '@/auth/AuthProvider': { useAuth: () => ({ session: session(`${audience}-reward-user`) }) },
+        '@/api/rewards': {
+          fetchRewards: async () => ({
+            points_balance: claimed ? 0 : 10,
+            current: 0,
+            threshold: 10,
+            completed_rides: 10,
+            unlocked_rewards_count: claimed ? 0 : 1,
+            test_mode: true,
+            history: claimed ? [{
+              status: 'redeemed',
+              reward_type: claimedType,
+              voucher_code: `TR-${audience.toUpperCase()}-TEST-CODE`,
+              voucher_description: 'Test reward voucher',
+              voucher_valid_until: '2026-11-05T00:00:00.000Z',
+            }] : [],
+          }),
+          claimReward: async (type) => {
+            claimed = true;
+            claimedType = type;
+            return {
+              code: `TR-${audience.toUpperCase()}-TEST-CODE`,
+              description: 'Test reward voucher',
+              valid_until: '2026-11-05T00:00:00.000Z',
+              reward_type: type,
+              value_centavos: 5000,
+              test_only: true,
+            };
+          },
+        },
+        '@/constants/theme': { colors: { muted: '#777', red: '#f00' } },
+      },
+      { setInterval: () => 1, clearInterval() {} },
+    );
+    let tree;
+    await act(async () => {
+      tree = create(React.createElement(screen.RewardsPanel, { audience }));
+    });
+    const expectedType = audience === 'passenger' ? 'drink_voucher' : 'fuel_discount';
+    const expectedClaim = audience === 'passenger' ? 'Claim drink voucher' : 'Claim fuel discount';
+    assert.ok(JSON.stringify(tree.toJSON()).includes(expectedClaim));
+    assert.ok(JSON.stringify(tree.toJSON()).includes('no real drink or fuel discount'));
+    const button = tree.root.findAllByType('Button').find((item) => item.props.label === expectedClaim);
+    await act(async () => button.props.onPress());
+    assert.equal(claimedType, expectedType);
+    assert.ok(JSON.stringify(tree.toJSON()).includes(`TR-${audience.toUpperCase()}-TEST-CODE`));
+    await act(async () => tree.unmount());
+  }
 });
 
 test('TODA operator dashboard shows assigned members and lost-item notices read-only', async () => {

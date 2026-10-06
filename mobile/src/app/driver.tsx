@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppState, TextInput, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Screen } from '@/components/Screen';
-import { Button, Card, Copy, Header, Title, replace } from '@/components/ui';
+import { Button, Card, Copy, Detail, Icon, Title } from '@/components/ui';
 import { DriverEnrollment, type RegisteredDriver } from '@/components/DriverEnrollment';
 import { QrImage } from '@/components/QrImage';
 import { apiRequest, ApiError } from '@/api/client';
@@ -13,6 +13,7 @@ import { enqueueOutbox } from '@/offline/queue';
 import { triggerSync } from '@/api/sync';
 import { useAuth } from '@/auth/AuthProvider';
 import { colors } from '@/constants/theme';
+import { RewardsPanel } from '@/components/RewardsPanel';
 
 type Account = {
   driver: RegisteredDriver | null;
@@ -34,8 +35,8 @@ function DriverAccountScreen() {
   const [busy, setBusy] = useState(false);
   const [notifications, setNotifications] = useState<DriverNotification[]>([]);
   const userId = session?.user.id;
-  const refreshAccount = useRef<(() => Promise<void>) | null>(null);
-  const [checking, setChecking] = useState(false);
+  const driver = account?.driver;
+  const isPendingApproval = driver?.verification_status === 'pending';
   useEffect(() => {
     if (!userId) return;
     let active = true;
@@ -44,7 +45,6 @@ function DriverAccountScreen() {
     async function refresh() {
       if (inFlight || !active) return;
       inFlight = true;
-      setChecking(true);
       try {
         const value = await apiRequest<Account>('/auth/me');
         if (!active) return;
@@ -78,24 +78,20 @@ function DriverAccountScreen() {
           setError('Could not refresh driver details. Saved information may be out of date.');
       } finally {
         inFlight = false;
-        if (active) setChecking(false);
       }
     }
-    refreshAccount.current = refresh;
     const appState = AppState.addEventListener('change', (state) => {
       if (state === 'active') void refresh();
     });
     void triggerSync().catch(() => {});
     void refresh();
-    const timer = setInterval(() => void refresh(), 15000);
+    const timer = isPendingApproval ? setInterval(() => void refresh(), 5000) : undefined;
     return () => {
       active = false;
-      clearInterval(timer);
+      if (timer) clearInterval(timer);
       appState.remove();
-      refreshAccount.current = null;
     };
-  }, [userId]);
-  const driver = account?.driver;
+  }, [userId, isPendingApproval]);
   const vehicle = account?.vehicle;
   async function shift() {
     if (!driver || !vehicle || busy) return;
@@ -142,7 +138,6 @@ function DriverAccountScreen() {
   }
   return (
     <Screen>
-      <Header title="Driver portal" />
       {!account ? (
         <Card>
           <Copy>{error || 'Loading your driver account...'}</Copy>
@@ -163,43 +158,37 @@ function DriverAccountScreen() {
         />
       ) : driver.verification_status !== 'verified' ? (
         <>
-          <Title>
-            {driver.verification_status === 'suspended'
-              ? 'Driver account suspended'
-              : 'Awaiting admin verification'}
-          </Title>
-          <Copy style={{ marginTop: 8 }}>
-            {driver.full_name} · {driver.driver_code}
-          </Copy>
-          <Card style={{ marginTop: 16 }}>
-            <Copy>
-              {driver.verification_status === 'suspended'
-                ? 'Contact the TalaRide administrator to review your account.'
-                : 'Your registration has been submitted to the TalaRide admin. Once approved, this screen will open your driver dashboard automatically.'}
-            </Copy>
+          <Card style={{ marginTop: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Icon
+                name={driver.verification_status === 'suspended' ? 'alert-circle-outline' : 'time-outline'}
+                size={32}
+                color={driver.verification_status === 'suspended' ? colors.red : colors.green}
+              />
+              <View style={{ flex: 1 }}>
+                <Title>
+                  {driver.verification_status === 'suspended'
+                    ? 'Account suspended'
+                    : 'Verification pending'}
+                </Title>
+                <Copy>
+                  {driver.verification_status === 'suspended'
+                    ? 'Ask an administrator to review your account.'
+                    : 'Your dashboard opens automatically after approval.'}
+                </Copy>
+              </View>
+            </View>
           </Card>
-          <Card style={{ marginTop: 16 }}>
-            <Copy bold>TODA membership</Copy>
-            <Copy>
-              {driver.toda_group_id
-                ? driver.toda_operator
-                : 'You have not been added to a TODA group yet.'}
-            </Copy>
-            <Copy style={{ marginTop: 8 }}>
-              Share your driver code with your TODA operator so they can add you to the group.
-              Membership and admin verification are separate.
-            </Copy>
-          </Card>
-          <View style={{ marginTop: 16 }}>
-            <Button
-              label={checking ? 'Checking…' : 'Check approval'}
-              disabled={checking}
-              onPress={() => void refreshAccount.current?.()}
-            />
-          </View>
+          <Detail icon="person-outline" label="Driver" value={driver.full_name} />
+          <Detail icon="card-outline" label="Driver code" value={driver.driver_code} />
+          <Detail
+            icon="people-outline"
+            label="TODA group"
+            value={driver.toda_group_id ? driver.toda_operator || 'Assigned' : 'Not assigned yet'}
+          />
           {!online && (
             <Copy style={{ marginTop: 12 }}>
-              Offline · showing saved status. Connect to check for approval.
+              Offline · showing saved status. Reconnect to check for approval.
             </Copy>
           )}
         </>
@@ -262,6 +251,9 @@ function DriverAccountScreen() {
               {!!cashMessage && <Copy>{cashMessage}</Copy>}
             </Card>
           )}
+          <View style={{ marginTop: 16 }}>
+            <RewardsPanel audience="driver" />
+          </View>
           <Card style={{ marginTop: 16 }}>
             <Copy bold>Payment and lost-item notifications</Copy>
             {notifications.length ? (

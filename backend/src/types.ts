@@ -159,7 +159,12 @@ export interface RewardsLedger {
   ride_id?: string | null;
   points: number;
   status: 'earned' | 'redeemed' | 'revoked';
-  reward_type: 'ride_completion' | 'promotional_voucher';
+  reward_type: 'ride_completion' | 'promotional_voucher' | 'drink_voucher' | 'fuel_discount';
+  environment?: 'test' | 'live';
+  voucher_code?: string | null;
+  voucher_description?: string | null;
+  voucher_value_centavos?: number | null;
+  voucher_valid_until?: string | null;
   created_at: string;
 }
 

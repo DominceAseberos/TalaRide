@@ -829,9 +829,13 @@ export class TalaRideRepository {
     userId: string;
     rideId: string;
     points?: number;
+    environment?: 'test' | 'live';
   }): Promise<RewardsLedger | null> {
-    // Critical constraint: rewards_ledger.ride_id UNIQUE
-    const existing = this.memoryState.rewards.find((r) => r.ride_id === params.rideId);
+    // A completed ride can reward both the passenger and the driver, once each.
+    const environment = params.environment ?? env.PAYMENT_ENVIRONMENT;
+    const existing = this.memoryState.rewards.find(
+      (r) => r.ride_id === params.rideId && r.user_id === params.userId && r.reward_type === 'ride_completion'
+    );
     if (existing) {
       return null; // Already minted, strictly prevent double reward
     }
@@ -839,7 +843,7 @@ export class TalaRideRepository {
     // Daily cap rule: max 10 rewards earned per passenger per day
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const todayEarnedCount = this.memoryState.rewards.filter(
-      (r) => r.user_id === params.userId && r.created_at >= oneDayAgo && r.status === 'earned'
+      (r) => r.user_id === params.userId && (r.environment ?? 'live') === environment && r.created_at >= oneDayAgo && r.status === 'earned' && r.reward_type === 'ride_completion'
     ).length;
 
     if (todayEarnedCount >= 10) {
@@ -853,6 +857,7 @@ export class TalaRideRepository {
       points: params.points ?? 1,
       status: 'earned',
       reward_type: 'ride_completion',
+      environment,
       created_at: new Date().toISOString()
     };
 
@@ -861,16 +866,38 @@ export class TalaRideRepository {
     return reward;
   }
 
-  async getRewardsForUser(userId: string): Promise<{
+  async mintRideRewards(params: {
+    passengerUserId?: string | null;
+    driverUserId?: string | null;
+    rideId: string;
+    environment: 'test' | 'live';
+  }): Promise<{ passengerPointsAwarded: number; driverPointsAwarded: number }> {
+    // Keep both awards in the same durable-state commit so a retry cannot
+    // leave one side of a completed ride without its reward.
+    const passenger = params.passengerUserId
+      ? await this.mintReward({ userId: params.passengerUserId, rideId: params.rideId, environment: params.environment })
+      : null;
+    const driver = params.driverUserId
+      ? await this.mintReward({ userId: params.driverUserId, rideId: params.rideId, environment: params.environment })
+      : null;
+    return {
+      passengerPointsAwarded: passenger?.points ?? 0,
+      driverPointsAwarded: driver?.points ?? 0
+    };
+  }
+
+  async getRewardsForUser(userId: string, environment: 'test' | 'live' = env.PAYMENT_ENVIRONMENT): Promise<{
     currentPoints: number;
     progressTowardsMilestone: number;
     unlockedRewardsCount: number;
+    completedRides: number;
     history: RewardsLedger[];
   }> {
     const userRewards = this.memoryState.rewards.filter((r) => r.user_id === userId);
-    const earned = userRewards.filter((r) => r.status === 'earned').reduce((s, r) => s + r.points, 0);
-    const redeemed = userRewards.filter((r) => r.status === 'redeemed').length;
-    const currentPoints = Math.max(0, earned - redeemed * 10);
+    const programRewards = userRewards.filter((r) => (r.environment ?? 'live') === environment);
+    const earned = programRewards.filter((r) => r.status === 'earned').reduce((s, r) => s + r.points, 0);
+    const redeemed = programRewards.filter((r) => r.status === 'redeemed').reduce((s, r) => s + r.points, 0);
+    const currentPoints = Math.max(0, earned - redeemed);
     const progressTowardsMilestone = currentPoints % 10;
     const unlockedRewardsCount = Math.floor(currentPoints / 10);
 
@@ -878,24 +905,40 @@ export class TalaRideRepository {
       currentPoints,
       progressTowardsMilestone,
       unlockedRewardsCount,
-      history: userRewards.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      completedRides: programRewards.filter((r) => r.status === 'earned' && r.reward_type === 'ride_completion').length,
+      history: [...userRewards].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     };
   }
 
-  async redeemReward(userId: string): Promise<RewardsLedger> {
-    const balance = await this.getRewardsForUser(userId);
+  async redeemReward(
+    userId: string,
+    rewardType: 'drink_voucher' | 'fuel_discount',
+    environment: 'test' | 'live' = env.PAYMENT_ENVIRONMENT
+  ): Promise<RewardsLedger> {
+    const balance = await this.getRewardsForUser(userId, environment);
     if (balance.currentPoints < 10) {
       throw new Error('Insufficient points. Minimum 10 TalaPoints required to redeem.');
     }
 
+    const claimedAt = new Date();
+    const validUntil = new Date(claimedAt.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const voucherCode = `TR-${rewardType === 'drink_voucher' ? 'DRINK' : 'FUEL'}-${randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`;
+    const voucherDescription = rewardType === 'drink_voucher'
+      ? 'One drink voucher worth up to ₱50 at a participating TalaRide beverage partner.'
+      : '10% off eligible Petron gasoline, up to ₱50. Gasoline only; diesel excluded.';
     const redemption: RewardsLedger = {
       reward_id: `REW-RED-${randomUUID()}`,
       user_id: userId,
       ride_id: null,
       points: 10,
       status: 'redeemed',
-      reward_type: 'promotional_voucher',
-      created_at: new Date().toISOString()
+      reward_type: rewardType,
+      environment,
+      voucher_code: voucherCode,
+      voucher_description: voucherDescription,
+      voucher_value_centavos: 5000,
+      voucher_valid_until: validUntil,
+      created_at: claimedAt.toISOString()
     };
 
     this.memoryState.rewards.push(redemption);

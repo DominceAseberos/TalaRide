@@ -89,18 +89,58 @@ test('payment intent + status round-trip shape matches backend contract', async 
 });
 
 test('server failure leaves local data usable (rewards fallback)', async () => {
+  const cache = new Map();
+  cache.set('talaride.rewards-cache-v2:passenger-a', JSON.stringify({
+    points_balance: 3,
+    current: 3,
+    threshold: 10,
+    completed_rides: 13,
+    unlocked_rewards_count: 0,
+    test_mode: false,
+    history: [],
+  }));
   const rewards = load('src/api/rewards.ts', {
     './client': {
       apiRequest: async () => {
         throw new Error('down');
       },
     },
+    '@/auth/client': {
+      supabase: { auth: { getSession: async () => ({ data: { session: { user: { id: 'passenger-a' } } } }) } },
+    },
     '@react-native-async-storage/async-storage': {
-      getItem: async () => null,
-      setItem: async () => {},
+      getItem: async (key) => cache.get(key) ?? null,
+      setItem: async (key, value) => cache.set(key, value),
     },
   });
   const r = await rewards.fetchRewards();
   assert.equal(r.threshold, 10);
-  assert.equal(r.points_balance, 0);
+  assert.equal(r.points_balance, 3);
+  assert.equal(r.completed_rides, 13);
+  assert.ok(cache.has('talaride.rewards-cache-v2:passenger-a'));
+});
+
+test('reward claims use the selected reward type and return the server voucher', async () => {
+  const calls = [];
+  const voucher = {
+    code: 'TR-DRINK-123456789ABC',
+    reward_type: 'drink_voucher',
+    description: 'One drink up to ₱50',
+    value_centavos: 5000,
+    valid_until: '2026-11-05T00:00:00.000Z',
+    test_only: true,
+  };
+  const rewards = load('src/api/rewards.ts', {
+    './client': {
+      apiRequest: async (path, options) => {
+        calls.push([path, options]);
+        return { success: true, voucher };
+      },
+    },
+    '@/auth/client': { supabase: null },
+    '@react-native-async-storage/async-storage': { getItem: async () => null, setItem: async () => {} },
+  });
+  assert.deepEqual(await rewards.claimReward('drink_voucher'), voucher);
+  assert.equal(calls[0][0], '/rewards/redeem');
+  assert.deepEqual(JSON.parse(calls[0][1].body), { reward_type: 'drink_voucher' });
 });

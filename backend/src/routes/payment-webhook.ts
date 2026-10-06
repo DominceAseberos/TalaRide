@@ -170,6 +170,14 @@ paymentWebhookRouter.post('/', async (req: Request, res: Response) => {
 
     // 5. Idempotent check
     if (payment.payment_status === 'confirmed' && payment.provider_ref === provider_ref) {
+      const ride = await repository.getRide(payment.ride_id);
+      const driver = await repository.getDriver(payment.driver_code);
+      await repository.mintRideRewards({
+        passengerUserId: ride?.passenger_id,
+        driverUserId: driver?.user_id,
+        rideId: payment.ride_id,
+        environment: payment.payment_environment ?? env.PAYMENT_ENVIRONMENT
+      });
       return res.json({
         success: true,
         message: 'Webhook duplicate already processed',
@@ -204,14 +212,16 @@ paymentWebhookRouter.post('/', async (req: Request, res: Response) => {
       passengerMobile: passengerProfile?.mobile_number || null
     });
 
-    // 8. Mint reward if passenger attached
-    if (finalPassengerId && payment.payment_environment !== 'test') {
-      await repository.mintReward({
-        userId: finalPassengerId,
-        rideId: result.payment.ride_id,
-        points: 1
-      });
-    }
+    // 8. Mint one ride point for each account involved in one durable write.
+    // Test-environment points stay separate and only produce test-only coupons.
+    const rewardEnvironment = result.payment.payment_environment ?? env.PAYMENT_ENVIRONMENT;
+    const driver = await repository.getDriver(result.payment.driver_code);
+    await repository.mintRideRewards({
+      passengerUserId: finalPassengerId,
+      driverUserId: driver?.user_id,
+      rideId: result.payment.ride_id,
+      environment: rewardEnvironment
+    });
 
     // 9. Real-time driver notification
     sse.notifyDriver(result.payment.driver_code, 'payment_confirmed', {
