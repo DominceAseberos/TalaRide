@@ -51,7 +51,7 @@ export default function SplashScreen() {
   return (
     <Screen scroll={false} style={{ padding: 0 }}>
       <Animated.View
-        accessibilityLabel="TalaRide. Remember every ride."
+        accessibilityLabel="TalaRide. Just ride and Go."
         accessible
         style={{
           flex: 1,
@@ -74,7 +74,7 @@ export default function SplashScreen() {
             TalaRide
           </Text>
           <Text style={{ fontSize: 16, fontStyle: 'italic', color: colors.green }}>
-            Remember every ride.
+            Just ride and Go.
           </Text>
         </View>
       </Animated.View>

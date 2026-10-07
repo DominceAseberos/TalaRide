@@ -54,7 +54,7 @@ const settings: { label: string; icon: IconName; message: string }[] = [
     label: 'About TalaRide',
     icon: 'information-circle-outline',
     message:
-      'TalaRide\nRemember every ride.\nPrivacy First · Community Driven · Safety Oriented\nBuilt for Tagum.',
+      'TalaRide\nJust ride and Go.\nPrivacy First · Community Driven · Safety Oriented\nBuilt for Tagum.',
   },
 ];
 export default function ProfileScreen() {

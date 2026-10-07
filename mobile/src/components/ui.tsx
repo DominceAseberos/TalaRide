@@ -138,14 +138,14 @@ export function Header({ title, right }: { title?: string; right?: React.ReactNo
 }
 export function Brand({ large = false }: { large?: boolean }) {
   return (
-    <View accessibilityLabel="TalaRide. Remember every ride." accessible style={s.row}>
+    <View accessibilityLabel="TalaRide. Just ride and Go." accessible style={s.row}>
       <TalaIllustration name="mark" width={large ? 54 : 43} />
       <View>
         <Copy bold style={{ fontSize: large ? 30 : 24, color: colors.darkGreen }}>
           TalaRide
         </Copy>
         <Copy style={{ fontSize: large ? 12 : 10, fontStyle: 'italic', color: colors.darkGreen }}>
-          Remember every ride.
+          Just ride and Go.
         </Copy>
       </View>
     </View>

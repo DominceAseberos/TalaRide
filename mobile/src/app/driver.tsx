@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Screen } from '@/components/Screen';
 import { Button, Card, Copy, Detail, Field, Icon, IconButton, Title } from '@/components/ui';
 import { PortalShell } from '@/components/PortalShell';
+import { DriverFarePicker } from '@/components/DriverFarePicker';
 import type { PortalTab } from '@/components/BottomNav';
 import { DriverEnrollment, type RegisteredDriver } from '@/components/DriverEnrollment';
 import { QrImage } from '@/components/QrImage';
@@ -67,6 +68,7 @@ function DriverAccountScreen() {
   const { saveRide } = useMock();
   const [section, setSection] = useState<PortalSection>('overview');
   const [cashFare, setCashFare] = useState('');
+  const [selectedFareCentavos, setSelectedFareCentavos] = useState<number | null>(null);
   const [cashMessage, setCashMessage] = useState('');
   const [plateBodyNumber, setPlateBodyNumber] = useState('');
   const [account, setAccount] = useState<Account | null>(null);
@@ -128,7 +130,23 @@ function DriverAccountScreen() {
               } catch {}
             }
           }
-          if (faresResult.status === 'fulfilled') setFares(faresResult.value);
+          if (faresResult.status === 'fulfilled') {
+            const availableFares = faresResult.value;
+            setFares(availableFares);
+            setSelectedFareCentavos((selected) => {
+              if (
+                selected != null &&
+                availableFares.some((fare) => fare.amountCentavos === selected)
+              ) {
+                return selected;
+              }
+              return (
+                availableFares.find((fare) => fare.amountCentavos === 3000)?.amountCentavos ??
+                availableFares[0]?.amountCentavos ??
+                null
+              );
+            });
+          }
         }
       } catch (failure) {
         if (!active) return;
@@ -208,7 +226,7 @@ function DriverAccountScreen() {
 
   async function recordCash() {
     if (!driver || !vehicle || driver.verification_status !== 'verified' || busy) return;
-    const value = Number(cashFare);
+    const value = cashFare.trim() ? Number(cashFare) : (selectedFareCentavos ?? 0) / 100;
     if (!Number.isFinite(value) || value < 1 || value > 500) {
       setError('Enter a cash fare from 1 to 500 pesos.');
       return;
@@ -425,13 +443,27 @@ function DriverAccountScreen() {
               <Card>
                 <Copy bold>Record a cash ride</Copy>
                 <Copy style={{ color: colors.muted, marginTop: 4 }}>
-                  Save it now. TalaRide syncs the ride when your connection returns.
+                  Selected fare:{' '}
+                  {selectedFareCentavos == null ? 'Choose a fare' : pesos(selectedFareCentavos)}.
+                  {' '}Save it now; TalaRide syncs when you reconnect.
                 </Copy>
+                <Button
+                  label="Choose fare"
+                  icon="cash-outline"
+                  variant="outline"
+                  onPress={() => setSection('fares')}
+                  style={{ marginTop: 12 }}
+                />
                 <TextInput
                   accessibilityLabel="Cash fare in pesos"
                   keyboardType="decimal-pad"
                   value={cashFare}
-                  onChangeText={setCashFare}
+                  onChangeText={(value) => {
+                    setCashFare(value);
+                    const amount = Number(value);
+                    const matchingFare = fares.find((fare) => fare.amountCentavos === Math.round(amount * 100));
+                    setSelectedFareCentavos(value.trim() && matchingFare ? matchingFare.amountCentavos : null);
+                  }}
                   placeholder="Fare in pesos"
                   placeholderTextColor={colors.muted}
                   style={{
@@ -531,18 +563,20 @@ function DriverAccountScreen() {
           <Card>
             <Title>Fare prices</Title>
             <Copy style={{ color: colors.muted, marginTop: 6 }}>
-              These are the same fare choices commuters see after scanning your QR.
+              Choose the fare to use for your next cash ride. Commuters choose their own fare after scanning your QR.
             </Copy>
           </Card>
-          {fares.map((fare) => (
-            <Card key={fare.id}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <Icon name="cash-outline" color={colors.green} />
-                <Copy style={{ flex: 1 }}>{fare.label}</Copy>
-                <Copy bold>{pesos(fare.amountCentavos)}</Copy>
-              </View>
-            </Card>
-          ))}
+          <DriverFarePicker
+            fares={fares}
+            selectedFareCentavos={selectedFareCentavos}
+            onSelect={(amountCentavos) => {
+              setSelectedFareCentavos(amountCentavos);
+              setCashFare(
+                (amountCentavos / 100).toFixed(amountCentavos % 100 === 0 ? 0 : 2),
+              );
+              setError('');
+            }}
+          />
           {!fares.length && (
             <Card>
               <Copy>Fare prices will appear when TalaRide finishes loading them.</Copy>
