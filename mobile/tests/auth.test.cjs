@@ -1020,7 +1020,9 @@ test('driver waits for admin approval then dashboard and saved membership update
         removeItem: async (key) => stored.delete(key),
       },
       '@/components/Screen': { Screen: 'Screen' },
-      '@/components/ui': { ...ui, replace() {} },
+      '@/components/PortalShell': { PortalShell: ({ children }) => React.createElement('PortalShell', null, children) },
+      '@/components/DriverFarePicker': { DriverFarePicker: 'DriverFarePicker' },
+      '@/components/ui': { ...ui, IconButton: 'IconButton', replace() {} },
       '@/components/DriverEnrollment': { DriverEnrollment: 'DriverEnrollment' },
       '@/components/QrImage': { QrImage: 'QrImage' },
       '@/components/RewardsPanel': { RewardsPanel: 'RewardsPanel' },
@@ -1046,6 +1048,7 @@ test('driver waits for admin approval then dashboard and saved membership update
         updateDriverPhoto: async () => ({}),
       },
       '@/api/fares': { fetchFares: async () => [] },
+      '@/api/rides': { confirmCashRide: async () => ({ ride_id: 'RIDE-CASH', status: 'completed' }) },
       '@/auth/profiles': { uploadProfileImage: async (_id, uri) => uri },
       'expo-image-picker': {
         requestMediaLibraryPermissionsAsync: async () => ({ granted: false }),
@@ -1160,6 +1163,7 @@ test('passenger and driver can claim only their own tenth-ride rewards', async (
           Title: 'Title',
         },
         '@/auth/AuthProvider': { useAuth: () => ({ session: session(`${audience}-reward-user`) }) },
+        'expo-crypto': { randomUUID: () => `${audience}-claim-operation` },
         '@/api/rewards': {
           fetchRewards: async () => ({
             points_balance: claimed ? 0 : 10,
@@ -1176,7 +1180,8 @@ test('passenger and driver can claim only their own tenth-ride rewards', async (
               voucher_valid_until: '2026-11-05T00:00:00.000Z',
             }] : [],
           }),
-          claimReward: async (type) => {
+          claimReward: async (type, operationId) => {
+            assert.equal(operationId, `reward-${audience}-claim-operation`);
             claimed = true;
             claimedType = type;
             return {
@@ -1213,8 +1218,10 @@ test('TODA operator dashboard shows assigned members and lost-item notices read-
   const group = { id: 'group-a', name: 'Group A' };
   const members = [{ driver_id: 'DR-123456', name: 'Registered driver', verification_status: 'pending' }];
   const lostItems = [{ report_id: 'lost-1', vehicle_code: 'TR-100', driver_code: 'DR-123456', item_category: 'bag', description: 'Blue backpack left on seat', status: 'open', created_at: '2026-10-06T00:00:00.000Z' }];
+  const transactions = [{ ride_id: 'ride-1', payment_id: 'pay-1', driver_code: 'DR-123456', vehicle_code: 'TR-100', timestamp: '2026-10-06T01:00:00.000Z', amount_centavos: 3000, payment_method: 'digital', provider: 'gcash', payment_status: 'confirmed', ride_status: 'completed', payment_environment: 'test' }];
   let memberReads = 0;
   let lostItemReads = 0;
+  let transactionReads = 0;
   const OpsLayout = ({ children, sections, onSelect }) => React.createElement(
     'ops-layout',
     null,
@@ -1234,6 +1241,7 @@ test('TODA operator dashboard shows assigned members and lost-item notices read-
         api: {
           getTodaMembers: async () => { memberReads++; return { group, members }; },
           getTodaLostItems: async () => { lostItemReads++; return lostItems; },
+          getTodaTransactions: async () => { transactionReads++; return transactions; },
           renameTodaGroup: async (name) => ({ group: { ...group, name } }),
         },
       },
@@ -1248,6 +1256,7 @@ test('TODA operator dashboard shows assigned members and lost-item notices read-
   const rendered = JSON.stringify(tree.toJSON());
   assert.equal(memberReads, 1);
   assert.equal(lostItemReads, 1);
+  assert.equal(transactionReads, 1);
   assert.ok(rendered.includes('Group A'));
   assert.ok(rendered.includes('Group members'));
   await act(async () => {
@@ -1256,6 +1265,13 @@ test('TODA operator dashboard shows assigned members and lost-item notices read-
   const roster = JSON.stringify(tree.toJSON());
   assert.ok(roster.includes('DR-123456'));
   assert.ok(roster.includes('Pending admin review'));
+  await act(async () => {
+    tree.root.findAllByType('button').find((button) => button.children.includes('Transactions')).props.onClick();
+  });
+  const activity = JSON.stringify(tree.toJSON());
+  assert.ok(activity.includes('30.00'));
+  assert.ok(activity.includes('gcash'));
+  assert.ok(activity.includes('Test / simulation'));
   await act(async () => {
     tree.root.findAllByType('button').find((button) => button.children.includes('Lost item notices')).props.onClick();
   });

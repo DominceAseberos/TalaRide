@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { env } from './env.js';
+import { env, paymentSimulationConfigured } from './env.js';
 import { sse } from './sse.js';
 import { repository } from './lib/repository.js';
 
@@ -104,7 +104,9 @@ app.get('/api/ready', async (_req, res) => {
 
 // 1. Payment Lifecycle
 app.use('/api/payment-intent', paymentIntentRouter);
-if (env.NODE_ENV === 'test') app.use('/api/mock-confirm', mockConfirmRouter);
+if (paymentSimulationConfigured()) {
+  app.use('/api/mock-confirm', mockConfirmRouter);
+}
 app.use('/api/payment-webhook', paymentWebhookRouter);
 app.use('/api/payment-status', paymentStatusRouter);
 

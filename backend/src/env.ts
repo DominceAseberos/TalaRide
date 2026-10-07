@@ -13,6 +13,7 @@ const envSchema = z.object({
   QR_INTENT_SECRET: z.string().default('talaride_qr_secret_key_2026_super_secure'),
   PAYMENT_MODE: z.enum(['mock', 'live']).default('mock'),
   PAYMENT_ENVIRONMENT: z.enum(['test', 'live']).default('live'),
+  PAYMENT_SIMULATION_ENABLED: z.string().default('false').transform((v) => v === 'true'),
   PAYMENT_PROVIDER_KEY: z.string().default(''),
   PAYMENT_WEBHOOK_SECRET: z.string().default('mock_webhook_secret_key_2026'),
   WEB_ORIGIN: z.string().default('http://localhost:3000,http://localhost:5173'),
@@ -28,4 +29,10 @@ export const env = envSchema.parse(process.env);
 export function paymentProviderConfigured(): boolean {
   return env.PAYMENT_MODE === 'live' &&
     env.PAYMENT_PROVIDER_KEY.startsWith(`sk_${env.PAYMENT_ENVIRONMENT}_`);
+}
+
+export function paymentSimulationConfigured(): boolean {
+  return env.PAYMENT_MODE === 'mock' &&
+    env.PAYMENT_ENVIRONMENT === 'test' &&
+    (env.NODE_ENV !== 'production' || env.PAYMENT_SIMULATION_ENABLED);
 }

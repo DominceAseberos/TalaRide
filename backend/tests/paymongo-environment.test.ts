@@ -20,7 +20,13 @@ test('production checkout accepts explicitly selected test gateway and rejects m
       assert.equal((await request('/api/payment-intent', { method: 'POST', body: {} })).status, 503);
     }
     env.PAYMENT_MODE = 'mock';
+    env.PAYMENT_ENVIRONMENT = 'test';
+    env.PAYMENT_PROVIDER_KEY = '';
+    env.PAYMENT_WEBHOOK_SECRET = '';
+    env.PAYMENT_SIMULATION_ENABLED = false;
     assert.equal((await request('/api/payment-intent', { method: 'POST', body: {} })).status, 503);
+    env.PAYMENT_SIMULATION_ENABLED = true;
+    assert.equal((await request('/api/payment-intent', { method: 'POST', body: {} })).status, 400);
   } finally { Object.assign(env, previous); }
 });
 

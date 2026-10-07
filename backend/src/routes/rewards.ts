@@ -9,7 +9,8 @@ export const rewardsRouter = Router();
 rewardsRouter.use(productionAuth);
 
 const RewardClaimSchema = z.object({
-  reward_type: z.enum(['drink_voucher', 'fuel_discount'])
+  reward_type: z.enum(['drink_voucher', 'fuel_discount']),
+  client_operation_id: z.string().min(8).max(160)
 });
 
 function rewardHistory(history: Awaited<ReturnType<typeof repository.getRewardsForUser>>['history']) {
@@ -55,6 +56,7 @@ rewardsRouter.get('/rewards-me', optionalAuth, async (req: Request, res: Respons
       completed_rides: data.completedRides,
       payment_environment: env.PAYMENT_ENVIRONMENT,
       test_mode: env.PAYMENT_ENVIRONMENT === 'test',
+      active_voucher: activeVoucher(data.history),
       history: rewardHistory(data.history)
     });
   } catch (err: any) {
@@ -93,8 +95,11 @@ rewardsRouter.get('/:userId', async (req: Request, res: Response) => {
 rewardsRouter.post('/redeem', optionalAuth, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Sign in to claim a reward.' });
-    const parsed = RewardClaimSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: 'Choose a valid reward.' });
+    const parsed = RewardClaimSchema.safeParse({
+      reward_type: req.body.reward_type,
+      client_operation_id: req.body.client_operation_id || req.body.clientOperationId || req.get('idempotency-key')
+    });
+    if (!parsed.success) return res.status(400).json({ error: 'Choose a valid reward and retry key.' });
     const rewardType = parsed.data.reward_type;
     if (rewardType === 'drink_voucher' && req.user.role !== 'passenger') {
       return res.status(403).json({ error: 'Drink vouchers are for passenger accounts.' });
@@ -109,7 +114,7 @@ rewardsRouter.post('/redeem', optionalAuth, async (req: Request, res: Response) 
       }
     }
 
-    const redemption = await repository.redeemReward(req.user.id, rewardType, env.PAYMENT_ENVIRONMENT);
+    const redemption = await repository.redeemReward(req.user.id, rewardType, env.PAYMENT_ENVIRONMENT, parsed.data.client_operation_id);
 
     return res.json({
       success: true,

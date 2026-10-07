@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import { randomInt } from 'node:crypto';
 import path from 'node:path';
-import { env, paymentProviderConfigured } from '../env.js';
+import { env, paymentProviderConfigured, paymentSimulationConfigured } from '../env.js';
 import { supabaseAdmin } from './supabase-admin.js';
 import { generateVehicleChecksum } from './qr.js';
 import {
@@ -19,8 +19,20 @@ import {
   PaymentIssueTicket,
   NotificationRecord,
   PaymentStatus,
-  TodaGroup
+  TodaGroup,
+  WebCheckoutSession
 } from '../types.js';
+
+function cloudPersistenceConfigured(): boolean {
+  const hasRealUrl =
+    Boolean(env.SUPABASE_URL) &&
+    !env.SUPABASE_URL.includes('your-project') &&
+    !env.SUPABASE_URL.includes('mock.supabase.co');
+  const hasServerCredential =
+    env.SUPABASE_SERVICE_ROLE_KEY.startsWith('sb_secret_') ||
+    env.SUPABASE_SERVICE_ROLE_KEY.startsWith('eyJ');
+  return env.NODE_ENV !== 'test' && hasRealUrl && hasServerCredential;
+}
 
 interface StorageSchema {
   profiles: Profile[];
@@ -35,6 +47,7 @@ interface StorageSchema {
   rewards: RewardsLedger[];
   paymentIssues: PaymentIssueTicket[];
   notifications: NotificationRecord[];
+  webSessions: WebCheckoutSession[];
   fareConfig: FareConfiguration;
 }
 
@@ -49,10 +62,7 @@ export class TalaRideRepository {
       ? path.resolve(env.DATA_DIR)
       : path.resolve(process.cwd(), 'data');
     this.localFilePath = path.join(this.localDataDir, 'talaride-persistence.json');
-    this.isSupabaseConfigured =
-      Boolean(env.SUPABASE_URL) &&
-      !env.SUPABASE_URL.includes('your-project') &&
-      !env.SUPABASE_URL.includes('mock.supabase.co');
+    this.isSupabaseConfigured = cloudPersistenceConfigured();
 
     this.memoryState = this.loadInitialData();
   }
@@ -197,6 +207,7 @@ export class TalaRideRepository {
       rewards: [],
       paymentIssues: [],
       notifications: [],
+      webSessions: [],
       fareConfig: {
         id: 'current',
         standard_fares_centavos: [1500, 2000, 2500, 3000, 4000],
@@ -226,7 +237,7 @@ export class TalaRideRepository {
   private emptyState(): StorageSchema {
     return {
       profiles: [], todaGroups: [], drivers: [], vehicles: [], shifts: [], rides: [], payments: [],
-      paymentEvents: [], lostItems: [], rewards: [], paymentIssues: [], notifications: [],
+      paymentEvents: [], lostItems: [], rewards: [], paymentIssues: [], notifications: [], webSessions: [],
       fareConfig: { id: 'current', standard_fares_centavos: [1500, 2000, 2500, 3000, 4000],
         min_custom_fare_centavos: 1500, max_custom_fare_centavos: 50000,
         provider_fee_basis_points: 175, talaride_fee_basis_points: 0 },
@@ -264,11 +275,12 @@ export class TalaRideRepository {
   }
 
   async checkReadiness(): Promise<{ ready: boolean; details: any }> {
-    let databaseReady = env.NODE_ENV !== 'production';
-    let commitFunctionReady = env.NODE_ENV !== 'production';
+    const useCloudPersistence = env.NODE_ENV === 'production' || cloudPersistenceConfigured();
+    let databaseReady = !useCloudPersistence;
+    let commitFunctionReady = !useCloudPersistence;
     let databaseHttpStatus: number | undefined;
     let commitHttpStatus: number | undefined;
-    if (env.NODE_ENV === 'production') {
+    if (useCloudPersistence) {
       const { error, status } = await supabaseAdmin.from('talaride_backend_state').select('id').limit(1);
       databaseHttpStatus = status;
       databaseReady = !error;
@@ -276,22 +288,35 @@ export class TalaRideRepository {
       commitHttpStatus = commit.status;
       commitFunctionReady = !commit.error && commit.data === false;
     }
+    const simulationPaymentsEnabled = paymentSimulationConfigured();
+    const providerPaymentsEnabled = env.PAYMENT_MODE === 'live';
+    const providerKeyConfigured = paymentProviderConfigured();
+    const webhookConfigured = !!env.PAYMENT_WEBHOOK_SECRET && !env.PAYMENT_WEBHOOK_SECRET.startsWith('mock_');
+    const paymentConfigurationReady = simulationPaymentsEnabled ||
+      (providerPaymentsEnabled && providerKeyConfigured && webhookConfigured);
     const configuration = {
       demoAuthDisabled: !env.DEMO_AUTH,
-      providerPaymentsEnabled: env.PAYMENT_MODE === 'live',
-      providerKeyConfigured: paymentProviderConfigured(),
+      simulationPaymentsEnabled,
+      providerPaymentsEnabled,
+      paymentConfigurationReady,
+      providerKeyConfigured,
       publicAuthKeyConfigured: !!env.SUPABASE_PUBLISHABLE_KEY,
       qrSigningConfigured: env.QR_INTENT_SECRET.length >= 32 && !env.QR_INTENT_SECRET.includes('talaride_qr_secret'),
-      webhookConfigured: !!env.PAYMENT_WEBHOOK_SECRET && !env.PAYMENT_WEBHOOK_SECRET.startsWith('mock_'),
+      webhookConfigured,
     };
-    const liveConfiguration = env.NODE_ENV !== 'production' || Object.values(configuration).every(Boolean);
+    const liveConfiguration = env.NODE_ENV !== 'production' || (
+      configuration.demoAuthDisabled &&
+      configuration.publicAuthKeyConfigured &&
+      configuration.qrSigningConfigured &&
+      configuration.paymentConfigurationReady
+    );
     return { ready: databaseReady && commitFunctionReady && liveConfiguration, details: {
       durablePersistenceReady: databaseReady, environment: env.NODE_ENV,
       databaseHttpStatus, commitHttpStatus,
       databaseCredentialType: env.SUPABASE_SERVICE_ROLE_KEY.startsWith('sb_publishable_') ? 'publishable'
         : env.SUPABASE_SERVICE_ROLE_KEY.startsWith('sb_secret_') ? 'secret'
         : env.SUPABASE_SERVICE_ROLE_KEY.startsWith('eyJ') ? 'legacy-jwt' : 'unrecognized',
-      persistence: env.NODE_ENV === 'production' ? 'supabase' : 'test-local',
+      persistence: useCloudPersistence ? 'supabase' : (env.NODE_ENV === 'test' ? 'test-local' : 'local-fallback'),
       paymentMode: env.PAYMENT_MODE, paymentEnvironment: env.PAYMENT_ENVIRONMENT,
       liveConfiguration, commitFunctionReady, configuration,
     } };
@@ -312,6 +337,77 @@ export class TalaRideRepository {
     this.memoryState.profiles.push(profile);
     this.persistToDisk(this.memoryState);
     return profile;
+  }
+
+  // --- Durable guest checkout sessions ---
+  private cleanupWebSessions(now = Date.now()): void {
+    this.memoryState.webSessions ||= [];
+    this.memoryState.webSessions = this.memoryState.webSessions.filter((session) =>
+      !session.consumed && Date.parse(session.expires_at) > now
+    );
+  }
+
+  async createWebSession(vehicleCode: string, ownerHash: string, ttlMs: number): Promise<WebCheckoutSession> {
+    this.cleanupWebSessions();
+    if (this.memoryState.webSessions.length >= 10000) throw new Error('Too many active ride sessions. Try again shortly.');
+    const now = Date.now();
+    const session: WebCheckoutSession = {
+      session_id: randomUUID(),
+      vehicle_code: vehicleCode,
+      owner_hash: ownerHash,
+      expires_at: new Date(now + ttlMs).toISOString(),
+      reserved: false,
+      consumed: false,
+      payment_id: null,
+      created_at: new Date(now).toISOString(),
+    };
+    this.memoryState.webSessions.push(session);
+    this.persistToDisk(this.memoryState);
+    return session;
+  }
+
+  async getWebSession(sessionId: string): Promise<WebCheckoutSession | null> {
+    this.cleanupWebSessions();
+    return this.memoryState.webSessions.find((session) => session.session_id === sessionId) || null;
+  }
+
+  async reserveWebSession(sessionId: string, vehicleCode: string, ownerHash: string): Promise<WebCheckoutSession | null> {
+    this.cleanupWebSessions();
+    const session = this.memoryState.webSessions.find((entry) => entry.session_id === sessionId);
+    if (!session || session.consumed || session.reserved || session.owner_hash !== ownerHash || session.vehicle_code !== vehicleCode) return null;
+    session.reserved = true;
+    this.persistToDisk(this.memoryState);
+    return session;
+  }
+
+  async releaseWebSession(sessionId: string, ownerHash: string): Promise<void> {
+    this.cleanupWebSessions();
+    const session = this.memoryState.webSessions.find((entry) => entry.session_id === sessionId);
+    if (session && !session.consumed && session.owner_hash === ownerHash) {
+      session.reserved = false;
+      session.payment_id = null;
+      this.persistToDisk(this.memoryState);
+    }
+  }
+
+  async attachPaymentToWebSession(sessionId: string, ownerHash: string, paymentId: string): Promise<boolean> {
+    this.cleanupWebSessions();
+    const session = this.memoryState.webSessions.find((entry) => entry.session_id === sessionId);
+    if (!session || session.consumed || session.owner_hash !== ownerHash || !session.reserved) return false;
+    session.payment_id = paymentId;
+    this.persistToDisk(this.memoryState);
+    return true;
+  }
+
+  async consumeWebSession(sessionId: string, paymentId?: string): Promise<boolean> {
+    this.cleanupWebSessions();
+    const session = this.memoryState.webSessions.find((entry) => entry.session_id === sessionId);
+    if (!session || session.consumed) return false;
+    if (paymentId && session.payment_id !== paymentId) return false;
+    session.consumed = true;
+    session.reserved = false;
+    this.persistToDisk(this.memoryState);
+    return true;
   }
 
   async getTodaGroups(): Promise<TodaGroup[]> {
@@ -728,15 +824,76 @@ export class TalaRideRepository {
     return ride;
   }
 
+  async confirmPendingCashRide(rideId: string, driverCode: string): Promise<Ride | null> {
+    const ride = this.memoryState.rides.find((entry) => entry.ride_id === rideId);
+    if (!ride) return null;
+    if (ride.driver_code !== driverCode || ride.payment_method !== 'cash' || ride.is_checkin_only) {
+      throw new Error('Cash ride does not belong to this driver.');
+    }
+    if (ride.status === 'completed') return ride;
+    if (ride.status !== 'pending') throw new Error('Cash ride is not awaiting confirmation.');
+
+    const shift = ride.shift_id
+      ? this.memoryState.shifts.find((entry) => entry.shift_id === ride.shift_id)
+      : this.memoryState.shifts.find(
+          (entry) =>
+            entry.driver_code === ride.driver_code &&
+            entry.vehicle_code === ride.vehicle_code &&
+            entry.status === 'active',
+        );
+    if (!shift) throw new Error('The originating driver shift could not be found.');
+
+    ride.status = 'completed';
+    shift.cash_rides_count += 1;
+    shift.cash_gross_centavos += ride.fare_amount_centavos;
+    this.persistToDisk(this.memoryState);
+    return ride;
+  }
+
   // --- Payments ---
-  async createRideAndPayment(ride: Ride, payment: Payment, event: PaymentEvent): Promise<{ ride: Ride; payment: Payment }> {
-    if (payment.ride_id !== ride.ride_id || event.payment_id !== payment.payment_id) throw new Error('Payment record mismatch');
-    if (this.memoryState.rides.some(r => r.ride_id === ride.ride_id) || this.memoryState.payments.some(p => p.ride_id === ride.ride_id || p.payment_id === payment.payment_id)) throw new Error('Payment already exists');
+  async createRideAndPayment(
+    ride: Ride,
+    payment: Payment,
+    event: PaymentEvent
+  ): Promise<{ ride: Ride; payment: Payment; created: boolean }> {
+    if (payment.ride_id !== ride.ride_id || event.payment_id !== payment.payment_id) {
+      throw new Error('Payment record mismatch');
+    }
+
+    // Enforce checkout idempotency inside the same serialized repository
+    // mutation used for the actual insert. This closes the race where two
+    // requests both pass a route-level lookup before either has persisted.
+    if (payment.client_operation_id) {
+      const existingPayment = this.memoryState.payments.find((entry) =>
+        entry.client_operation_id === payment.client_operation_id &&
+        (entry.payment_environment ?? 'live') === (payment.payment_environment ?? 'live') &&
+        (payment.owner_user_id
+          ? entry.owner_user_id === payment.owner_user_id
+          : !!payment.owner_browser_hash && entry.owner_browser_hash === payment.owner_browser_hash)
+      );
+      if (existingPayment) {
+        const existingRide = this.memoryState.rides.find(
+          (entry) => entry.ride_id === existingPayment.ride_id,
+        );
+        if (!existingRide) throw new Error('Idempotent payment is missing its ride record');
+        return { ride: existingRide, payment: existingPayment, created: false };
+      }
+    }
+
+    if (
+      this.memoryState.rides.some((r) => r.ride_id === ride.ride_id) ||
+      this.memoryState.payments.some(
+        (p) => p.ride_id === ride.ride_id || p.payment_id === payment.payment_id,
+      )
+    ) {
+      throw new Error('Payment already exists');
+    }
+
     this.memoryState.rides.push(ride);
     this.memoryState.payments.push(payment);
     this.memoryState.paymentEvents.push(event);
     this.persistToDisk(this.memoryState);
-    return { ride, payment };
+    return { ride, payment, created: true };
   }
 
   async createPayment(payment: Payment): Promise<Payment> {
@@ -779,6 +936,22 @@ export class TalaRideRepository {
     return payment || null;
   }
 
+  async getPaymentByClientOperation(params: {
+    clientOperationId: string;
+    ownerUserId?: string | null;
+    ownerBrowserHash?: string | null;
+    environment?: 'test' | 'live';
+  }): Promise<Payment | null> {
+    const payment = this.memoryState.payments.find((entry) =>
+      entry.client_operation_id === params.clientOperationId &&
+      (!params.environment || (entry.payment_environment ?? 'live') === params.environment) &&
+      (params.ownerUserId
+        ? entry.owner_user_id === params.ownerUserId
+        : !!params.ownerBrowserHash && entry.owner_browser_hash === params.ownerBrowserHash)
+    );
+    return payment || null;
+  }
+
   async getAllPayments(filters?: { query?: string; status?: PaymentStatus }): Promise<Payment[]> {
     let payments = [...this.memoryState.payments];
     if (filters?.status) {
@@ -809,10 +982,13 @@ export class TalaRideRepository {
     const payment = await this.getPayment(params.paymentId);
     if (!payment) throw new Error('Payment not found');
 
-    // Idempotency: if already confirmed with this provider_ref, return without duplicate shift increments
-    if (payment.payment_status === 'confirmed' && payment.provider_ref === params.providerRef) {
+    // Once a payment is confirmed, every later provider retry is a no-op even
+    // if the provider sends a different event/reference for the same payment.
+    if (payment.payment_status === 'confirmed') {
       const ride = (await this.getRide(payment.ride_id))!;
-      const shift = await this.getActiveShiftForDriver(payment.driver_code);
+      const shift = payment.shift_id
+        ? await this.getShift(payment.shift_id)
+        : await this.getActiveShiftForDriver(payment.driver_code);
       return { payment, ride, shift };
     }
 
@@ -841,8 +1017,11 @@ export class TalaRideRepository {
       if (params.passengerMobile) ride.passenger_mobile = params.passengerMobile;
     }
 
-    // Atomically update driver's active shift
-    const shift = await this.getActiveShiftForDriver(payment.driver_code);
+    // Attribute delayed confirmations to the shift that created the payment,
+    // not whichever shift happens to be active when the webhook arrives.
+    const shift = payment.shift_id
+      ? await this.getShift(payment.shift_id)
+      : await this.getActiveShiftForDriver(payment.driver_code);
     if (shift) {
       shift.digital_rides_count += 1;
       shift.digital_gross_centavos += payment.amount_centavos;
@@ -886,16 +1065,6 @@ export class TalaRideRepository {
     );
     if (existing) {
       return null; // Already minted, strictly prevent double reward
-    }
-
-    // Daily cap rule: max 10 rewards earned per passenger per day
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const todayEarnedCount = this.memoryState.rewards.filter(
-      (r) => r.user_id === params.userId && (r.environment ?? 'live') === environment && r.created_at >= oneDayAgo && r.status === 'earned' && r.reward_type === 'ride_completion'
-    ).length;
-
-    if (todayEarnedCount >= 10) {
-      return null; // Daily cap reached
     }
 
     const reward: RewardsLedger = {
@@ -961,8 +1130,18 @@ export class TalaRideRepository {
   async redeemReward(
     userId: string,
     rewardType: 'drink_voucher' | 'fuel_discount',
-    environment: 'test' | 'live' = env.PAYMENT_ENVIRONMENT
+    environment: 'test' | 'live' = env.PAYMENT_ENVIRONMENT,
+    claimOperationId?: string | null,
   ): Promise<RewardsLedger> {
+    if (claimOperationId) {
+      const existingClaim = this.memoryState.rewards.find((entry) =>
+        entry.user_id === userId &&
+        (entry.environment ?? 'live') === environment &&
+        entry.claim_operation_id === claimOperationId &&
+        entry.status === 'redeemed'
+      );
+      if (existingClaim) return existingClaim;
+    }
     const balance = await this.getRewardsForUser(userId, environment);
     if (balance.currentPoints < 10) {
       throw new Error('Insufficient points. Minimum 10 TalaPoints required to redeem.');
@@ -978,6 +1157,7 @@ export class TalaRideRepository {
       reward_id: `REW-RED-${randomUUID()}`,
       user_id: userId,
       ride_id: null,
+      claim_operation_id: claimOperationId || null,
       points: 10,
       status: 'redeemed',
       reward_type: rewardType,
@@ -998,7 +1178,7 @@ export class TalaRideRepository {
   async createLostItemReport(report: LostItemReport): Promise<LostItemReport> {
     if (report.client_operation_id) {
       const existing = this.memoryState.lostItems.find(
-        (l) => l.client_operation_id === report.client_operation_id
+        (l) => l.client_operation_id === report.client_operation_id && l.passenger_id === report.passenger_id
       );
       if (existing) return existing;
     }
@@ -1006,6 +1186,10 @@ export class TalaRideRepository {
     this.memoryState.lostItems.push(report);
     this.persistToDisk(this.memoryState);
     return report;
+  }
+
+  async getLostItemReport(reportId: string): Promise<LostItemReport | null> {
+    return this.memoryState.lostItems.find((entry) => entry.report_id === reportId) || null;
   }
 
   async getLostItems(filters?: { driver_code?: string; passenger_id?: string }): Promise<LostItemReport[]> {
@@ -1019,21 +1203,73 @@ export class TalaRideRepository {
     return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
-  async respondToLostItem(reportId: string, response: 'found' | 'not_found' | 'contact_support', note?: string): Promise<LostItemReport | null> {
+  async respondToLostItem(
+    reportId: string,
+    response: 'found' | 'not_found' | 'contact_support',
+    note?: string,
+    authorId?: string | null,
+  ): Promise<LostItemReport | null> {
     const report = this.memoryState.lostItems.find((l) => l.report_id === reportId);
     if (!report) return null;
 
     report.driver_response = response;
     report.driver_response_note = note || null;
+    report.messages ||= [];
+    report.messages.push({
+      message_id: `LIM-${randomUUID()}`,
+      author_role: 'driver',
+      author_id: authorId || null,
+      message:
+        note?.trim() ||
+        (response === 'found'
+          ? 'I found the reported item. Please use this thread to coordinate recovery.'
+          : response === 'not_found'
+            ? 'I checked the vehicle but have not found the item yet.'
+            : 'I need TalaRide support to help with this report.'),
+      created_at: new Date().toISOString(),
+    });
     if (response === 'found') {
+      // "Found" means the driver located the item; it is not proof the
+      // passenger has recovered it, so do not close/resolve the report here.
       report.status = 'found';
-      report.resolved_at = new Date().toISOString();
+      report.resolved_at = null;
     } else if (response === 'not_found') {
       report.status = 'unresolved';
     } else {
       report.status = 'driver_notified';
     }
 
+    this.persistToDisk(this.memoryState);
+    return report;
+  }
+
+  async addLostItemMessage(
+    reportId: string,
+    author: { role: 'passenger' | 'driver' | 'admin'; id?: string | null },
+    message: string,
+  ): Promise<LostItemReport | null> {
+    const report = this.memoryState.lostItems.find((entry) => entry.report_id === reportId);
+    if (!report) return null;
+    if (report.status === 'closed') throw new Error('This lost-item conversation is closed.');
+    report.messages ||= [];
+    report.messages.push({
+      message_id: `LIM-${randomUUID()}`,
+      author_role: author.role,
+      author_id: author.id || null,
+      message: message.trim(),
+      created_at: new Date().toISOString(),
+    });
+    this.persistToDisk(this.memoryState);
+    return report;
+  }
+
+  async closeLostItemReport(reportId: string): Promise<LostItemReport | null> {
+    const report = this.memoryState.lostItems.find((entry) => entry.report_id === reportId);
+    if (!report) return null;
+    if (report.status !== 'closed') {
+      report.status = 'closed';
+      report.resolved_at = new Date().toISOString();
+    }
     this.persistToDisk(this.memoryState);
     return report;
   }
@@ -1105,12 +1341,20 @@ export class TalaRideRepository {
 }
 
 const localRepository = new TalaRideRepository();
-export const repository: TalaRideRepository = env.NODE_ENV !== 'production' ? localRepository : new Proxy(localRepository, {
-  get(target, property) {
-    const value = Reflect.get(target, property);
-    if (typeof value !== 'function') return value;
-    if (property === 'checkReadiness') return value.bind(target);
-    if (property === 'resetForTesting') return () => { throw new Error('Unavailable in production'); };
-    return (...args: unknown[]) => target.cloudCall(String(property), args);
-  },
-});
+const useCloudRepository = env.NODE_ENV === 'production' || cloudPersistenceConfigured();
+
+export const repository: TalaRideRepository = !useCloudRepository
+  ? localRepository
+  : new Proxy(localRepository, {
+      get(target, property) {
+        const value = Reflect.get(target, property);
+        if (typeof value !== 'function') return value;
+        if (property === 'checkReadiness') return value.bind(target);
+        if (property === 'resetForTesting') {
+          return () => {
+            throw new Error('Unavailable while shared Supabase persistence is enabled');
+          };
+        }
+        return (...args: unknown[]) => target.cloudCall(String(property), args);
+      },
+    });

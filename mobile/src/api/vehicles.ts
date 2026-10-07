@@ -3,6 +3,7 @@ import { apiRequest, ApiError } from './client';
 
 export interface PublicVehicle {
   payment_environment?: 'test' | 'live';
+  payment_mode?: 'mock' | 'live';
   vehicle_code: string;
   plate_body_number: string;
   toda?: string;

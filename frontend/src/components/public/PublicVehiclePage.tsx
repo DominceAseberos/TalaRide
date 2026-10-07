@@ -15,6 +15,7 @@ type PaymentMethod = 'gcash' | 'maya' | 'card' | 'qrph';
 
 interface PublicVehicleData {
   payment_environment?: 'test' | 'live';
+  payment_mode?: 'mock' | 'live';
   vehicle_code: string;
   plate_body_number: string;
   toda: string;
@@ -27,6 +28,12 @@ interface PublicVehicleData {
   fare_config?: { standard_fares_centavos?: number[] };
   session_id?: string;
   session_expires_at?: string | null;
+  resume_payment?: {
+    payment_id: string;
+    payment_status: string;
+    provider: 'gcash' | 'maya' | 'card' | 'qrph_bank' | 'mock';
+    amount_centavos: number;
+  } | null;
   error?: string;
   message?: string;
 }
@@ -51,6 +58,12 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
   const [submitting, setSubmitting] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [simulatedCheckout, setSimulatedCheckout] = useState<{
+    paymentId: string;
+    method: PaymentMethod;
+    amount: number;
+  } | null>(null);
+  const [confirmingSimulation, setConfirmingSimulation] = useState(false);
 
   const fares = useMemo(() => {
     const configured = data?.fare_config?.standard_fares_centavos;
@@ -110,6 +123,30 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
           setErrorMessage(res.message || 'Vehicle QR could not be verified');
         } else {
           setData(res);
+          if (res.resume_payment) {
+            if (res.resume_payment.payment_status === 'confirmed') {
+              window.location.assign(
+                '/success?payment_id=' + encodeURIComponent(res.resume_payment.payment_id)
+              );
+              return;
+            }
+            if (
+              res.payment_mode === 'mock' &&
+              ['awaiting_confirmation', 'initiated'].includes(res.resume_payment.payment_status)
+            ) {
+              const provider =
+                res.resume_payment.provider === 'qrph_bank'
+                  ? 'qrph'
+                  : res.resume_payment.provider === 'mock'
+                    ? 'gcash'
+                    : res.resume_payment.provider;
+              setSimulatedCheckout({
+                paymentId: res.resume_payment.payment_id,
+                method: provider,
+                amount: res.resume_payment.amount_centavos / 100,
+              });
+            }
+          }
           if (res.session_id) {
             setSessionId(res.session_id);
             const url = new URL(window.location.href);
@@ -179,6 +216,18 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
         paymentMethod,
         sessionId ?? undefined
       );
+      if (result.paymentFlow === 'simulated') {
+        setSimulatedCheckout({
+          paymentId: result.payment.payment_id,
+          method: paymentMethod,
+          amount: finalFare,
+        });
+        const url = new URL(window.location.href);
+        url.searchParams.set('payment_id', result.payment.payment_id);
+        window.history.replaceState({}, '', url.toString());
+        setSubmitting(false);
+        return;
+      }
       if (!result.checkoutUrl) {
         throw new Error('The payment gateway is unavailable right now.');
       }
@@ -186,6 +235,24 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
     } catch (err: any) {
       setErrorMessage(err.message || 'Could not start payment.');
       setSubmitting(false);
+    }
+  };
+
+  const confirmSimulation = async () => {
+    if (!simulatedCheckout || confirmingSimulation) return;
+    setConfirmingSimulation(true);
+    setErrorMessage(null);
+    try {
+      await api.confirmPayment({
+        paymentId: simulatedCheckout.paymentId,
+        provider: simulatedCheckout.method === 'qrph' ? 'qrph_bank' : simulatedCheckout.method,
+      });
+      window.location.assign(
+        '/success?payment_id=' + encodeURIComponent(simulatedCheckout.paymentId)
+      );
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Could not confirm the simulated payment.');
+      setConfirmingSimulation(false);
     }
   };
 
@@ -241,7 +308,80 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
           </div>
         )}
 
-        {!loading && data && !sessionExpired && (
+        {!loading && data && !sessionExpired && simulatedCheckout && (
+          <div className="space-y-4">
+            <section className="rounded-2xl border border-line bg-white p-5 shadow-none">
+              <div className="text-xs font-bold uppercase tracking-[0.16em] text-accent">
+                TalaRide payment simulation
+              </div>
+              <h1 className="mt-2 text-2xl font-semibold text-ink">
+                {simulatedCheckout.method === 'gcash'
+                  ? 'GCash'
+                  : simulatedCheckout.method === 'maya'
+                    ? 'Maya'
+                    : simulatedCheckout.method === 'card'
+                      ? 'Card'
+                      : 'QR Ph'}{' '}
+                — Simulated Checkout
+              </h1>
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                This demo stays inside TalaRide. It does not open the real wallet or bank app and
+                never asks for a PIN, OTP, password, card number, or real payment credential.
+              </p>
+            </section>
+
+            <section className="rounded-2xl border border-line bg-subtle p-5">
+              <div className="flex justify-between border-b border-line pb-3 text-sm">
+                <span className="text-muted">Vehicle</span>
+                <span className="font-mono font-semibold">{data.vehicle_code}</span>
+              </div>
+              <div className="flex justify-between border-b border-line py-3 text-sm">
+                <span className="text-muted">Amount</span>
+                <span className="text-xl font-semibold text-accent">
+                  ₱{simulatedCheckout.amount.toFixed(2)}
+                </span>
+              </div>
+              <div className="pt-3 text-xs text-muted">
+                Payment ID: <span className="font-mono">{simulatedCheckout.paymentId}</span>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-accent bg-accent-soft p-4">
+              <div className="text-sm font-bold text-accent">SIMULATION — NO REAL MONEY</div>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                Confirming runs the real TalaRide backend workflow: ride completion, driver shift
+                totals, rewards, receipt, TODA activity, and history.
+              </p>
+            </section>
+
+            {errorMessage && (
+              <div className="rounded-2xl border border-danger-line bg-danger-soft px-4 py-3 text-sm font-medium text-danger">
+                {errorMessage}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => void confirmSimulation()}
+              disabled={confirmingSimulation}
+              className="flex min-h-[60px] w-full items-center justify-center rounded-2xl bg-accent px-5 py-4 text-base font-semibold text-white disabled:opacity-60"
+            >
+              {confirmingSimulation
+                ? 'Processing simulation…'
+                : 'Pay ₱' + simulatedCheckout.amount.toFixed(2) + ' — Simulation'}
+            </button>
+            <button
+              type="button"
+              disabled={confirmingSimulation}
+              onClick={() => setSimulatedCheckout(null)}
+              className="w-full rounded-xl border border-line bg-white py-3 text-sm font-semibold text-muted"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {!loading && data && !sessionExpired && !simulatedCheckout && (
           <div className="space-y-4">
             <section className="overflow-hidden rounded-2xl border border-line bg-white shadow-none">
               <div className="bg-white border-b border-line px-5 py-4 text-ink">
@@ -423,7 +563,11 @@ export const PublicVehiclePage: React.FC<Props> = ({ vehicleCode, checksum }) =>
             </button>
 
             <p className="px-4 text-center text-[11px] leading-relaxed text-muted">
-              {data.payment_environment === 'test' ? 'PayMongo test checkout — no real money is charged.' : 'Nothing is charged until you authorize payment with the provider.'} TalaRide shows success only after the payment provider confirms it.
+              {data.payment_mode === 'mock'
+                ? 'TalaRide simulation — no real money is charged and no external payment app opens.'
+                : data.payment_environment === 'test'
+                  ? 'PayMongo test checkout — no real money is charged.'
+                  : 'Nothing is charged until you authorize payment with the provider.'} TalaRide shows success only after backend confirmation.
             </p>
           </div>
         )}

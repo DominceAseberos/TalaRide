@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { z } from 'zod';
 import { requireRole } from '../lib/auth.js';
 import { repository } from '../lib/repository.js';
 
@@ -10,8 +9,10 @@ todaRouter.use(async (req, res, next) => {
   try {
     if (!req.user) return res.status(401).json({ message: 'Authentication is required.' });
     if (!req.user.toda_group) {
-      const group = await repository.ensureOperatorTodaGroup(req.user.id);
-      req.user.toda_group = { id: group.id, name: group.name, is_placeholder: group.is_placeholder };
+      return res.status(409).json({
+        error: 'No group assigned',
+        message: 'This operator account has no TODA group assigned. Ask an administrator to assign one.'
+      });
     }
     next();
   } catch (error) {
@@ -25,19 +26,19 @@ todaRouter.get('/group', async (req, res) => {
   return res.json({ group });
 });
 
-todaRouter.put('/group', async (req, res, next) => {
-  const parsed = z.object({ name: z.string().trim().min(2).max(120) }).safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Enter a TODA group name between 2 and 120 characters.' });
+todaRouter.put('/group', async (req, res) => {
   try {
-    const group = await repository.renameTodaGroup(req.user!.toda_group!.id, parsed.data.name);
-    if (!group) return res.status(404).json({ message: 'TODA group not found.' });
-    req.user!.toda_group = { id: group.id, name: group.name, is_placeholder: group.is_placeholder };
+    const name = String(req.body?.name ?? '').trim();
+    if (name.length < 2 || name.length > 120) {
+      return res.status(400).json({ error: 'Enter a TODA group name from 2 to 120 characters.' });
+    }
+    const group = await repository.renameTodaGroup(req.user!.toda_group!.id, name);
+    if (!group) return res.status(404).json({ error: 'TODA group not found.' });
     return res.json({ group });
   } catch (error) {
-    if (error instanceof Error && error.message.includes('already exists')) {
-      return res.status(409).json({ message: error.message });
-    }
-    next(error);
+    const message = error instanceof Error ? error.message : 'Could not rename TODA group.';
+    if (message.includes('already exists')) return res.status(409).json({ error: message });
+    return res.status(500).json({ error: 'Could not rename TODA group.', message });
   }
 });
 
@@ -53,6 +54,53 @@ todaRouter.get('/members', async (req, res, next) => {
     res.json({ group, members });
   } catch (error) { next(error); }
 });
+todaRouter.get('/transactions', async (req, res, next) => {
+  try {
+    const group = req.user!.toda_group!;
+    const driverCodes = new Set(
+      (await repository.getAllDrivers())
+        .filter(driver => driver.toda_group_id === group.id)
+        .map(driver => driver.driver_code),
+    );
+    const [rides, payments] = await Promise.all([
+      repository.getRides({}),
+      repository.getAllPayments(),
+    ]);
+    const paymentByRide = new Map(payments.map(payment => [payment.ride_id, payment]));
+
+    const transactions = rides
+      .filter(ride => driverCodes.has(ride.driver_code) && !ride.is_checkin_only)
+      .map(ride => {
+        const payment = paymentByRide.get(ride.ride_id);
+        return {
+          ride_id: ride.ride_id,
+          payment_id: payment?.payment_id ?? null,
+          driver_code: ride.driver_code,
+          vehicle_code: ride.vehicle_code,
+          timestamp: ride.timestamp,
+          amount_centavos: ride.fare_amount_centavos,
+          payment_method: ride.payment_method,
+          provider: payment?.provider ?? (ride.payment_method === 'cash' ? 'cash' : null),
+          payment_status:
+            payment?.payment_status ??
+            (ride.payment_method === 'cash'
+              ? ride.status === 'completed'
+                ? 'confirmed'
+                : 'awaiting_confirmation'
+              : null),
+          ride_status: ride.status,
+          payment_environment: payment?.payment_environment ?? null,
+        };
+      })
+      .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+      .slice(0, 250);
+
+    return res.json({ group, transactions });
+  } catch (error) {
+    next(error);
+  }
+});
+
 todaRouter.get('/lost-items', async (req, res, next) => {
   try {
     const group = req.user!.toda_group!;

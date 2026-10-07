@@ -27,7 +27,7 @@ export const CommuterPaymentSuccess: React.FC<Props> = ({
 
   const ride = paymentResult?.ride;
   const payment = paymentResult?.payment;
-  const pointsAwarded = paymentResult?.points_awarded ?? paymentResult?.pointsAwarded ?? 1;
+  const pointsAwarded = paymentResult?.points_awarded ?? paymentResult?.pointsAwarded ?? 0;
 
   const vehicleId = ride?.vehicle_code || ride?.vehicle_id || payment?.vehicle_code || payment?.vehicle_id || 'TR-01842';
   const amount = payment?.amount_centavos ? payment.amount_centavos / 100 : ride?.fare_amount || payment?.amount || 30;
@@ -88,7 +88,7 @@ export const CommuterPaymentSuccess: React.FC<Props> = ({
         {pointsAwarded > 0 && (
           <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-amber-50 border border-amber-200 rounded-full text-xs font-semibold text-amber-800 shadow-xs">
             <Award className="w-4 h-4 text-amber-600" />
-            <span>+1 TalaPoint Earned! (Ride #{pointsAwarded + 8} / 10)</span>
+            <span>+{pointsAwarded} TalaPoint{pointsAwarded === 1 ? '' : 's'} added to your backend reward balance.</span>
           </div>
         )}
       </div>

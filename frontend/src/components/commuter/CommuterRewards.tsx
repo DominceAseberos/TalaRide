@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Award, Gift, Sparkles, ShieldAlert, ArrowLeft, Ticket } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { api } from '../../services/api';
@@ -12,6 +12,7 @@ export const CommuterRewards: React.FC<Props> = ({ userId = 'USR-COM-001', onBac
   const [data, setData] = useState<any>(null);
   const [redeeming, setRedeeming] = useState(false);
   const [unlockedVoucher, setUnlockedVoucher] = useState<any>(null);
+  const claimOperation = useRef<string | null>(null);
 
   const loadRewards = useCallback(async () => {
     try {
@@ -23,9 +24,9 @@ export const CommuterRewards: React.FC<Props> = ({ userId = 'USR-COM-001', onBac
     } catch (e) {
       console.warn('Rewards load fallback', e);
       setData({
-        currentPoints: 8,
+        currentPoints: 0,
         targetMilestone: 10,
-        progressTowardsMilestone: 8,
+        progressTowardsMilestone: 0,
         unlockedRewardsCount: 0
       });
     }
@@ -61,9 +62,11 @@ export const CommuterRewards: React.FC<Props> = ({ userId = 'USR-COM-001', onBac
   const handleRedeem = async () => {
     setRedeeming(true);
     try {
-      const res = await api.redeemReward(userId);
+      claimOperation.current ||= `web-reward-${crypto.randomUUID()}`;
+      const res = await api.redeemReward(claimOperation.current);
       if (res.success) {
         setUnlockedVoucher(res.voucher);
+        claimOperation.current = null;
         confetti({ particleCount: 50, spread: 60 });
         await loadRewards();
       }
@@ -74,9 +77,9 @@ export const CommuterRewards: React.FC<Props> = ({ userId = 'USR-COM-001', onBac
     }
   };
 
-  const points = data?.currentPoints ?? 8;
+  const points = data?.currentPoints ?? 0;
   const target = data?.targetMilestone ?? 10;
-  const progress = data?.progressTowardsMilestone ?? 8;
+  const progress = data?.progressTowardsMilestone ?? 0;
   const pct = Math.min(100, Math.round((progress / target) * 100));
 
   return (

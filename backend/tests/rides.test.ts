@@ -1,6 +1,7 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { request, stopTestServer, resetDatabase } from './helpers.js';
+import { repository } from '../src/lib/repository.js';
 
 describe('Rides, Cash Trips & Offline Idempotency (Section 27)', () => {
   before(() => {
@@ -42,6 +43,54 @@ describe('Rides, Cash Trips & Offline Idempotency (Section 27)', () => {
     const listRes = await request(`/api/rides?driver_code=DR-000481`);
     const matchingRides = listRes.body.filter((r: any) => r.client_operation_id === operationId);
     assert.equal(matchingRides.length, 1, 'Only one ride must be stored in database');
+  });
+
+  test('passenger cash request stays pending until the assigned driver confirms receipt exactly once', async () => {
+    const shift = await repository.getActiveShiftForDriver('DR-000481');
+    assert.ok(shift);
+    const beforeCount = shift.cash_rides_count;
+    const beforeGross = shift.cash_gross_centavos;
+
+    const requested = await request('/api/rides/cash-request', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer mock-passenger-token' },
+      body: {
+        vehicle_code: 'TR-01842',
+        amount_centavos: 2500,
+        client_operation_id: 'passenger-cash-request-001'
+      }
+    });
+    assert.equal(requested.status, 201);
+    assert.equal(requested.body.ride.status, 'pending');
+    assert.equal(requested.body.ride.payment_method, 'cash');
+
+    const forbidden = await request('/api/rides/cash-confirm', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer mock-passenger-token' },
+      body: { ride_id: requested.body.ride.ride_id }
+    });
+    assert.equal(forbidden.status, 403);
+
+    const confirmed = await request('/api/rides/cash-confirm', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer mock-driver-token' },
+      body: { ride_id: requested.body.ride.ride_id }
+    });
+    assert.equal(confirmed.status, 200);
+    assert.equal(confirmed.body.ride.status, 'completed');
+
+    const duplicate = await request('/api/rides/cash-confirm', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer mock-driver-token' },
+      body: { ride_id: requested.body.ride.ride_id }
+    });
+    assert.equal(duplicate.status, 200);
+    assert.equal(duplicate.body.duplicate, true);
+
+    const after = await repository.getShift(shift.shift_id);
+    assert.ok(after);
+    assert.equal(after.cash_rides_count, beforeCount + 1);
+    assert.equal(after.cash_gross_centavos, beforeGross + 2500);
   });
 
   test('✓ commuter safety check-in records trip with 0 fare and checkin flag', async () => {

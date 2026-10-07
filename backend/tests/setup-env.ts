@@ -1,6 +1,7 @@
 process.env.NODE_ENV = 'test';
 process.env.DEMO_AUTH = 'true';
 process.env.PAYMENT_MODE = 'mock';
+process.env.PAYMENT_ENVIRONMENT = 'test';
 process.env.ALLOW_EPHEMERAL_STATE = 'true';
 process.env.DATA_DIR = '';
 process.env.SUPABASE_URL = 'https://example.supabase.co';

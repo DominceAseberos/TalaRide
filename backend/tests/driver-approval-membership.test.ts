@@ -28,15 +28,10 @@ test('only admin approval unlocks a driver; operator membership is scoped, durab
     const queue = await call('admin', '/api/admin/drivers');
     assert.ok(queue.body.some((driver: any) => driver.driver_code === code && driver.verification_status === 'pending'));
     for (const token of ['operator-a', 'driver', 'lgu']) assert.equal((await call(token, `/api/admin/drivers/${code}/verify`, 'POST')).status, 403);
-    const autoProvisioned = await call('unassigned', '/api/toda/members');
-    assert.equal(autoProvisioned.status, 200);
-    assert.equal(autoProvisioned.body.group.name, 'Untitled TODA');
-    assert.equal(autoProvisioned.body.group.is_placeholder, true);
-    const renamedPlaceholder = await call('unassigned', '/api/toda/group', 'PUT', { name: 'Sunrise TODA' });
-    assert.equal(renamedPlaceholder.status, 200);
-    assert.equal(renamedPlaceholder.body.group.name, 'Sunrise TODA');
-    assert.equal(renamedPlaceholder.body.group.is_placeholder, false);
-    assert.equal((await call('unassigned', '/api/toda/members')).body.group.name, 'Sunrise TODA');
+    const unassigned = await call('unassigned', '/api/toda/members');
+    assert.equal(unassigned.status, 409);
+    assert.equal(unassigned.body.error, 'No group assigned');
+    assert.equal((await call('unassigned', '/api/toda/group', 'PUT', { name: 'Sunrise TODA' })).status, 409);
     assert.equal((await call('driver', '/api/toda/members')).status, 403);
     assert.equal((await call('operator-a', '/api/toda/members')).body.members.length, 0);
     assert.equal((await call('operator-a', '/api/toda/members', 'POST', { driver_code: code })).status, 404, 'TODA operators have read-only membership access');
@@ -60,6 +55,31 @@ test('only admin approval unlocks a driver; operator membership is scoped, durab
     const operatorView = await call('operator-a', '/api/toda/members');
     assert.equal(operatorView.body.group.name, 'Group A Renamed');
     assert.equal(operatorView.body.members[0].verification_status, 'verified');
+
+    await repository.createRide({
+      ride_id: 'RIDE-TODA-TRANSACTION-1',
+      driver_code: code,
+      driver_name: 'Registered driver',
+      vehicle_code: 'TR-12345',
+      passenger_id: null,
+      passenger_name: null,
+      passenger_mobile: null,
+      timestamp: new Date().toISOString(),
+      approximate_location: 'Tagum City',
+      payment_method: 'cash',
+      fare_amount_centavos: 3000,
+      status: 'completed',
+      is_checkin_only: false,
+      client_operation_id: 'toda-transaction-test',
+      created_at: new Date().toISOString()
+    });
+    const groupATransactions = await call('operator-a', '/api/toda/transactions');
+    const groupBTransactions = await call('operator-b', '/api/toda/transactions');
+    assert.equal(groupATransactions.status, 200);
+    assert.equal(groupATransactions.body.transactions.some((item: any) => item.ride_id === 'RIDE-TODA-TRANSACTION-1'), true);
+    assert.equal(groupBTransactions.status, 200);
+    assert.equal(groupBTransactions.body.transactions.some((item: any) => item.ride_id === 'RIDE-TODA-TRANSACTION-1'), false);
+
     assert.equal((await call('operator-a', '/api/toda/members', 'POST', { driver_code: 'DR-999999' })).status, 404);
 
     const independentRegistration = await call('driver-independent', '/api/drivers/enroll', 'POST', { full_name: 'Independent driver', mobile_number: '09987654321', license_number: 'LICENSE-456' });

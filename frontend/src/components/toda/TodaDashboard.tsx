@@ -21,6 +21,20 @@ type TodaGroup = {
   is_placeholder?: boolean;
 };
 
+type TodaTransaction = {
+  ride_id: string;
+  payment_id?: string | null;
+  driver_code: string;
+  vehicle_code: string;
+  timestamp: string;
+  amount_centavos: number;
+  payment_method: 'cash' | 'digital';
+  provider?: string | null;
+  payment_status?: string | null;
+  ride_status: string;
+  payment_environment?: 'test' | 'live' | null;
+};
+
 const card = 'rounded border border-slate-200 bg-white';
 
 export function TodaDashboard({
@@ -38,13 +52,15 @@ export function TodaDashboard({
   const [saveNotice, setSaveNotice] = useState('');
   const [members, setMembers] = useState<Driver[]>([]);
   const [lostItems, setLostItems] = useState<LostNotice[]>([]);
+  const [transactions, setTransactions] = useState<TodaTransaction[]>([]);
   const [tab, setTab] = useState<OpsSection>('overview');
   const [error, setError] = useState('');
 
   const refresh = useCallback(async () => {
-    const [memberData, reportData] = await Promise.all([
+    const [memberData, reportData, transactionData] = await Promise.all([
       api.getTodaMembers(),
       api.getTodaLostItems(),
+      api.getTodaTransactions(),
     ]);
     setGroup(memberData.group);
     if (!groupNameDirtyRef.current) {
@@ -52,6 +68,7 @@ export function TodaDashboard({
     }
     setMembers(memberData.members);
     setLostItems(reportData as LostNotice[]);
+    setTransactions(transactionData as TodaTransaction[]);
     setError('');
   }, []);
 
@@ -104,6 +121,7 @@ export function TodaDashboard({
   const sections = [
     { id: 'overview' as const, label: 'Overview' },
     { id: 'members' as const, label: 'Members', count: members.length },
+    { id: 'transactions' as const, label: 'Transactions', count: transactions.length },
     { id: 'lostItems' as const, label: 'Lost item notices', count: openItems.length },
   ];
   const displayGroupName = group?.is_placeholder
@@ -139,7 +157,9 @@ export function TodaDashboard({
             ? 'Group activity and member status'
             : tab === 'members'
               ? 'Read-only driver roster'
-              : 'New and unresolved lost-item reports'}
+              : tab === 'transactions'
+                ? 'Backend ride and payment activity for this TODA'
+                : 'New and unresolved lost-item reports'}
         </p>
       </div>
 
@@ -200,6 +220,7 @@ export function TodaDashboard({
                 'Pending verification',
                 members.filter(driver => driver.verification_status === 'pending').length,
               ],
+              ['Recorded transactions', transactions.length],
               ['Open lost-item notices', openItems.length],
             ].map(([label, value]) => (
               <div
@@ -278,6 +299,68 @@ export function TodaDashboard({
           ) : (
             <p className="p-8 text-center text-sm text-slate-500">
               No members have been assigned by the TalaRide administrator.
+            </p>
+          )}
+        </section>
+      )}
+
+      {tab === 'transactions' && (
+        <section className={`${card} overflow-hidden`}>
+          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+            <div>
+              <h2 className="font-semibold">Ride and payment activity</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Read-only backend records for drivers assigned to this TODA.
+              </p>
+            </div>
+            <span className="text-xs text-slate-500">{transactions.length} records</span>
+          </div>
+          {transactions.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] text-left text-sm">
+                <thead className="bg-[#f4f6f9] text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Driver / vehicle</th>
+                    <th className="px-4 py-3">Amount</th>
+                    <th className="px-4 py-3">Method</th>
+                    <th className="px-4 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map(item => (
+                    <tr key={item.ride_id} className="border-t border-slate-200">
+                      <td className="px-4 py-3 text-xs text-slate-600">
+                        {new Date(item.timestamp).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-mono text-xs">{item.driver_code}</div>
+                        <div className="mt-1 font-mono text-xs text-slate-500">{item.vehicle_code}</div>
+                      </td>
+                      <td className="px-4 py-3 font-semibold">
+                        ₱{(item.amount_centavos / 100).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium capitalize">
+                          {item.payment_method === 'cash' ? 'Cash' : item.provider || 'Digital'}
+                        </div>
+                        {item.payment_environment === 'test' && (
+                          <div className="mt-1 text-[11px] text-amber-700">Test / simulation</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                          {item.payment_status || item.ride_status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="p-8 text-center text-sm text-slate-500">
+              No rides or payments have been recorded for this TODA yet.
             </p>
           )}
         </section>

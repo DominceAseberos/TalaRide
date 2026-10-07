@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { repository } from '../lib/repository.js';
@@ -8,8 +8,8 @@ import { optionalAuth } from '../lib/auth.js';
 import { paymentIntentRateLimiter } from '../middleware/rate-limit.js';
 import { createPayMongoCheckout, createPayMongoDirectGcash } from '../lib/paymongo.js';
 import type { Ride, Payment } from '../types.js';
-import { env, paymentProviderConfigured } from '../env.js';
-import { consumeWebSession, reserveWebSession, releaseWebSession } from '../lib/web-session.js';
+import { env, paymentProviderConfigured, paymentSimulationConfigured } from '../env.js';
+import { attachPaymentToWebSession, hashWebSessionOwner, reserveWebSession, releaseWebSession } from '../lib/web-session.js';
 
 export const paymentIntentRouter = Router();
 
@@ -19,7 +19,8 @@ export const PaymentIntentSchema = z.object({
   amount_centavos: z.number().int().positive('amount_centavos must be a positive integer'),
   payment_method: z.enum(['gcash', 'maya', 'card', 'qrph']).default('gcash'),
   approximate_location: z.string().optional().default('Tagum City'),
-  session_id: z.string().min(20).max(128).optional()
+  session_id: z.string().min(20).max(128).optional(),
+  client_operation_id: z.string().min(8).max(160).optional()
 });
 
 // POST /api/payment-intent
@@ -28,7 +29,12 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
   let completed = false;
   const owner = req.get('x-ride-owner') || '';
   try {
-    if (env.NODE_ENV === 'production' && !paymentProviderConfigured()) return res.status(503).json({ error: 'Payment gateway is not configured for this environment.' });
+    if (env.PAYMENT_MODE === 'mock' && !paymentSimulationConfigured()) {
+      return res.status(503).json({ error: 'Payment simulation is not enabled for this deployment.' });
+    }
+    if (env.NODE_ENV === 'production' && env.PAYMENT_MODE === 'live' && !paymentProviderConfigured()) {
+      return res.status(503).json({ error: 'Payment gateway is not configured for this environment.' });
+    }
     // Normalize body if legacy camelCase properties are provided
     const rawBody = {
       driver_code: req.body.driver_code || req.body.driverId,
@@ -41,7 +47,8 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
           : undefined,
       payment_method: req.body.payment_method || req.body.paymentMethod || 'gcash',
       approximate_location: req.body.approximate_location || req.body.approximateLocation,
-      session_id: req.body.session_id || req.body.sessionId
+      session_id: req.body.session_id || req.body.sessionId,
+      client_operation_id: req.body.client_operation_id || req.body.clientOperationId || (req.headers['idempotency-key'] as string)
     };
 
     const parsed = PaymentIntentSchema.safeParse(rawBody);
@@ -52,10 +59,46 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       });
     }
 
-    const { driver_code, vehicle_code, amount_centavos, payment_method, approximate_location, session_id } = parsed.data;
+    const { driver_code, vehicle_code, amount_centavos, payment_method, approximate_location, session_id, client_operation_id } = parsed.data;
+    const ownerBrowserHash = owner ? hashWebSessionOwner(owner) : null;
+    const operationId = client_operation_id || (session_id ? `guest-payment:${session_id}` : undefined);
 
     if (env.NODE_ENV !== 'test' && !req.user && !session_id) return res.status(401).json({ error: 'Scan the vehicle QR to start your payment session.' });
-    if (session_id && !reserveWebSession(session_id, vehicle_code, owner)) {
+
+    if (operationId && (req.user?.id || ownerBrowserHash)) {
+      const existingPayment = await repository.getPaymentByClientOperation({
+        clientOperationId: operationId,
+        ownerUserId: req.user?.id ?? null,
+        ownerBrowserHash,
+        environment: env.PAYMENT_ENVIRONMENT,
+      });
+      if (existingPayment) {
+        const existingRide = await repository.getRide(existingPayment.ride_id);
+        return res.status(200).json({
+          success: true,
+          retry: true,
+          payment_id: existingPayment.payment_id,
+          ride_id: existingPayment.ride_id,
+          driver_code: existingPayment.driver_code,
+          vehicle_code: existingPayment.vehicle_code,
+          amount_centavos: existingPayment.amount_centavos,
+          payment_method: existingPayment.provider === 'qrph_bank' ? 'qrph' : existingPayment.provider,
+          provider_fee_centavos: existingPayment.provider_fee_centavos,
+          talaride_fee_centavos: existingPayment.talaride_fee_centavos,
+          net_centavos: existingPayment.net_centavos,
+          payment_status: existingPayment.payment_status,
+          payment_environment: existingPayment.payment_environment,
+          expires_at: existingPayment.expires_at,
+          qr_payload: existingPayment.qr_payload,
+          checkout_url: existingPayment.checkout_url ?? null,
+          session_id: existingPayment.guest_session_id ?? null,
+          ride_status: existingRide?.status ?? null,
+          payment_flow: env.PAYMENT_MODE === 'mock' ? 'simulated' : existingPayment.provider === 'gcash' ? 'direct_gcash' : 'paymongo_checkout'
+        });
+      }
+    }
+
+    if (session_id && !await reserveWebSession(session_id, vehicle_code, owner)) {
       return res.status(410).json({
         error: 'Session expired',
         message: 'This ride session has expired. Scan the vehicle QR code again to start a new payment.'
@@ -140,6 +183,14 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       expiresInSeconds: 300
     });
 
+    // A provider-return browser gets a capability scoped to this one payment.
+    // Only its SHA-256 hash is stored; the raw token exists only in the provider
+    // return URL. Guest web checkouts already use their browser-owner capability.
+    const returnHandoff = req.user ? randomBytes(32).toString('base64url') : null;
+    const returnHandoffHash = returnHandoff
+      ? createHash('sha256').update(returnHandoff).digest('hex')
+      : null;
+
     // 9. In provider-authoritative mode, create the PayMongo checkout before
     // persisting a pending ride/payment. This prevents orphaned unpaid records.
     let checkoutSessionId: string | null = null;
@@ -159,7 +210,8 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
             vehicleCode: vehicle_code,
             driverCode: driver_code,
             amountCentavos: amount_centavos,
-            paymentMethod: 'gcash'
+            paymentMethod: 'gcash',
+            returnHandoff
           });
           // Existing persistence column is kept for compatibility; for direct GCash
           // it stores the PayMongo PaymentIntent id instead of a Checkout Session id.
@@ -172,7 +224,8 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
             vehicleCode: vehicle_code,
             driverCode: driver_code,
             amountCentavos: amount_centavos,
-            paymentMethod: payment_method
+            paymentMethod: payment_method,
+            returnHandoff
           });
           checkoutSessionId = pmResult.checkoutSessionId;
           checkoutUrl = pmResult.checkoutUrl;
@@ -210,6 +263,12 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       ride_id: rideId,
       driver_code,
       vehicle_code,
+      shift_id: activeShift.shift_id,
+      client_operation_id: operationId || null,
+      owner_user_id: req.user?.id ?? null,
+      owner_browser_hash: ownerBrowserHash,
+      guest_session_id: session_id ?? null,
+      return_handoff_hash: returnHandoffHash,
       amount_centavos,
       provider: payment_method === 'qrph' ? 'qrph_bank' : payment_method,
       provider_ref: null,
@@ -227,41 +286,51 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
       confirmed_at: null
     };
 
-    // Record initiated event in audit trail
-    await repository.createRideAndPayment(ride, payment, {
+    // Bind the reserved guest session before persisting the payment. If the
+    // durable payment write fails, the finally block releases the reservation.
+    if (session_id) {
+      const attached = await attachPaymentToWebSession(session_id, owner, paymentId);
+      if (!attached) throw new Error('Ride session could not be attached to the payment.');
+    }
+
+    // Record initiated event in audit trail. The repository performs the
+    // idempotency decision inside the same serialized mutation as the insert,
+    // so concurrent requests with one operation key resolve to one record.
+    const saved = await repository.createRideAndPayment(ride, payment, {
       event_id: `EVT-${randomUUID()}`,
       payment_id: paymentId,
       event_type: 'intent_created',
       payload: { amount_centavos, ride_id: rideId, payment_method },
       created_at: new Date().toISOString()
     });
-
-    if (session_id) consumeWebSession(session_id, vehicle_code, owner);
     completed = true;
 
-    return res.status(201).json({
+    const savedPayment = saved.payment;
+    const savedRide = saved.ride;
+    return res.status(saved.created ? 201 : 200).json({
       success: true,
-      payment_id: payment.payment_id,
-      ride_id: ride.ride_id,
-      driver_code: payment.driver_code,
-      vehicle_code: payment.vehicle_code,
-      amount_centavos: payment.amount_centavos,
-      payment_method,
-      provider_fee_centavos: payment.provider_fee_centavos,
-      talaride_fee_centavos: payment.talaride_fee_centavos,
-      net_centavos: payment.net_centavos,
-      payment_status: payment.payment_status,
-      payment_environment: payment.payment_environment,
-      expires_at: payment.expires_at,
-      qr_payload: payment.qr_payload,
-      checkout_url: checkoutUrl,
-      session_id: session_id ?? null,
-      payment_flow: payment_method === 'gcash' ? 'direct_gcash' : 'paymongo_checkout'
+      retry: !saved.created,
+      payment_id: savedPayment.payment_id,
+      ride_id: savedRide.ride_id,
+      driver_code: savedPayment.driver_code,
+      vehicle_code: savedPayment.vehicle_code,
+      amount_centavos: savedPayment.amount_centavos,
+      payment_method: savedPayment.provider === 'qrph_bank' ? 'qrph' : savedPayment.provider,
+      provider_fee_centavos: savedPayment.provider_fee_centavos,
+      talaride_fee_centavos: savedPayment.talaride_fee_centavos,
+      net_centavos: savedPayment.net_centavos,
+      payment_status: savedPayment.payment_status,
+      payment_environment: savedPayment.payment_environment,
+      expires_at: savedPayment.expires_at,
+      qr_payload: savedPayment.qr_payload,
+      checkout_url: savedPayment.checkout_url ?? null,
+      session_id: savedPayment.guest_session_id ?? null,
+      payment_flow: env.PAYMENT_MODE === 'mock' ? 'simulated' : savedPayment.provider === 'gcash' ? 'direct_gcash' : 'paymongo_checkout'
     });
   } catch (err: any) {
     console.error('Error generating payment intent:', err);
     return res.status(503).json({ error: 'Payment could not be saved. Please contact support before retrying.' });
   } finally {
-    if (reservedSession && !completed) releaseWebSession(reservedSession, owner);
+    if (reservedSession && !completed) await releaseWebSession(reservedSession, owner);
   }
 });

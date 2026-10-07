@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { randomUUID } from 'expo-crypto';
 import { AppState, View } from 'react-native';
 import { Button, Card, Copy, Detail, Title } from '@/components/ui';
 import { useAuth } from '@/auth/AuthProvider';
@@ -11,6 +12,7 @@ export function RewardsPanel({ audience }: { audience: 'passenger' | 'driver' })
   const [rewards, setRewards] = useState<RewardsMe | null>(null);
   const [latestClaim, setLatestClaim] = useState<{ userId: string; voucher: RewardVoucher } | null>(null);
   const [claiming, setClaiming] = useState(false);
+  const claimOperation = useRef<string | null>(null);
   const [error, setError] = useState('');
   const rewardType: RewardClaimType = audience === 'passenger' ? 'drink_voucher' : 'fuel_discount';
   const title = audience === 'passenger' ? 'Ride rewards' : 'Driver rewards';
@@ -59,7 +61,9 @@ export function RewardsPanel({ audience }: { audience: 'passenger' | 'driver' })
     setClaiming(true);
     setError('');
     try {
-      const voucher = await claimReward(rewardType);
+      claimOperation.current ||= `reward-${randomUUID()}`;
+      const voucher = await claimReward(rewardType, claimOperation.current);
+      claimOperation.current = null;
       setLatestClaim({ userId, voucher });
       setRewards(await fetchRewards());
     } catch (failure) {

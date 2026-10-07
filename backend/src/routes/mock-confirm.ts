@@ -1,26 +1,28 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { env } from '../env.js';
+import { env, paymentSimulationConfigured } from '../env.js';
 import { repository } from '../lib/repository.js';
 import { sse } from '../sse.js';
 import { optionalAuth } from '../lib/auth.js';
+import { consumeWebSession, hashWebSessionOwner } from '../lib/web-session.js';
 
 export const mockConfirmRouter = Router();
 
 const MockConfirmSchema = z.object({
   payment_id: z.string().min(1, 'payment_id is required'),
-  provider: z.enum(['gcash', 'maya', 'gotyme', 'qrph_bank', 'mock']).default('gcash'),
+  provider: z.enum(['gcash', 'maya', 'gotyme', 'qrph_bank', 'card', 'mock']).default('gcash'),
   passenger_id: z.string().optional()
 });
 
 // POST /api/mock-confirm
 mockConfirmRouter.post('/', optionalAuth, async (req: Request, res: Response) => {
   try {
-    // 1. Strict guard: Mock confirmation prohibited in live production mode
-    if (env.NODE_ENV !== 'test' || env.PAYMENT_MODE !== 'mock') {
+    // 1. Simulation requires explicit mock/test configuration. Production-hosted
+    // thesis/demo deployments additionally require PAYMENT_SIMULATION_ENABLED=true.
+    if (!paymentSimulationConfigured()) {
       return res.status(403).json({
         error: 'Forbidden',
-        message: 'Mock payment confirmation is disabled in production live mode. Provider webhook required.'
+        message: 'Simulated payment confirmation is disabled. Provider confirmation is required.'
       });
     }
 
@@ -43,9 +45,28 @@ mockConfirmRouter.post('/', optionalAuth, async (req: Request, res: Response) =>
       return res.status(404).json({ error: 'Payment not found' });
     }
 
+    const ownershipRide = await repository.getRide(payment.ride_id);
+    const legacyTestPayment =
+      env.NODE_ENV === 'test' && !payment.owner_user_id && !payment.owner_browser_hash;
+    const passengerOwns =
+      req.user?.role === 'passenger' &&
+      (payment.owner_user_id === req.user.id || ownershipRide?.passenger_id === req.user.id);
+    let browserOwns = false;
+    if (!req.user && payment.owner_browser_hash) {
+      const browserOwner = req.get('x-ride-owner') || '';
+      try {
+        browserOwns = !!browserOwner && payment.owner_browser_hash === hashWebSessionOwner(browserOwner);
+      } catch {
+        browserOwns = false;
+      }
+    }
+    if (!legacyTestPayment && !passengerOwns && !browserOwns) {
+      return res.status(403).json({ error: 'This simulated payment belongs to another account or browser session.' });
+    }
+
     // 3. Idempotent check
     if (payment.payment_status === 'confirmed') {
-      const ride = await repository.getRide(payment.ride_id);
+      const ride = ownershipRide;
       const driver = await repository.getDriver(payment.driver_code);
       const rewardsAwarded = await repository.mintRideRewards({
         passengerUserId: ride?.passenger_id,
@@ -53,6 +74,7 @@ mockConfirmRouter.post('/', optionalAuth, async (req: Request, res: Response) =>
         rideId: payment.ride_id,
         environment: payment.payment_environment ?? env.PAYMENT_ENVIRONMENT
       });
+      if (payment.guest_session_id) await consumeWebSession(payment.guest_session_id, payment.payment_id);
       return res.json({
         success: true,
         message: 'Payment was already confirmed',
@@ -77,7 +99,7 @@ mockConfirmRouter.post('/', optionalAuth, async (req: Request, res: Response) =>
     // never when the driver creates the payment intent.
     const providerRef = `${provider.toUpperCase()}-REF-${Math.floor(1000000 + Math.random() * 9000000)}`;
     const confirmedAt = new Date().toISOString();
-    const finalPassengerId = req.user?.id || passenger_id;
+    const finalPassengerId = req.user?.role === 'passenger' ? req.user.id : legacyTestPayment ? passenger_id : undefined;
     const passengerProfile = finalPassengerId
       ? await repository.getProfile(finalPassengerId)
       : null;
@@ -100,6 +122,9 @@ mockConfirmRouter.post('/', optionalAuth, async (req: Request, res: Response) =>
       rideId: result.payment.ride_id,
       environment: result.payment.payment_environment ?? env.PAYMENT_ENVIRONMENT
     });
+    if (result.payment.guest_session_id) {
+      await consumeWebSession(result.payment.guest_session_id, result.payment.payment_id);
+    }
 
     // 7. Secure SSE push to authenticated driver
     sse.notifyDriver(result.payment.driver_code, 'payment_confirmed', {

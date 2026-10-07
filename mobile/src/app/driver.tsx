@@ -21,6 +21,7 @@ import {
   type DriverVehicle,
 } from '@/api/drivers';
 import { fetchFares } from '@/api/fares';
+import { confirmCashRide } from '@/api/rides';
 import { useMock } from '@/mocks/MockProvider';
 import { enqueueOutbox } from '@/offline/queue';
 import { triggerSync } from '@/api/sync';
@@ -237,7 +238,8 @@ function DriverAccountScreen() {
     try {
       const rideId = await saveRide(vehicle.vehicle_code, 'Body #');
       const operation = `cash-${rideId}`;
-      await enqueueOutbox(operation, 'cash_ride', {
+      if (!userId) throw new Error('Sign in before saving a ride.');
+      await enqueueOutbox(userId, operation, 'cash_ride', {
         account_id: userId,
         client_operation_id: operation,
         local_ride_id: rideId,
@@ -250,6 +252,26 @@ function DriverAccountScreen() {
       void triggerSync().catch(() => {});
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Could not save cash ride.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmPassengerCash(rideId: string) {
+    if (!driver || busy) return;
+    setBusy(true);
+    setError('');
+    setCashMessage('');
+    try {
+      const result = await confirmCashRide(rideId);
+      setCashMessage(
+        result.duplicate
+          ? 'This cash payment was already confirmed.'
+          : 'Cash received. TalaRide completed the ride and updated the shift.',
+      );
+      setSummary(await fetchDriverSummary(driver.driver_code));
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Could not confirm the cash payment.');
     } finally {
       setBusy(false);
     }
@@ -367,6 +389,9 @@ function DriverAccountScreen() {
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
   );
   const completedRides = rides.filter((item) => item.status === 'completed');
+  const pendingCashRides = rides.filter(
+    (item) => item.payment_method === 'cash' && item.status === 'pending',
+  );
   const totalFare = completedRides.reduce((total, item) => total + item.fare_amount_centavos, 0);
 
   return (
@@ -440,6 +465,29 @@ function DriverAccountScreen() {
                 disabled={busy || !online}
                 onPress={() => void shift()}
               />
+              {pendingCashRides.length > 0 && (
+                <Card>
+                  <Copy bold>Cash payments waiting for you</Copy>
+                  <Copy style={{ color: colors.muted, marginTop: 4 }}>
+                    Confirm only after you have physically received the passenger’s cash.
+                  </Copy>
+                  <View style={{ gap: 10, marginTop: 12 }}>
+                    {pendingCashRides.slice(0, 5).map((ride) => (
+                      <View key={ride.ride_id} style={{ gap: 6 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Copy>{ride.vehicle_code}</Copy>
+                          <Copy bold>{pesos(ride.fare_amount_centavos)}</Copy>
+                        </View>
+                        <Button
+                          label="Confirm cash received"
+                          disabled={busy}
+                          onPress={() => void confirmPassengerCash(ride.ride_id)}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                </Card>
+              )}
               <Card>
                 <Copy bold>Record a cash ride</Copy>
                 <Copy style={{ color: colors.muted, marginTop: 4 }}>

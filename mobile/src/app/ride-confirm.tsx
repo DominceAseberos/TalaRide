@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { randomUUID } from 'expo-crypto';
 import { Image, Linking, Pressable, TextInput, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/components/Screen';
@@ -13,14 +14,19 @@ import {
   type PaymentMethod,
 } from '@/api/payments';
 import { fetchFares } from '@/api/fares';
+import { requestCashRide } from '@/api/rides';
 import { fetchPublicVehicle, type PublicVehicle } from '@/api/vehicles';
 import { enqueueOutbox } from '@/offline/queue';
 import { triggerSync } from '@/api/sync';
 import { useMock } from '@/mocks/MockProvider';
+import { useAuth } from '@/auth/AuthProvider';
 
 const MIN_FARE_CENTAVOS = 1500;
 
-const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; subtitle: string }[] = [
+type RidePaymentMethod = PaymentMethod | 'cash';
+
+const PAYMENT_OPTIONS: { id: RidePaymentMethod; label: string; subtitle: string }[] = [
+  { id: 'cash', label: 'Cash', subtitle: 'Driver confirms receipt' },
   { id: 'gcash', label: 'GCash', subtitle: 'E-wallet' },
   { id: 'maya', label: 'Maya', subtitle: 'E-wallet' },
   { id: 'card', label: 'Card', subtitle: 'Visa / Mastercard' },
@@ -34,6 +40,7 @@ export default function RideConfirmScreen() {
     c?: string;
   }>();
   const { saveRide } = useMock();
+  const { session } = useAuth();
 
   const [vehicle, setVehicle] = useState<PublicVehicle | null>(null);
   const [fares, setFares] = useState<{ id: string; label: string; amountCentavos: number }[]>(
@@ -42,11 +49,12 @@ export default function RideConfirmScreen() {
   const [presetFare, setPresetFare] = useState<number | null>(null);
   const [customMode, setCustomMode] = useState(false);
   const [customFare, setCustomFare] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<RidePaymentMethod | null>(null);
   const [verifying, setVerifying] = useState(Boolean(!payload && vehicle_code));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [photoUnavailable, setPhotoUnavailable] = useState(false);
+  const paymentOperation = useRef<string | null>(null);
 
   useEffect(() => {
     if (payload) return;
@@ -94,6 +102,10 @@ export default function RideConfirmScreen() {
     }
   }, [customFare, customMode, presetFare]);
 
+  useEffect(() => {
+    paymentOperation.current = null;
+  }, [vehicle?.vehicle_code, amountCentavos, paymentMethod]);
+
   const staticError = payload ? 'Old payment QR codes are no longer supported. Scan the registered vehicle sticker.' : error;
 
   const canProceed =
@@ -125,12 +137,32 @@ export default function RideConfirmScreen() {
     setBusy(true);
     setError('');
     try {
+      if (paymentMethod === 'cash') {
+        const ride = await requestCashRide({
+          vehicle_code: vehicle.vehicle_code,
+          amount_centavos: amountCentavos,
+          client_operation_id: (paymentOperation.current ||= `mobile-cash-${randomUUID()}`),
+        });
+        replace('/rides?cash_pending=' + encodeURIComponent(ride.ride_id));
+        return;
+      }
+
       const intent = await createPaymentIntent({
         driver_code: vehicle.driver_code,
         vehicle_code: vehicle.vehicle_code,
         amount_centavos: amountCentavos,
         payment_method: paymentMethod,
+        client_operation_id: (paymentOperation.current ||= `mobile-payment-${randomUUID()}`),
       });
+      if (intent.payment_flow === 'simulated') {
+        replace(
+          '/payment-status?payment_id=' +
+            encodeURIComponent(intent.payment_id) +
+            '&simulate=1&method=' +
+            encodeURIComponent(paymentMethod),
+        );
+        return;
+      }
       if (!intent.checkout_url) {
         throw new Error('The payment provider did not return an authorization link.');
       }
@@ -151,7 +183,9 @@ export default function RideConfirmScreen() {
       if (!/^TR-\d{5}$/.test(code)) throw new Error('Enter a valid registered vehicle code.');
       const rideId = await saveRide(code, 'Body #');
       const op = 'checkin-' + rideId;
-      await enqueueOutbox(op, 'checkin', {
+      const ownerId = session?.user.id;
+      if (!ownerId) throw new Error('Sign in before saving an offline ride.');
+      await enqueueOutbox(ownerId, op, 'checkin', {
         client_operation_id: op,
         local_ride_id: rideId,
         vehicle_code: code,
@@ -168,7 +202,9 @@ export default function RideConfirmScreen() {
   return (
     <Screen>
       <Header title="Pay fare" />
-      {vehicle?.payment_environment === 'test' && <Card><Copy bold>PayMongo test mode — no real money is charged.</Copy></Card>}
+      {vehicle?.payment_mode === 'mock' && (
+        <Card><Copy bold>Simulated payment — no real money is charged.</Copy></Card>
+      )}
       <Title style={{ fontSize: 22 }}>Scan • Choose fare • Pay</Title>
       <Copy style={{ marginTop: 5, color: colors.muted }}>
         No payment is created until you choose a fare, choose a payment method, and tap Proceed.
@@ -371,8 +407,8 @@ export default function RideConfirmScreen() {
           </View>
 
           <Copy style={{ marginTop: 10, textAlign: 'center', fontSize: 11, color: colors.muted }}>
-            Your fare and payment method are locked only after you tap Proceed. TalaRide marks the
-            ride paid only after provider confirmation.
+            Your fare and payment method are locked only after you tap Proceed. In simulation mode,
+            TalaRide shows an in-app checkout and marks the ride paid only after you explicitly confirm it.
           </Copy>
         </>
       )}

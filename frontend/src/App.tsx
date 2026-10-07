@@ -38,7 +38,7 @@ export function App() {
 
   const page =
     path === '/success' || path === '/cancel' ? (
-      <PaymentReturnPage paymentId={query.get('payment_id') || ''} cancelled={path === '/cancel'} />
+      <PaymentReturnPage paymentId={query.get('payment_id') || ''} handoff={query.get('handoff') || undefined} cancelled={path === '/cancel'} />
     ) : path.startsWith('/v/') ? (
       <PublicVehiclePage vehicleCode={path.split('/')[2]} checksum={query.get('c') || ''} />
     ) : (

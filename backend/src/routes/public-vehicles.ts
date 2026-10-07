@@ -3,7 +3,7 @@ import { repository } from '../lib/repository.js';
 import { env } from '../env.js';
 import { requireAuth } from '../lib/auth.js';
 import { generateVehicleChecksum, verifyVehicleChecksum } from '../lib/qr.js';
-import { createWebSession, getWebSessionExpiry, validateWebSession } from '../lib/web-session.js';
+import { createWebSession, getWebSessionState } from '../lib/web-session.js';
 
 export const publicVehiclesRouter = Router();
 
@@ -40,11 +40,20 @@ publicVehiclesRouter.get('/:code/public', async (req: Request, res: Response) =>
       });
     }
 
+    const existingWebSession = requestedSessionId
+      ? await getWebSessionState(requestedSessionId, vehicleCode, owner)
+      : null;
     const webSession = requestedSessionId
-      ? (validateWebSession(requestedSessionId, vehicleCode, owner)
-        ? { sessionId: requestedSessionId, expiresAt: getWebSessionExpiry(requestedSessionId, vehicleCode, owner) }
+      ? (existingWebSession
+        ? {
+            sessionId: existingWebSession.session_id,
+            expiresAt: existingWebSession.expires_at,
+            paymentId: existingWebSession.payment_id,
+          }
         : null)
-      : owner ? createWebSession(vehicleCode, owner) : { sessionId: null, expiresAt: null };
+      : owner
+        ? { ...(await createWebSession(vehicleCode, owner)), paymentId: null }
+        : { sessionId: null, expiresAt: null, paymentId: null };
     if (!webSession) {
       return res.status(410).json({
         error: 'Session expired',
@@ -75,10 +84,16 @@ publicVehiclesRouter.get('/:code/public', async (req: Request, res: Response) =>
       }
     }
 
-    // Strictly safe public metadata: no phone numbers, no license number, no addresses
+    const resumablePayment = webSession.paymentId
+      ? await repository.getPayment(webSession.paymentId)
+      : null;
+
+    // Strictly safe public metadata: no phone numbers, no license number, no addresses.
+    // A browser may resume only the payment bound to its own hashed checkout session.
     return res.json({
       vehicle_code: vehicle.vehicle_code,
       payment_environment: env.PAYMENT_ENVIRONMENT,
+      payment_mode: env.PAYMENT_MODE,
       plate_body_number: vehicle.plate_body_number,
       toda: vehicle.toda,
       status: vehicle.status === 'active' ? 'Active' : 'Inactive',
@@ -89,7 +104,15 @@ publicVehiclesRouter.get('/:code/public', async (req: Request, res: Response) =>
       driver_photo_url: driverPhotoUrl,
       fare_config: await repository.getFareConfig(),
       session_id: webSession.sessionId,
-      session_expires_at: webSession.expiresAt ?? null
+      session_expires_at: webSession.expiresAt ?? null,
+      resume_payment: resumablePayment
+        ? {
+            payment_id: resumablePayment.payment_id,
+            payment_status: resumablePayment.payment_status,
+            provider: resumablePayment.provider,
+            amount_centavos: resumablePayment.amount_centavos,
+          }
+        : null
     });
   } catch (err: any) {
     console.error('Error in public vehicle lookup:', err);

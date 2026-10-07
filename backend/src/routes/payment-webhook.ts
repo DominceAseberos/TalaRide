@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { env, paymentProviderConfigured } from '../env.js';
 import { repository } from '../lib/repository.js';
 import { sse } from '../sse.js';
+import { consumeWebSession } from '../lib/web-session.js';
 
 export const paymentWebhookRouter = Router();
 
@@ -168,8 +169,9 @@ paymentWebhookRouter.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    // 5. Idempotent check
-    if (payment.payment_status === 'confirmed' && payment.provider_ref === provider_ref) {
+    // 5. Idempotent check. Once confirmed, alternate provider event/reference
+    // retries must never change totals, rewards, or the original provider reference.
+    if (payment.payment_status === 'confirmed') {
       const ride = await repository.getRide(payment.ride_id);
       const driver = await repository.getDriver(payment.driver_code);
       await repository.mintRideRewards({
@@ -178,11 +180,13 @@ paymentWebhookRouter.post('/', async (req: Request, res: Response) => {
         rideId: payment.ride_id,
         environment: payment.payment_environment ?? env.PAYMENT_ENVIRONMENT
       });
+      if (payment.guest_session_id) await consumeWebSession(payment.guest_session_id, payment.payment_id);
       return res.json({
         success: true,
         message: 'Webhook duplicate already processed',
         status: 'confirmed',
-        payment_id: payment.payment_id
+        payment_id: payment.payment_id,
+        provider_ref: payment.provider_ref
       });
     }
 
@@ -222,6 +226,9 @@ paymentWebhookRouter.post('/', async (req: Request, res: Response) => {
       rideId: result.payment.ride_id,
       environment: rewardEnvironment
     });
+    if (result.payment.guest_session_id) {
+      await consumeWebSession(result.payment.guest_session_id, result.payment.payment_id);
+    }
 
     // 9. Real-time driver notification
     sse.notifyDriver(result.payment.driver_code, 'payment_confirmed', {

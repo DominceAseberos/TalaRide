@@ -5,7 +5,7 @@ export type VehicleStatus = 'active' | 'maintenance' | 'inactive';
 export type ShiftStatus = 'active' | 'ended';
 export type PaymentMethod = 'digital' | 'cash';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
-export type PaymentProvider = 'gcash' | 'maya' | 'gotyme' | 'qrph_bank';
+export type PaymentProvider = 'gcash' | 'maya' | 'gotyme' | 'qrph_bank' | 'card' | 'mock';
 export type LostItemCategory = 'phone' | 'wallet' | 'bag' | 'documents' | 'keys' | 'other';
 export type LostItemStatus = 'submitted' | 'driver_notified' | 'found' | 'unresolved' | 'closed';
 

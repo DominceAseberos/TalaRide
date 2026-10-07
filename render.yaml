@@ -13,14 +13,20 @@ services:
       - key: NODE_ENV
         value: production
       - key: PAYMENT_MODE
-        value: live
+        value: mock
+      - key: PAYMENT_ENVIRONMENT
+        value: test
+      - key: PAYMENT_SIMULATION_ENABLED
+        value: "true"
       - key: DEMO_AUTH
         value: "false"
       - key: ALLOW_EPHEMERAL_STATE
-        value: "true"
+        value: "false"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
         sync: false
       - key: SUPABASE_JWT_SECRET
         sync: false
@@ -31,4 +37,6 @@ services:
       - key: PAYMENT_WEBHOOK_SECRET
         sync: false
       - key: WEB_ORIGIN
+        sync: false
+      - key: PUBLIC_WEB_ORIGIN
         sync: false

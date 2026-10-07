@@ -9,6 +9,7 @@ export type PaymentStatus =
   | 'confirmed'
   | 'failed'
   | 'expired'
+  | 'cancelled'
   | 'refunded'
   | 'reversed';
 export type PaymentProvider = 'gcash' | 'maya' | 'gotyme' | 'qrph_bank' | 'card' | 'mock';
@@ -91,6 +92,7 @@ export interface Ride {
   driver_code: string;
   driver_name?: string;
   vehicle_code: string;
+  shift_id?: string | null;
   passenger_id?: string | null;
   passenger_name?: string | null;
   passenger_mobile?: string | null;
@@ -110,6 +112,12 @@ export interface Payment {
   ride_id: string;
   driver_code: string;
   vehicle_code: string;
+  shift_id?: string | null;
+  client_operation_id?: string | null;
+  owner_user_id?: string | null;
+  owner_browser_hash?: string | null;
+  guest_session_id?: string | null;
+  return_handoff_hash?: string | null;
   amount_centavos: number;
   provider: PaymentProvider;
   provider_ref: string | null;
@@ -135,6 +143,14 @@ export interface PaymentEvent {
   created_at: string;
 }
 
+export interface LostItemMessage {
+  message_id: string;
+  author_role: 'passenger' | 'driver' | 'admin';
+  author_id?: string | null;
+  message: string;
+  created_at: string;
+}
+
 export interface LostItemReport {
   report_id: string;
   ride_id: string;
@@ -149,6 +165,7 @@ export interface LostItemReport {
   driver_response?: 'found' | 'not_found' | 'contact_support' | null;
   driver_response_note?: string | null;
   client_operation_id?: string | null;
+  messages?: LostItemMessage[];
   created_at: string;
   resolved_at?: string | null;
 }
@@ -157,6 +174,7 @@ export interface RewardsLedger {
   reward_id: string;
   user_id: string;
   ride_id?: string | null;
+  claim_operation_id?: string | null;
   points: number;
   status: 'earned' | 'redeemed' | 'revoked';
   reward_type: 'ride_completion' | 'promotional_voucher' | 'drink_voucher' | 'fuel_discount';
@@ -190,6 +208,17 @@ export interface PaymentIssueTicket {
   client_operation_id?: string | null;
   created_at: string;
   resolved_at?: string | null;
+}
+
+export interface WebCheckoutSession {
+  session_id: string;
+  vehicle_code: string;
+  owner_hash: string;
+  expires_at: string;
+  reserved: boolean;
+  consumed: boolean;
+  payment_id?: string | null;
+  created_at: string;
 }
 
 export interface NotificationRecord {

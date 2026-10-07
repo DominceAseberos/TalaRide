@@ -14,7 +14,9 @@ const TOKEN_KEY = 'talaride.auth-token';
 
 export const eventBus = new BroadcastChannel('talaride_events');
 
-export function getWebPaymentMode(): 'live' | 'mock' { return 'live'; }
+export function getWebPaymentMode(): 'live' | 'mock' {
+  return import.meta.env.VITE_PAYMENT_MODE === 'mock' ? 'mock' : 'live';
+}
 function broadcastSimulation(_type: string, _payload: unknown) {}
 export function setAuthToken(_token: string | null) { window.sessionStorage.removeItem(TOKEN_KEY); }
 async function getAuthToken() { return authToken(); }
@@ -27,11 +29,11 @@ function rideOwner() {
 }
 
 async function apiFetch(path: string, init: RequestInit = {}) {
-  const publicRequest = path.startsWith('/public/') || path.startsWith('/payment-status') || path === '/payment-intent';
+  const publicRequest = path.startsWith('/public/') || path.startsWith('/payment-status') || path === '/payment-intent' || path === '/mock-confirm';
   const token = publicRequest ? await getAuthToken().catch(() => '') : await getAuthToken();
   const headers = new Headers(init.headers);
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  if (path.startsWith('/public/vehicles/') || path === '/payment-intent') headers.set('x-ride-owner', rideOwner());
+  if (path.startsWith('/public/vehicles/') || path === '/payment-intent' || path.startsWith('/payment-status') || path === '/mock-confirm') headers.set('x-ride-owner', rideOwner());
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
@@ -203,6 +205,7 @@ export const api = {
     return { group: data.group, members: data.members.map(normalizeDriver) };
   },
   getTodaLostItems: async (): Promise<any[]> => (await apiJson<{ items: any[] }>('/toda/lost-items')).items,
+  getTodaTransactions: async (): Promise<any[]> => (await apiJson<{ transactions: any[] }>('/toda/transactions')).transactions,
   getAdminTodaGroups: async (): Promise<{ id: string; name: string; members: Driver[] }[]> => {
     const groups = await apiJson<any[]>('/admin/toda-groups');
     return groups.map(group => ({ ...group, members: (group.members || []).map(normalizeDriver) }));
@@ -371,6 +374,7 @@ export const api = {
         vehicle_code: vehicleId,
         amount_centavos: Math.round(fareAmount * 100),
         payment_method: paymentMethod,
+        client_operation_id: sessionId ? `guest-payment:${sessionId}` : `web-payment-${crypto.randomUUID()}`,
         ...(sessionId ? { session_id: sessionId } : {})
       })
     });
@@ -386,25 +390,26 @@ export const api = {
       success: true,
       payment,
       qrPayload: raw.qr_payload,
-      checkoutUrl: raw.checkout_url ?? null
+      checkoutUrl: raw.checkout_url ?? null,
+      paymentFlow: raw.payment_flow ?? null
     };
     broadcastSimulation('payment_created', result);
     return result;
   },
 
-  getPaymentStatus: async (paymentId: string) => {
-    const raw = await apiJson<any>(
-      `/payment-status?payment_id=${encodeURIComponent(paymentId)}`
-    );
+  getPaymentStatus: async (paymentId: string, handoff?: string) => {
+    const query = new URLSearchParams({ payment_id: paymentId });
+    if (handoff) query.set('handoff', handoff);
+    const raw = await apiJson<any>(`/payment-status?${query.toString()}`);
     return {
       ...raw,
-      payment: normalizePayment(raw),
+      payment: { ...normalizePayment(raw), payment_mode: raw.payment_mode },
       checkoutUrl: raw.checkout_url ?? null
     };
   },
 
-  getConfirmedPaymentResult: async (paymentId: string) => {
-    const status = await api.getPaymentStatus(paymentId);
+  getConfirmedPaymentResult: async (paymentId: string, handoff?: string) => {
+    const status = await api.getPaymentStatus(paymentId, handoff);
     if (status.payment.payment_status !== 'paid') {
       return { success: false, status: status.payment.payment_status, payment: status.payment };
     }
@@ -421,9 +426,6 @@ export const api = {
     passengerName?: string;
     approximateLocation?: string;
   }) => {
-    if (getWebPaymentMode() !== 'mock') {
-      throw new Error('Mock confirmation is disabled outside the simulator. Use PayMongo Checkout.');
-    }
     const raw = await apiJson<any>('/mock-confirm', {
       method: 'POST',
       body: JSON.stringify({
@@ -522,10 +524,13 @@ export const api = {
     };
   },
 
-  redeemReward: async (userId: string) =>
+  redeemReward: async (clientOperationId: string) =>
     apiJson<any>('/rewards/redeem', {
       method: 'POST',
-      body: JSON.stringify({ userId })
+      body: JSON.stringify({
+        reward_type: 'drink_voucher',
+        client_operation_id: clientOperationId
+      })
     }),
 
   getAdminOverview: async () => apiJson<any>('/admin/overview'),

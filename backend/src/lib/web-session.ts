@@ -1,62 +1,65 @@
-import { randomBytes } from 'node:crypto';
+import crypto from 'node:crypto';
+import { repository } from './repository.js';
 
 const SESSION_TTL_MS = 10 * 60 * 1000;
 
-interface WebSession {
-  vehicleCode: string;
-  expiresAt: number;
-  consumed: boolean;
-  owner: string;
-  reserved: boolean;
-}
-
-const sessions = new Map<string, WebSession>();
-
-function cleanupExpired(now = Date.now()) {
-  for (const [sessionId, session] of sessions) {
-    if (session.expiresAt <= now || session.consumed) sessions.delete(sessionId);
-  }
-}
-
-export function createWebSession(vehicleCode: string, owner: string) {
-  const now = Date.now();
-  cleanupExpired(now);
+export function hashWebSessionOwner(owner: string): string {
   if (!/^[a-zA-Z0-9_-]{24,128}$/.test(owner)) throw new Error('Invalid browser session.');
-  if (sessions.size >= 10000) throw new Error('Too many active ride sessions. Try again shortly.');
-  const sessionId = randomBytes(24).toString('base64url');
-  const expiresAt = now + SESSION_TTL_MS;
-  sessions.set(sessionId, { vehicleCode, expiresAt, consumed: false, owner, reserved: false });
-  return { sessionId, expiresAt: new Date(expiresAt).toISOString() };
+  return crypto.createHash('sha256').update(owner).digest('hex');
 }
 
-export function validateWebSession(sessionId: string, vehicleCode: string, owner: string): boolean {
-  cleanupExpired();
-  const session = sessions.get(sessionId);
-  return !!session && !session.consumed && !session.reserved && session.owner === owner && session.vehicleCode === vehicleCode;
+export async function createWebSession(vehicleCode: string, owner: string) {
+  const session = await repository.createWebSession(
+    vehicleCode,
+    hashWebSessionOwner(owner),
+    SESSION_TTL_MS,
+  );
+  return { sessionId: session.session_id, expiresAt: session.expires_at };
 }
 
-export function getWebSessionExpiry(sessionId: string, vehicleCode: string, owner: string): string | null {
-  cleanupExpired();
-  const session = sessions.get(sessionId);
-  if (!session || session.consumed || session.owner !== owner || session.vehicleCode !== vehicleCode) return null;
-  return new Date(session.expiresAt).toISOString();
+export async function validateWebSession(sessionId: string, vehicleCode: string, owner: string): Promise<boolean> {
+  const session = await repository.getWebSession(sessionId);
+  return !!session &&
+    !session.consumed &&
+    !session.reserved &&
+    session.owner_hash === hashWebSessionOwner(owner) &&
+    session.vehicle_code === vehicleCode;
 }
 
-export function consumeWebSession(sessionId: string, vehicleCode: string, owner: string): boolean {
-  cleanupExpired();
-  const session = sessions.get(sessionId);
-  if (!session || session.consumed || session.owner !== owner || session.vehicleCode !== vehicleCode) return false;
-  session.consumed = true;
-  sessions.delete(sessionId);
-  return true;
+export async function getWebSessionState(sessionId: string, vehicleCode: string, owner: string) {
+  const session = await repository.getWebSession(sessionId);
+  if (
+    !session ||
+    session.consumed ||
+    session.owner_hash !== hashWebSessionOwner(owner) ||
+    session.vehicle_code !== vehicleCode
+  ) {
+    return null;
+  }
+  return session;
 }
 
-export function reserveWebSession(id: string, vehicleCode: string, owner: string): boolean {
-  if (!validateWebSession(id, vehicleCode, owner)) return false;
-  sessions.get(id)!.reserved = true;
-  return true;
+export async function getWebSessionExpiry(sessionId: string, vehicleCode: string, owner: string): Promise<string | null> {
+  return (await getWebSessionState(sessionId, vehicleCode, owner))?.expires_at ?? null;
 }
-export function releaseWebSession(id: string, owner: string) {
-  const session = sessions.get(id);
-  if (session?.owner === owner) session.reserved = false;
+
+export async function reserveWebSession(sessionId: string, vehicleCode: string, owner: string): Promise<boolean> {
+  const session = await repository.reserveWebSession(
+    sessionId,
+    vehicleCode,
+    hashWebSessionOwner(owner),
+  );
+  return !!session;
+}
+
+export async function releaseWebSession(sessionId: string, owner: string): Promise<void> {
+  await repository.releaseWebSession(sessionId, hashWebSessionOwner(owner));
+}
+
+export async function attachPaymentToWebSession(sessionId: string, owner: string, paymentId: string): Promise<boolean> {
+  return repository.attachPaymentToWebSession(sessionId, hashWebSessionOwner(owner), paymentId);
+}
+
+export async function consumeWebSession(sessionId: string, paymentId?: string): Promise<boolean> {
+  return repository.consumeWebSession(sessionId, paymentId);
 }

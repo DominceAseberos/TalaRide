@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Copy, Icon, IconButton, Title, go } from '@/components/ui';
 import { PortalShell } from '@/components/PortalShell';
@@ -5,14 +6,30 @@ import { RideRow } from '@/components/RideRow';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/auth/AuthProvider';
 import { useMock } from '@/mocks/MockProvider';
-
-const REWARD_THRESHOLD = 10;
+import { fetchRewards, type RewardsMe } from '@/api/rewards';
 
 export default function HomeScreen() {
-  const { displayName } = useAuth();
+  const { displayName, session } = useAuth();
   const { rides, ridesLoading, ridesError } = useMock();
   const recent = rides.slice(0, 1);
-  const progress = Math.min(rides.length % (REWARD_THRESHOLD + 1), REWARD_THRESHOLD);
+  const [rewardsState, setRewardsState] = useState<{ ownerId: string; data: RewardsMe } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const ownerId = session?.user.id;
+    if (!ownerId) return;
+    void fetchRewards().then((value) => {
+      if (active) setRewardsState({ ownerId, data: value });
+    });
+    return () => {
+      active = false;
+    };
+  }, [session?.user.id, rides.length]);
+
+  const rewards =
+    rewardsState && rewardsState.ownerId === session?.user.id ? rewardsState.data : null;
+  const progress = rewards?.current ?? 0;
+  const rewardThreshold = rewards?.threshold ?? 10;
   return (
     <PortalShell
       activeTab="home"
@@ -79,7 +96,7 @@ export default function HomeScreen() {
             Rewards
           </Copy>
           <Copy style={{ fontSize: 12, color: colors.muted }}>
-            {progress} / {REWARD_THRESHOLD} rides
+            {progress} / {rewardThreshold} points
           </Copy>
         </Pressable>
       </View>

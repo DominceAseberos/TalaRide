@@ -8,6 +8,7 @@ export interface PayMongoCheckoutOptions {
   amountCentavos: number;
   paymentMethod?: 'gcash' | 'maya' | 'card' | 'qrph';
   description?: string;
+  returnHandoff?: string | null;
 }
 
 export interface PayMongoCheckoutResult {
@@ -126,7 +127,7 @@ export async function createPayMongoDirectGcash(
           attributes: {
             payment_method: paymentMethodId,
             client_key: clientKey,
-            return_url: `${publicWebOrigin}/success?payment_id=${encodeURIComponent(options.paymentId)}`
+            return_url: `${publicWebOrigin}/success?payment_id=${encodeURIComponent(options.paymentId)}${options.returnHandoff ? `&handoff=${encodeURIComponent(options.returnHandoff)}` : ''}`
           }
         }
       })
@@ -185,8 +186,8 @@ export async function createPayMongoCheckout(
         send_email_receipt: false,
         show_description: true,
         show_line_items: true,
-        cancel_url: `${publicWebOrigin}/cancel?payment_id=${encodeURIComponent(options.paymentId)}`,
-        success_url: `${publicWebOrigin}/success?payment_id=${encodeURIComponent(options.paymentId)}`,
+        cancel_url: `${publicWebOrigin}/cancel?payment_id=${encodeURIComponent(options.paymentId)}${options.returnHandoff ? `&handoff=${encodeURIComponent(options.returnHandoff)}` : ''}`,
+        success_url: `${publicWebOrigin}/success?payment_id=${encodeURIComponent(options.paymentId)}${options.returnHandoff ? `&handoff=${encodeURIComponent(options.returnHandoff)}` : ''}`,
         description: `TalaRide fare for ${options.vehicleCode} (Ride #${options.rideId})`,
         payment_method_types: selectedPaymentMethod,
         reference_number: options.paymentId,

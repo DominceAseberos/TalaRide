@@ -68,10 +68,10 @@ export async function fetchRewards(): Promise<RewardsMe> {
   }
 }
 
-export async function claimReward(rewardType: RewardClaimType): Promise<RewardVoucher> {
+export async function claimReward(rewardType: RewardClaimType, clientOperationId: string): Promise<RewardVoucher> {
   const result = await apiRequest<{ success: boolean; voucher: RewardVoucher }>('/rewards/redeem', {
     method: 'POST',
-    body: JSON.stringify({ reward_type: rewardType }),
+    body: JSON.stringify({ reward_type: rewardType, client_operation_id: clientOperationId }),
   });
   return result.voucher;
 }

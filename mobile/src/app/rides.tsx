@@ -29,7 +29,7 @@ export default function RidesScreen() {
     let active = true;
     void (async () => {
       try {
-        const pending = await listPendingOutbox(100);
+        const pending = session ? await listPendingOutbox(session.user.id, 100) : [];
         if (active) setPendingCount(pending.length);
       } catch {}
       await triggerSync().catch(() => {});

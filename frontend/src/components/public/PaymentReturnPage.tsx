@@ -4,10 +4,11 @@ import { api } from '../../services/api';
 
 interface Props {
   paymentId: string;
+  handoff?: string;
   cancelled?: boolean;
 }
 
-export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = false }) => {
+export const PaymentReturnPage: React.FC<Props> = ({ paymentId, handoff, cancelled = false }) => {
   const [state, setState] = useState<'checking' | 'confirmed' | 'pending' | 'failed'>(
     cancelled ? 'failed' : 'checking'
   );
@@ -45,14 +46,20 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
       }
 
       try {
-        const res = await api.getConfirmedPaymentResult(paymentId);
+        const res = await api.getConfirmedPaymentResult(paymentId, handoff);
         setResult(res);
         if (res.success) {
           terminalStateReached.current = true;
           stopPolling();
           setResult(res);
           setState('confirmed');
-          setMessage(res.payment.payment_environment === 'test' ? 'Test confirmed by PayMongo. No real money was charged.' : 'Payment confirmed by TalaRide.');
+          setMessage(
+            res.payment.payment_mode === 'mock'
+              ? 'TalaRide simulated payment confirmed. No real money was charged.'
+              : res.payment.payment_environment === 'test'
+                ? 'PayMongo test payment confirmed. No real money was charged.'
+                : 'Payment confirmed by TalaRide.'
+          );
           return;
         }
 
@@ -91,7 +98,7 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
         verifyInFlight.current = false;
       }
     },
-    [cancelled, paymentId, stopPolling]
+    [cancelled, handoff, paymentId, stopPolling]
   );
 
   const openTalaRide = useCallback(
@@ -180,7 +187,7 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
           <div>
             <h1 className="text-xl font-semibold">
               {state === 'confirmed'
-                ? (result?.payment?.payment_environment === 'test' ? 'Test payment successful' : 'Payment successful')
+                ? (result?.payment?.payment_mode === 'mock' ? 'Simulated payment successful' : result?.payment?.payment_environment === 'test' ? 'Test payment successful' : 'Payment successful')
                 : state === 'failed'
                   ? 'Payment not completed'
                   : 'Verifying payment'}
@@ -239,7 +246,7 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, cancelled = fals
             </div>
             <div className="rounded-2xl border border-line bg-warning-soft p-4">
               <div className="text-sm font-semibold text-warning">🎟 Vouchers & rewards</div>
-              <p className="mt-1 text-xs text-warning">Coming soon.</p>
+              <p className="mt-1 text-xs text-warning">Eligible completed rides are added to your backend TalaRide reward balance. Open Rewards in the app to see your current points and vouchers.</p>
             </div>
           </div>
         )}
