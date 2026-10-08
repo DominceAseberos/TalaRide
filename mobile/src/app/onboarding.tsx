@@ -23,7 +23,7 @@ const pages = [
     art: 'community' as IllustrationName,
     eyebrow: 'RIDE HISTORY & REWARDS',
     title: 'Ride, earn, and keep track',
-    body: 'Earn TalaPoints on completed digital rides and track progress toward vouchers. Voucher claiming and redemption are coming soon. Your trip history also helps with lost-item follow-up.',
+    body: 'Earn TalaPoints on eligible digital rides, then claim available vouchers in Rewards. Test vouchers are for preview only and cannot be spent. Your trip history also helps with lost-item follow-up.',
   },
 ] as const;
 

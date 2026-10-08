@@ -16,9 +16,15 @@ export function RewardsPanel({ audience }: { audience: 'passenger' | 'driver' })
   const [error, setError] = useState('');
   const rewardType: RewardClaimType = audience === 'passenger' ? 'drink_voucher' : 'fuel_discount';
   const title = audience === 'passenger' ? 'Ride rewards' : 'Driver rewards';
-  const offer = audience === 'passenger'
-    ? 'Claim one drink voucher worth up to ₱50 after 10 confirmed paid digital rides.'
-    : 'Claim 10% off Petron gasoline after 10 confirmed paid digital rides, up to ₱50. Gasoline only; diesel excluded.';
+  const offer = !rewards
+    ? 'Rewards are based on eligible, server-confirmed digital rides.'
+    : rewards.test_mode
+      ? audience === 'passenger'
+        ? 'Preview a test-only drink voucher after 10 eligible digital rides.'
+        : 'Preview a test-only fuel-discount voucher after 10 eligible digital rides.'
+      : audience === 'passenger'
+        ? 'Claim an available passenger voucher after 10 eligible digital rides.'
+        : 'Claim an available driver fuel voucher after 10 eligible digital rides.';
   const claimLabel = audience === 'passenger' ? 'Claim drink voucher' : 'Claim fuel discount';
 
   useEffect(() => {
@@ -91,9 +97,11 @@ export function RewardsPanel({ audience }: { audience: 'passenger' | 'driver' })
           onPress={() => void claim()}
         />
         <Copy style={{ marginTop: 10, fontSize: 12, color: colors.muted }}>
-          {rewards?.test_mode
+          {!rewards
+            ? 'Reward availability and partner terms load from TalaRide.'
+            : rewards.test_mode
             ? 'Test voucher only · no real drink or fuel discount is issued.'
-            : 'Voucher codes are for participating partners and expire 30 days after claim.'}
+            : 'Voucher codes are valid only with active participating partners and expire 30 days after claim.'}
         </Copy>
       </Card>
       {(displayedClaim?.code || claimed?.voucher_code) && (

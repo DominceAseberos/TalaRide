@@ -181,7 +181,11 @@ export default function PaymentStatusScreen() {
 
           <Card style={{ marginTop: 12, backgroundColor: colors.paleGreen }}>
             <Copy bold style={{ color: colors.darkGreen }}>Rewards & vouchers</Copy>
-            <Copy style={{ marginTop: 4, color: colors.muted }}>Eligible completed rides are added to your backend reward balance. Open Rewards to see your current progress.</Copy>
+            <Copy style={{ marginTop: 4, color: colors.muted }}>
+              {simulated || testPayment
+                ? 'This demo/test payment does not issue a production reward. Open Rewards to view the matching test environment.'
+                : 'Eligible completed rides are added to your TalaRide reward balance. Open Rewards to see your current progress.'}
+            </Copy>
           </Card>
 
           <View style={{ gap: 10, marginTop: 16 }}>

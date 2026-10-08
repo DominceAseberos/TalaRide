@@ -1,6 +1,6 @@
 {
   "name": "@talaride/mobile",
-  "version": "1.2.12",
+  "version": "1.2.13",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/roboto": "^0.4.3",
@@ -54,7 +54,7 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=2 tests/*.test.cjs",
+    "test": "node --require ./tests/setup-test-env.cjs --test --test-concurrency=2 tests/*.test.cjs",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",

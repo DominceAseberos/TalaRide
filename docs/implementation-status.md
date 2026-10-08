@@ -1,5 +1,10 @@
 # TalaRide — Goal + Implementation Status
 
+> Historical planning snapshot (before the unified monorepo). References to
+> Next.js, `apps/web`, and unbuilt web/backend services below are superseded.
+> For the current source layout see [README.md](../README.md); for remaining
+> demonstration checks see [presentation-readiness-2026-10-08.md](presentation-readiness-2026-10-08.md).
+
 ## 1. Goal
 TalaRide MVP proves: tricycle drivers accept digital payments, commuters pay fast via QR Ph apps (GCash/Maya/GoTyme/banks) or cash, app adds ride records/safety/lost-item/rewards value, every ride resolves to driver + vehicle + transaction + time. Cash stays. App never mandatory for guest pay. One thing well: `Scan → See ₱30 → Pay → ✓`.
 

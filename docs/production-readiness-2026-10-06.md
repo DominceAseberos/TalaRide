@@ -1,5 +1,11 @@
 # Production preparation — 6 October 2026
 
+> Historical snapshot. As of 2026-10-08, the Android workflow expects the
+> `AD:1C:AC:12:...:77:EE` signer instead of the `e714...c914d8` signer cited
+> below, and the current presentation candidate is 1.2.13 (versionCode 15). Verify the
+> APK already installed on each device before assuming an in-place update is
+> possible. See [App Updates](app-updates.md) for the signing migration warning.
+
 Status: the user manually applied backend storage SQL and returned all four verification checks as true. The account/QR update was merged as 10fdb00 and published on Vercel. Initial Render startup failed because the service-role field held a publishable key and the payment key was not live. The user reports correcting the Supabase key and explicitly requested keeping the existing PayMongo test gateway. The follow-up selects PAYMENT_ENVIRONMENT=test while retaining provider-authoritative PAYMENT_MODE=live; its deployment is being verified. The broader product is not yet fully production-ready; remaining integration is listed below.
 
 ## Implemented in this snapshot

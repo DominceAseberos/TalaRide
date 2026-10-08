@@ -1,9 +1,16 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 process.env.NODE_ENV = 'test';
 process.env.DEMO_AUTH = 'true';
 process.env.PAYMENT_MODE = 'mock';
 process.env.PAYMENT_ENVIRONMENT = 'test';
 process.env.ALLOW_EPHEMERAL_STATE = 'true';
-process.env.DATA_DIR = '';
+// Each test process gets isolated writable persistence, even when the source
+// checkout is mounted read-only (CI/sandbox). Persistence tests can still
+// construct a second repository instance and read the same on-disk records.
+process.env.DATA_DIR = mkdtempSync(join(tmpdir(), 'talaride-backend-test-'));
 process.env.SUPABASE_URL = 'https://example.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
 process.env.SUPABASE_JWT_SECRET = 'test-jwt-secret';
