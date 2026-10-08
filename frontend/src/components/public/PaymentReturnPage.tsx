@@ -246,7 +246,11 @@ export const PaymentReturnPage: React.FC<Props> = ({ paymentId, handoff, cancell
             </div>
             <div className="rounded-2xl border border-line bg-warning-soft p-4">
               <div className="text-sm font-semibold text-warning">🎟 Vouchers & rewards</div>
-              <p className="mt-1 text-xs text-warning">Eligible completed rides are added to your backend TalaRide reward balance. Open Rewards in the app to see your current points and vouchers.</p>
+              <p className="mt-1 text-xs text-warning">
+                {result?.payment?.payment_mode === 'mock' || result?.payment?.payment_environment === 'test'
+                  ? 'This demo/test payment does not issue a production reward. Open Rewards in the app to view the matching test environment.'
+                  : 'Eligible completed rides are added to your TalaRide reward balance. Open Rewards in the app to see your current points and vouchers.'}
+              </p>
             </div>
           </div>
         )}

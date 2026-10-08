@@ -1,5 +1,10 @@
 # TalaRide v1.2.7
 
+> Historical release notes. The current Android workflow (2026-10-08) expects a
+> different signer (`AD:1C:AC:12:...:77:EE`); the fingerprint below is the
+> requirement recorded for this older release, not for new builds. Confirm
+> actual installed/build APK signatures before attempting any upgrade.
+
 Android package: `com.beepanjero.talaride`
 
 Android version code: `9`

@@ -10,6 +10,7 @@ interface Props {
 
 export const CommuterRewards: React.FC<Props> = ({ userId = 'USR-COM-001', onBack }) => {
   const [data, setData] = useState<any>(null);
+  const [loadError, setLoadError] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
   const [unlockedVoucher, setUnlockedVoucher] = useState<any>(null);
   const claimOperation = useRef<string | null>(null);
@@ -18,11 +19,13 @@ export const CommuterRewards: React.FC<Props> = ({ userId = 'USR-COM-001', onBac
     try {
       const res = await api.getRewards(userId);
       setData(res);
+      setLoadError(false);
       if (res.activeVoucher) {
         setUnlockedVoucher(res.activeVoucher);
       }
     } catch (e) {
       console.warn('Rewards load fallback', e);
+      setLoadError(true);
       setData({
         currentPoints: 0,
         targetMilestone: 10,
@@ -38,6 +41,7 @@ export const CommuterRewards: React.FC<Props> = ({ userId = 'USR-COM-001', onBac
       .then((res) => {
         if (!ignore) {
           setData(res);
+          setLoadError(false);
           if (res.activeVoucher) {
             setUnlockedVoucher(res.activeVoucher);
           }
@@ -46,10 +50,11 @@ export const CommuterRewards: React.FC<Props> = ({ userId = 'USR-COM-001', onBac
       .catch((e) => {
         if (!ignore) {
           console.warn('Rewards load fallback', e);
+          setLoadError(true);
           setData({
-            currentPoints: 8,
+            currentPoints: 0,
             targetMilestone: 10,
-            progressTowardsMilestone: 8,
+            progressTowardsMilestone: 0,
             unlockedRewardsCount: 0
           });
         }
@@ -100,6 +105,11 @@ export const CommuterRewards: React.FC<Props> = ({ userId = 'USR-COM-001', onBac
             {points} TalaPoints
           </span>
         </div>
+        {loadError && (
+          <p role="alert" className="text-xs text-amber-800">
+            Reward balance could not be loaded. Displayed points are not confirmed.
+          </p>
+        )}
 
         {/* Milestone Card */}
         <div className="bg-linear-to-br from-emerald-600 to-teal-700 text-white rounded-3xl p-6 shadow-xl shadow-emerald-600/20 space-y-4">
@@ -116,7 +126,7 @@ export const CommuterRewards: React.FC<Props> = ({ userId = 'USR-COM-001', onBac
           <div className="space-y-1">
             <h3 className="text-2xl font-black">10-Ride Reward Voucher</h3>
             <p className="text-xs text-emerald-100">
-              Earn 1 TalaPoint for every completed digital ride. Reach 10 to unlock your reward voucher.
+              Eligible, server-confirmed paid digital rides may earn TalaPoints. Reach 10 to unlock a promotional voucher.
             </p>
           </div>
 
@@ -152,17 +162,17 @@ export const CommuterRewards: React.FC<Props> = ({ userId = 'USR-COM-001', onBac
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-amber-800 uppercase flex items-center gap-1">
                 <Ticket className="w-4 h-4 text-amber-600" />
-                Active Promotional Voucher
+                Promotional Voucher Record
               </span>
               <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded font-bold">
-                READY TO USE
+                {data?.testMode ? 'TEST ONLY' : 'PARTNER VERIFICATION REQUIRED'}
               </span>
             </div>
             <div className="font-mono text-xl font-black text-slate-900 tracking-wider">
               {unlockedVoucher.voucherCode || unlockedVoucher.code || 'TALA-PROMO-10RIDE'}
             </div>
             <p className="text-xs text-slate-600">
-              Show to participating TODA terminal or partner merchant for ₱20 fare credit / discount.
+              Test vouchers cannot be redeemed for goods or discounts. Live offers require an active participating partner before redemption.
             </p>
           </div>
         )}
@@ -174,7 +184,7 @@ export const CommuterRewards: React.FC<Props> = ({ userId = 'USR-COM-001', onBac
             <span>Fair Play & Rewards Verification Policy</span>
           </div>
           <p className="text-[11px] leading-relaxed text-slate-500">
-            Points are credited only upon verified server confirmation from the QR Ph gateway. Repetitive ₱1 micro-transactions or duplicate driver-passenger looping are automatically flagged and excluded.
+            Only eligible, server-confirmed payments may earn rewards. Test payments do not earn production rewards.
           </p>
           <div className="text-[10px] text-slate-400 border-t border-slate-100 pt-1.5">
             Disclaimer: Promotional reward values and availability are controlled by TalaRide and local TODA sponsors. Rewards have no independent cash value.

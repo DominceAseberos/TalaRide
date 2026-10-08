@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Share, View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import {
   ActionRow,
@@ -27,7 +27,7 @@ export default function RideDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { rides, updateRide, deleteRide } = useMock();
   const ride = rides.find((item) => item.id === id);
-  const [dialog, setDialog] = useState<'edit' | 'share' | 'delete' | 'menu' | null>(null);
+  const [dialog, setDialog] = useState<'edit' | 'shareError' | 'delete' | 'menu' | null>(null);
   const [note, setNote] = useState('');
   const [location, setLocation] = useState('');
   const [error, setError] = useState('');
@@ -55,6 +55,22 @@ export default function RideDetailsScreen() {
     setNote(ride!.note);
     setLocation(ride!.location);
     setDialog('edit');
+  }
+  async function shareRide() {
+    setDialog(null);
+    try {
+      await Share.share({
+        title: 'TalaRide ride summary',
+        message: [
+          'TalaRide ride summary',
+          `Ride: TR-${ride!.number.replace(/^TR-/i, '')}`,
+          `Date: ${formatDate(ride!.date)}`,
+          `Identifier: ${ride!.identifier}`,
+        ].join('\n'),
+      });
+    } catch {
+      setDialog('shareError');
+    }
   }
   return (
     <Screen>
@@ -124,8 +140,8 @@ export default function RideDetailsScreen() {
       <ActionRow icon="pencil-outline" label="Edit Note / Location" onPress={openEdit} />
       <ActionRow
         icon="share-social-outline"
-        label="Share (Image)"
-        onPress={() => setDialog('share')}
+        label="Share Ride"
+        onPress={() => void shareRide()}
       />
       <View style={{ height: 12 }} />
       <ActionRow
@@ -159,18 +175,12 @@ export default function RideDetailsScreen() {
           {!!error && <Copy accessibilityRole="alert">{error}</Copy>}
         </Notice>
       )}
-      {dialog === 'share' && (
+      {dialog === 'shareError' && (
         <Notice
-          title="Share Ride"
-          message="Ride image sharing will be available in the next feature phase. Here is the ride summary."
+          title="Unable to share ride"
+          message="The share sheet could not be opened. Please try again."
           onClose={() => setDialog(null)}
-        >
-          <Card>
-            <Title>TalaRide · #{ride.number}</Title>
-            <Copy>{formatDate(ride.date)}</Copy>
-            <Copy>{ride.identifier}</Copy>
-          </Card>
-        </Notice>
+        />
       )}
       {dialog === 'delete' && (
         <Notice
@@ -191,8 +201,8 @@ export default function RideDetailsScreen() {
           <ActionRow icon="pencil-outline" label="Edit Note / Location" onPress={openEdit} />
           <ActionRow
             icon="share-social-outline"
-            label="Share (Image)"
-            onPress={() => setDialog('share')}
+            label="Share Ride"
+            onPress={() => void shareRide()}
           />
           <ActionRow
             icon="trash-outline"
