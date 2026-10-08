@@ -141,6 +141,8 @@ jobs:
           cd mobile/android
           # Expo generates the Android project during this workflow.
           # Limit concurrent Kotlin compilation and increase Gradle's Metaspace budget.
+          # The Expo-generated gradle.properties may not end in a newline.
+          printf '\n' >> gradle.properties
           cat >> gradle.properties <<'EOF'
           org.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8
           org.gradle.workers.max=2
