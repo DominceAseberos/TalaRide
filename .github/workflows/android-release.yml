@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 90
     env:
       RELEASE_TAG: ${{ inputs.release_tag }}
-      EXPECTED_SIGNER_SHA256: E7:14:87:90:93:DB:3A:6E:24:5D:49:22:78:AD:B3:67:48:A0:EF:69:5A:62:78:4B:D0:14:66:C0:30:C9:14:D8
+      EXPECTED_SIGNER_SHA256: AD:1C:AC:12:00:08:24:5B:12:92:3F:71:74:BF:DB:73:78:BB:46:DF:9E:F3:66:D3:95:E3:5F:91:35:F1:77:EE
 
     steps:
       - name: Check out release source
