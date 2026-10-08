@@ -49,7 +49,7 @@ test('Expo/mobile-facing HTTP contract completes a payment end to end', async ()
 
     const intent = await json(base, '/payment-intent', {
       method: 'POST',
-      headers: driverHeaders,
+      headers: passengerHeaders,
       body: JSON.stringify({
         driver_code: 'DR-000481',
         vehicle_code: 'TR-01842',

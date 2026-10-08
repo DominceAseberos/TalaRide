@@ -29,6 +29,9 @@ paymentIntentRouter.post('/', paymentIntentRateLimiter, optionalAuth, async (req
   let completed = false;
   const owner = req.get('x-ride-owner') || '';
   try {
+    if (req.user && req.user.role !== 'passenger') {
+      return res.status(403).json({ error: 'Passenger payment QR', message: 'This QR is for passengers paying a fare. Driver and staff accounts cannot make passenger payments.' });
+    }
     if (env.PAYMENT_MODE === 'mock' && !paymentSimulationConfigured()) {
       return res.status(503).json({ error: 'Payment simulation is not enabled for this deployment.' });
     }

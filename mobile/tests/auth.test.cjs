@@ -521,7 +521,7 @@ test('protected route declarations hide private screens during initialization, o
   await act(async () => {
     tree.update(element());
   });
-  assert.deepEqual(routes(), ['index', 'auth-callback', 'staff-account']);
+  assert.deepEqual(routes(), ['index', 'auth-callback', 'v/[vehicle]', 'staff-account']);
   state = { ready: true, onboardingComplete: true, signedIn: true, profile: null };
   await act(async () => {
     tree.update(element());
@@ -1004,6 +1004,7 @@ test('driver waits for admin approval then dashboard and saved membership update
     'src/app/driver.tsx',
     {
       'react-native': {
+        ActivityIndicator: 'ActivityIndicator',
         Image: 'Image',
         TextInput: 'TextInput',
         View: 'View',
@@ -1070,6 +1071,8 @@ test('driver waits for admin approval then dashboard and saved membership update
         return 1;
       },
       clearInterval() {},
+      setTimeout: () => 1,
+      clearTimeout() {},
     },
   );
   let tree;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AppState, Image, TextInput, View } from 'react-native';
+import { ActivityIndicator, AppState, Image, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Screen } from '@/components/Screen';
@@ -77,6 +77,9 @@ function DriverAccountScreen() {
   const [fares, setFares] = useState<Awaited<ReturnType<typeof fetchFares>>>([]);
   const [online, setOnline] = useState(false);
   const [error, setError] = useState('');
+  const [accountLoading, setAccountLoading] = useState(true);
+  const [accountSlow, setAccountSlow] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
   const [busy, setBusy] = useState(false);
   const [notifications, setNotifications] = useState<DriverNotification[]>([]);
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -100,6 +103,9 @@ function DriverAccountScreen() {
     async function refresh() {
       if (inFlight || !active) return;
       inFlight = true;
+      setAccountLoading(true);
+      setAccountSlow(false);
+      const slowTimer = setTimeout(() => { if (active) setAccountSlow(true); }, 8000);
       try {
         const value = await apiRequest<Account>('/auth/me');
         if (!active) return;
@@ -154,6 +160,7 @@ function DriverAccountScreen() {
         setOnline(false);
         if (failure instanceof ApiError && (failure.status === 401 || failure.status === 403)) {
           setAccount(null);
+          setError('Your driver session is not authorized. Sign in again or contact support.');
           await AsyncStorage.removeItem(`talaride.driver-account:${userId}`);
           return;
         }
@@ -175,6 +182,8 @@ function DriverAccountScreen() {
           setError('Could not refresh driver details. Saved information may be out of date.');
         }
       } finally {
+        clearTimeout(slowTimer);
+        if (active) { setAccountLoading(false); setAccountSlow(false); }
         inFlight = false;
       }
     }
@@ -189,7 +198,7 @@ function DriverAccountScreen() {
       clearInterval(timer);
       appState.remove();
     };
-  }, [userId, isPendingApproval]);
+  }, [userId, isPendingApproval, reloadToken]);
 
   async function shift() {
     if (!driver || !vehicle || busy) return;
@@ -324,7 +333,13 @@ function DriverAccountScreen() {
     return (
       <Screen>
         <Card>
-          <Copy>{error || 'Loading your driver account…'}</Copy>
+          <Title>{error ? "Couldn't load your driver account" : accountSlow ? 'Still loading your driver account' : 'Loading your driver account'}</Title>
+          <Copy>{error || (accountSlow ? 'This is taking longer than expected. You can try again.' : 'Checking your driver account…')}</Copy>
+          {accountLoading && <ActivityIndicator color={colors.green} />}
+          {(!!error || accountSlow) && <View style={{ gap: 10, marginTop: 12 }}>
+            <Button label="Try again" onPress={() => { setError(''); setReloadToken((value) => value + 1); }} />
+            <Button label="Sign out" variant="outline" onPress={() => void signOut()} />
+          </View>}
         </Card>
       </Screen>
     );

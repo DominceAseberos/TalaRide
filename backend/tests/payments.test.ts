@@ -14,6 +14,20 @@ describe('Payment Intent & Settlement Verification (Section 8, 10, 11, 12, 14, 1
     await stopTestServer();
   });
 
+  test('staff roles cannot create passenger payment intents', async () => {
+    for (const token of ['mock-driver-token', 'mock-admin-token']) {
+      const before = (await repository.getAllPayments()).length;
+      const response = await request('/api/payment-intent', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: { driver_code: 'DR-000481', vehicle_code: 'TR-01842', amount_centavos: 1500 }
+      });
+      assert.equal(response.status, 403);
+      assert.equal(response.body.error, 'Passenger payment QR');
+      assert.equal((await repository.getAllPayments()).length, before);
+    }
+  });
+
   test('✓ fake driver → 404', async () => {
     const res = await request('/api/payment-intent', {
       method: 'POST',

@@ -7,13 +7,12 @@ import { Roboto_500Medium } from '@expo-google-fonts/roboto/500Medium';
 import { Roboto_700Bold } from '@expo-google-fonts/roboto/700Bold';
 import { useEffect } from 'react';
 import { prepareScanCache } from '@/scan/draft';
-import { AuthProvider } from '@/auth/AuthProvider';
+import { AuthProvider, useAuth } from '@/auth/AuthProvider';
 import { ActivityIndicator, AppState, View } from 'react-native';
 import { NotificationProvider } from '@/notifications/NotificationProvider';
 import { triggerSync } from '@/api/sync';
 import { Brand, Copy } from '@/components/ui';
 import { colors } from '@/constants/theme';
-import { useAuth } from '@/auth/AuthProvider';
 
 function AppStack() {
   const { ready, onboardingComplete, signedIn } = useMock();
@@ -32,15 +31,15 @@ function AppStack() {
       >
         <Brand />
         <ActivityIndicator color={colors.green} accessibilityLabel="Restoring your session" />
-        <Copy>Loading TalaRide…</Copy>
+        <Copy>Restoring your account…</Copy>
       </View>
     );
   return (
     <Stack screenOptions={{ headerShown: false, animation: 'fade', animationDuration: 450 }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="auth-callback" />
+      <Stack.Screen name="v/[vehicle]" />
       <Stack.Protected guard={!signedIn || profile?.role === 'passenger'}>
-        <Stack.Screen name="v/[vehicle]" />
         <Stack.Screen name="ride-confirm" />
         <Stack.Screen name="payment-status" />
       </Stack.Protected>
