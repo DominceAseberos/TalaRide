@@ -124,6 +124,12 @@ jobs:
           echo "Release signer SHA-256: $ACTUAL"
           test "$ACTUAL" = "$EXPECTED_SIGNER_SHA256"
 
+      - name: Diagnose Android autolinking
+        run: |
+          cd mobile
+          node --no-warnings --eval "require(require.resolve('expo-modules-autolinking', { paths: [require.resolve('expo/package.json')] }))(process.argv.slice(1))" react-native-config --json --platform android > /tmp/talaride-android-autolinking.json
+          node -e "const c = require('/tmp/talaride-android-autolinking.json'); console.log('Android autolinking found', Object.keys(c.dependencies || {}).length, 'dependencies')"
+
       - name: Build signed Android APK
         env:
           NODE_ENV: production
@@ -141,7 +147,7 @@ jobs:
           org.gradle.parallel=false
           kotlin.compiler.execution.strategy=in-process
           EOF
-          ./gradlew app:assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon --max-workers=2 --no-parallel
+          ./gradlew app:assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon --max-workers=2 --no-parallel --stacktrace --info
 
       - name: Verify finished APK signer and package
         shell: bash
