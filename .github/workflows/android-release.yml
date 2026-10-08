@@ -133,7 +133,15 @@ jobs:
           TALARIDE_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           cd mobile/android
-          ./gradlew app:assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+          # Expo generates the Android project during this workflow.
+          # Limit concurrent Kotlin compilation and increase Gradle's Metaspace budget.
+          cat >> gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8
+          org.gradle.workers.max=2
+          org.gradle.parallel=false
+          kotlin.compiler.execution.strategy=in-process
+          EOF
+          ./gradlew app:assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon --max-workers=2 --no-parallel
 
       - name: Verify finished APK signer and package
         shell: bash
